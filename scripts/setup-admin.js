@@ -4,12 +4,12 @@ const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
 
 async function main() {
-    const email = process.argv[2];
-    const password = process.argv[3];
+    const email = (process.argv[2] || process.env.ADMIN_EMAIL || "").trim();
+    const password = (process.argv[3] || process.env.ADMIN_PASSWORD || "").trim();
 
     if (!email) {
-        console.error("Please provide email. Usage: node scripts/setup-admin.js <email> [password]");
-        process.exit(1);
+        console.log("No ADMIN_EMAIL provided. Skipping auto-admin setup.");
+        return;
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -29,8 +29,8 @@ async function main() {
         console.log("User promoted and password updated successfully!");
     } else {
         if (!password) {
-            console.error("Password required for new user. Usage: node scripts/setup-admin.js <email> <password>");
-            process.exit(1);
+            console.log("Password not provided for new user. Skipping admin creation.");
+            return;
         }
 
         console.log(`Creating new SUPERADMIN user ${email}...`);
