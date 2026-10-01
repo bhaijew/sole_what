@@ -1,6 +1,6 @@
 # 🗄️ Database Setup Guide
 
-This guide will help you set up the database for **WA-AKG**. The project uses **Prisma ORM**, which supports PostgreSQL, MySQL, SQLite, and MongoDB.
+This guide will help you set up the database for **Sole-what**. The project uses **Prisma ORM**, which supports PostgreSQL, MySQL, SQLite, and MongoDB.
 
 ## 1. Prerequisites
 
@@ -12,7 +12,7 @@ Ensure you have a database server running.
 
 ## 2. Docker Compose Setup (Alternative)
 
-WA-AKG menyertakan `docker-compose.yml` di root project yang mendefinisikan container MySQL 8.0 (`wa-akg-db`) dan aplikasi (`wa-akg-app`).
+Sole-what menyertakan `docker-compose.yml` di root project yang mendefinisikan container MySQL 8.0 (`sole-what-db`) dan aplikasi (`sole-what-app`).
 
 1. **Siapkan Environment**:
    ```bash
@@ -38,12 +38,12 @@ Edit your `.env` file and set the `DATABASE_URL`.
 
 ### MySQL
 ```env
-DATABASE_URL="mysql://user:pass@db-host:3306/wa_akg"
+DATABASE_URL="mysql://user:pass@db-host:3306/sole_what"
 ```
 
 ### PostgreSQL
 ```env
-DATABASE_URL="postgresql://user:pass@db-host:5432/wa_akg?schema=public"
+DATABASE_URL="postgresql://user:pass@db-host:5432/sole_what?schema=public"
 ```
 
 ## 3. Initialization Commands

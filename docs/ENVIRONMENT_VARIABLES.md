@@ -1,6 +1,6 @@
 # 🔐 Environment Variables Guide
 
-This document provides a comprehensive reference for all configuration options available in **WA-AKG**. 
+This document provides a comprehensive reference for all configuration options available in **Sole-what**. 
 
 > [!WARNING]
 > Never commit your `.env` file to version control (Git). It contains sensitive credentials that could compromise your system.
@@ -41,7 +41,7 @@ Branding attributes and client interface pagination settings.
 
 | Variable | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `APP_NAME` | string | `WA-AKG` | Custom name displayed across the login screens, dashboard header, and sidebar footer. |
+| `APP_NAME` | string | `Sole-what` | Custom name displayed across the login screens, dashboard header, and sidebar footer. |
 | `LOGO_URL` | string | — | Custom image URL for your brand logo (leave empty to use default asset). |
 | `FAVICON_URL` | string | — | Custom image URL for the browser tab favicon (leave empty to use default asset). |
 | `NEXT_PUBLIC_CHAT_PAGE_SIZE` | number | `50` | Default number of conversations loaded per page in the chat window. |
@@ -115,7 +115,7 @@ Required ONLY if utilizing the `docker-compose.yml` stack deployment.
 | Variable | Required | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `MYSQL_ROOT_PASSWORD` | **Yes** | — | Root access password for the MySQL container. |
-| `MYSQL_DATABASE` | No | `wa_akg` | Target schema database name. |
+| `MYSQL_DATABASE` | No | `sole_what` | Target schema database name. |
 | `ADMIN_EMAIL` | **Yes** | — | Email of the default SuperAdmin generated on first boot. |
 | `ADMIN_PASSWORD` | **Yes** | — | Password of the default SuperAdmin generated on first boot. |
 

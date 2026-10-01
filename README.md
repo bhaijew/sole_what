@@ -6,7 +6,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
-[![Repository](https://img.shields.io/badge/GitHub-Sole--what-blue?style=for-the-badge&logo=github)](https://github.com/zeeshan912989/Sole-what)
+[![Repository](https://img.shields.io/badge/GitHub-Sole--what-blue?style=for-the-badge&logo=github)](https://github.com/bhaijew/sole_what)
 
 **A professional multi-session WhatsApp Gateway, Interactive Messaging, Drip Marketing, and AI Auto-Responder System.**  
 Built with **Next.js**, **React**, **Prisma**, and **Baileys** for high-performance messaging automation and real-time WhatsApp Bot services.
@@ -97,8 +97,8 @@ graph LR
 ### 2. Setup
 ```bash
 # Clone and install
-git clone https://github.com/zeeshan912989/Sole-what.git
-cd Sole-what
+git clone https://github.com/bhaijew/sole_what.git
+cd sole-what
 npm install
 
 # Configure environment
@@ -157,4 +157,3 @@ Developed and Maintained by **[Zeeshan](https://github.com/zeeshan912989)**
 <div align="center">
   Built with ❤️ for <b>Sole-what</b>
 </div>
-"# sole_what" 

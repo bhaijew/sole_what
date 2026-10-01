@@ -1,12 +1,12 @@
-# Contributing to WA-AKG
+# Contributing to sole-what
 
 Thanks for your interest in contributing! 🎉
 
 ## Development Setup
 
 ```bash
-git clone https://github.com/mrifqidaffaaditya/WA-AKG.git
-cd WA-AKG
+git clone https://github.com/bhaijew/sole_what.git
+cd sole-what
 npm install
 cp .env.example .env
 # Edit .env to match your environment

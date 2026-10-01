@@ -1,4 +1,4 @@
-# Security Policy — WA-AKG
+# Security Policy — Sole-what
 
 ## Supported Versions
 
@@ -27,7 +27,7 @@ Report via:
 
 ## Scope
 
-- Vulnerabilities in WA-AKG code (Next.js, Baileys integration, API)
+- Vulnerabilities in Sole-what code (Next.js, Baileys integration, API)
 - Dependencies with critical CVEs
 - Credential leaks or exposure
 
