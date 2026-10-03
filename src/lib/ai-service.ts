@@ -75,7 +75,7 @@ export async function generateAiResponse(
         const modelName = aiConfig.modelName || (
             provider === "gemini" ? "gemini-1.5-flash" :
             provider === "openai" ? "gpt-4o-mini" :
-            "meta-llama/llama-3.1-8b-instruct:free"
+            "openrouter/free"
         );
         const systemPrompt = aiConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT;
         const knowledgeBase = aiConfig.knowledgeBase || "";
@@ -130,7 +130,7 @@ BUSINESS KNOWLEDGE BASE & FAQS:
 ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific knowledge base provided. Answer standard customer service queries politely."}
 ==================================================`;
 
-    // 1. OPENROUTER (Default & Free Models)
+    // 1. OPENROUTER (Default & Free Models with Automatic Fallback Chain)
     if (provider === "openrouter") {
         const url = "https://openrouter.ai/api/v1/chat/completions";
         const headers: Record<string, string> = {
@@ -145,31 +145,65 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
         }
         headers["Authorization"] = `Bearer ${finalApiKey}`;
 
-        const targetModel = modelName?.trim() || "meta-llama/llama-3.1-8b-instruct:free";
+        // Top reliable free models on OpenRouter
+        const freeFallbackModels = [
+            "openrouter/free",
+            "deepseek/deepseek-r1:free",
+            "google/gemma-2-9b-it:free",
+            "qwen/qwen-2.5-7b-instruct:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "mistralai/mistral-7b-instruct:free",
+            "meta-llama/llama-3.1-8b-instruct:free"
+        ];
 
-        const response = await fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({
-                model: targetModel,
-                messages: [
-                    { role: "system", content: fullSystemMessage },
-                    { role: "user", content: userPrompt }
-                ],
-                temperature,
-                max_tokens: maxTokens
-            }),
-            signal: AbortSignal.timeout(25000)
-        });
+        const requestedModel = modelName?.trim() || "openrouter/free";
+        // Build sequence: try requested model first, then remaining free models
+        const modelsToTry = [
+            requestedModel,
+            ...freeFallbackModels.filter((m) => m !== requestedModel)
+        ];
 
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`OpenRouter returned HTTP ${response.status}: ${errText.substring(0, 300)}`);
+        let lastErrorMsg = "";
+
+        for (const currentModel of modelsToTry) {
+            try {
+                logger.info("AI-Bot", `Calling OpenRouter with model: ${currentModel}...`);
+
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({
+                        model: currentModel,
+                        messages: [
+                            { role: "system", content: fullSystemMessage },
+                            { role: "user", content: userPrompt }
+                        ],
+                        temperature,
+                        max_tokens: maxTokens
+                    }),
+                    signal: AbortSignal.timeout(25000)
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    lastErrorMsg = `HTTP ${response.status}: ${errText.substring(0, 300)}`;
+                    logger.warn("AI-Bot", `OpenRouter model "${currentModel}" failed (${response.status}): ${errText.substring(0, 150)}. Falling back to next free model...`);
+                    continue; // Try next model in chain
+                }
+
+                const data = await response.json();
+                const content = data?.choices?.[0]?.message?.content;
+                if (content && content.trim().length > 0) {
+                    logger.success("AI-Bot", `OpenRouter successfully generated response using: ${currentModel}`);
+                    return content.trim();
+                }
+            } catch (err: any) {
+                lastErrorMsg = err?.message || String(err);
+                logger.warn("AI-Bot", `OpenRouter model "${currentModel}" encountered error: ${lastErrorMsg}. Falling back to next free model...`);
+            }
         }
 
-        const data = await response.json();
-        const content = data?.choices?.[0]?.message?.content;
-        return content ? content.trim() : null;
+        throw new Error(`All OpenRouter free models failed. Last error: ${lastErrorMsg}`);
     }
 
     // 2. OPENAI (ChatGPT Direct API)

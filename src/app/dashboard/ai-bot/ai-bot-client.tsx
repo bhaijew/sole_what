@@ -195,7 +195,7 @@ export default function AiBotClient() {
                     const defaultModel =
                         fetchedProvider === "gemini" ? "gemini-1.5-flash" :
                         fetchedProvider === "openai" ? "gpt-4o-mini" :
-                        "meta-llama/llama-3.1-8b-instruct:free";
+                        "openrouter/free";
 
                     setConfig({
                         enabled: res.data.enabled ?? false,
@@ -437,7 +437,7 @@ export default function AiBotClient() {
                                                 const nextModel =
                                                     p.id === "gemini" ? "gemini-1.5-flash" :
                                                     p.id === "openai" ? "gpt-4o-mini" :
-                                                    "meta-llama/llama-3.1-8b-instruct:free";
+                                                    "openrouter/free";
                                                 setConfig((prev) => ({ ...prev, provider: p.id, modelName: nextModel }));
                                             }}
                                             className={`p-3 rounded-xl border text-left transition-all relative flex items-start justify-between ${
@@ -463,7 +463,12 @@ export default function AiBotClient() {
 
                         {/* Model Dropdown */}
                         <div>
-                            <label className="text-xs font-semibold text-foreground block mb-1.5">Model Selection:</label>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="text-xs font-semibold text-foreground">Model Selection:</label>
+                                {config.provider === "openrouter" && (
+                                    <span className="text-[10px] text-emerald-500 font-medium">⚡ Auto-Fallback Enabled</span>
+                                )}
+                            </div>
                             <select
                                 value={config.modelName}
                                 onChange={(e) => setConfig((prev) => ({ ...prev, modelName: e.target.value }))}
@@ -478,11 +483,13 @@ export default function AiBotClient() {
                                 )}
                                 {config.provider === "openrouter" && (
                                     <>
-                                        <option value="meta-llama/llama-3.1-8b-instruct:free">Meta Llama 3.1 8B Instruct (FREE)</option>
+                                        <option value="openrouter/free">OpenRouter Auto (All Free Models Dynamic Router - Recommended)</option>
                                         <option value="deepseek/deepseek-r1:free">DeepSeek R1 (FREE Reasoning)</option>
                                         <option value="google/gemma-2-9b-it:free">Google Gemma 2 9B (FREE)</option>
                                         <option value="qwen/qwen-2.5-7b-instruct:free">Qwen 2.5 7B Instruct (FREE)</option>
-                                        <option value="openrouter/free">OpenRouter Auto Free Router</option>
+                                        <option value="meta-llama/llama-3.3-70b-instruct:free">Meta Llama 3.3 70B Instruct (FREE)</option>
+                                        <option value="mistralai/mistral-7b-instruct:free">Mistral 7B Instruct (FREE)</option>
+                                        <option value="meta-llama/llama-3.1-8b-instruct:free">Meta Llama 3.1 8B Instruct</option>
                                         <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini (via OpenRouter)</option>
                                     </>
                                 )}
@@ -494,6 +501,11 @@ export default function AiBotClient() {
                                     </>
                                 )}
                             </select>
+                            {config.provider === "openrouter" && (
+                                <p className="text-[11px] text-muted-foreground mt-1">
+                                    💡 Tip: Agar koi model busy ya paid ho jaye, engine automatically aglay free model par switch kar leta hai.
+                                </p>
+                            )}
                         </div>
 
                         {/* API Key Field */}

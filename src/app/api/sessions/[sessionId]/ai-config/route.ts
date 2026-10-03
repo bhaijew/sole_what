@@ -44,7 +44,7 @@ export async function GET(
                 enabled: false,
                 provider: "openrouter",
                 apiKey: "",
-                modelName: "meta-llama/llama-3.1-8b-instruct:free",
+                modelName: "openrouter/free",
                 systemPrompt: `You are a polite, helpful customer support assistant for a business. Answer customer questions accurately based ONLY on the provided Knowledge Base. Keep responses concise, friendly, and easy to read on WhatsApp.`,
                 knowledgeBase: "",
                 temperature: 0.7,
