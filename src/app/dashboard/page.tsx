@@ -14,11 +14,14 @@ import {
     ArrowRight,
     Activity,
     Zap,
+    Globe,
+    Sparkles,
 } from "lucide-react";
 
 import { auth } from "@/lib/auth";
 import { getAccessibleSessions } from "@/lib/api-auth";
 import { redirect } from "next/navigation";
+import { DashboardSessionCards } from "@/components/dashboard/dashboard-session-cards";
 
 export const dynamic = 'force-dynamic';
 
@@ -84,10 +87,10 @@ export default async function DashboardPage() {
     ];
 
     const quickActions = [
-        { href: "/dashboard/sessions", label: "New Session", icon: Plus, description: "Connect a new device" },
+        { href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, description: "WooCommerce, Shopify & APIs" },
+        { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode, description: "Manage WhatsApp devices" },
         { href: "/dashboard/chat", label: "Send Message", icon: Send, description: "Open chat interface" },
-        { href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot, description: "Configure chatbot" },
-        { href: "/dashboard/system-monitor", label: "System Monitor", icon: Activity, description: "View server metrics" },
+        { href: "/dashboard/ai-bot", label: "AI Auto-Responder", icon: Sparkles, description: "Free AI customer chatbot" },
     ];
 
     return (
@@ -95,14 +98,43 @@ export default async function DashboardPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Dashboard</h2>
-                    <p className="text-sm text-slate-500 mt-1">Overview of your WhatsApp gateway</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Dashboard</h2>
+                    <p className="text-sm text-slate-500 mt-1">Overview of your WhatsApp gateway &amp; website integrations</p>
                 </div>
-                <Link href="/dashboard/sessions">
-                    <Button size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Add Session
-                    </Button>
-                </Link>
+                <div className="flex items-center gap-2">
+                    <Link href="/dashboard/connect-website">
+                        <Button size="sm" variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary hover:text-white">
+                            <Globe className="h-4 w-4" /> Connect Website
+                        </Button>
+                    </Link>
+                    <Link href="/dashboard/sessions">
+                        <Button size="sm" className="gap-2">
+                            <Plus className="h-4 w-4" /> Add Session
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+
+            {/* Website Connect Banner */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-emerald-500/10 to-teal-500/10 border border-primary/20 p-5 sm:p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1.5 max-w-2xl">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-bold">
+                            <Sparkles className="h-3 w-3" /> E-Commerce Order Alerts
+                        </div>
+                        <h3 className="text-lg font-bold text-foreground">
+                            Connect Your Online Store (WooCommerce, Shopify, PHP, Laravel)
+                        </h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                            Send instant automated WhatsApp confirmation messages, delivery updates, and receipts to customers when an order is completed.
+                        </p>
+                    </div>
+                    <Link href="/dashboard/connect-website" className="flex-shrink-0">
+                        <Button className="gap-2 shadow-sm font-semibold">
+                            <Globe className="h-4 w-4" /> Integration Guide &amp; Code <ArrowRight className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Stats Grid */}
@@ -153,59 +185,23 @@ export default async function DashboardPage() {
                 </div>
             </div>
 
-            {/* Sessions List */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Sessions</h3>
-                    <Link href="/dashboard/sessions" className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors">
-                        View all <ArrowRight size={14} />
+            {/* Sessions List with Prominent Session IDs */}
+            <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+                            <span>WhatsApp Sessions &amp; API Identifiers</span>
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                            Every session has a unique <strong className="text-foreground">Session ID</strong> required for external websites and API integrations.
+                        </p>
+                    </div>
+                    <Link href="/dashboard/sessions" className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors self-start sm:self-auto">
+                        Manage all sessions <ArrowRight size={14} />
                     </Link>
                 </div>
 
-                {sessions.length === 0 ? (
-                    <Card className="border-dashed border-2 border-slate-200 shadow-none">
-                        <CardContent className="py-12 text-center">
-                            <div className="bg-slate-100 h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <QrCode className="h-6 w-6 text-slate-400" />
-                            </div>
-                            <p className="text-sm font-medium text-slate-600 mb-1">No sessions yet</p>
-                            <p className="text-xs text-slate-400 mb-4">Connect your first WhatsApp device to get started</p>
-                            <Link href="/dashboard/sessions">
-                                <Button size="sm" variant="outline" className="gap-2">
-                                    <Plus className="h-4 w-4" /> Create Session
-                                </Button>
-                            </Link>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {sessions.map(s => {
-                            const isConnected = s.status === 'CONNECTED';
-                            const isDisconnected = !isConnected;
-
-                            return (
-                                <Link key={s.id} href={`/dashboard/sessions/${s.sessionId}`}>
-                                    <Card className="glass-panel border-border/50 shadow-sm hover:shadow-md hover:shadow-primary/5 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer h-full">
-                                        <CardContent className="p-4">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold text-foreground truncate">{s.name}</p>
-                                                    <p className="text-xs text-muted-foreground font-mono truncate mt-1">{s.sessionId}</p>
-                                                </div>
-                                                <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full flex-shrink-0
-                                                    ${isConnected ? 'bg-emerald-50 text-emerald-700' : isDisconnected ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}
-                                                `}>
-                                                    <span className={`h-1.5 w-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : isDisconnected ? 'bg-red-400' : 'bg-amber-400'}`} />
-                                                    {s.status}
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                )}
+                <DashboardSessionCards sessions={sessions} />
             </div>
         </div>
     );

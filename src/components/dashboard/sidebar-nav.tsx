@@ -31,7 +31,8 @@ import {
     ShoppingBag,
     BarChart2,
     Sparkles,
-    Repeat
+    Repeat,
+    Globe
 } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import {
@@ -83,6 +84,7 @@ const navGroups: NavGroup[] = [
     {
         label: "Automation",
         items: [
+            { href: "/dashboard/connect-website", label: "Connect Website", icon: Globe },
             { href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot },
             { href: "/dashboard/ai-bot", label: "AI Auto-Responder", icon: Sparkles },
             { href: "/dashboard/autoreply", label: "Auto Reply", icon: MessageCircleReply },

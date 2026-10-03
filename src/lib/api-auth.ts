@@ -16,7 +16,14 @@ type Role = keyof typeof ROLE_HIERARCHY;
  * Validate API key from request header
  */
 export async function validateApiKey(request: NextRequest) {
-    const apiKey = request.headers.get("x-api-key");
+    let apiKey = request.headers.get("x-api-key");
+
+    if (!apiKey) {
+        const authHeader = request.headers.get("authorization");
+        if (authHeader?.startsWith("Bearer ")) {
+            apiKey = authHeader.substring(7).trim();
+        }
+    }
 
     if (!apiKey) {
         return null;
