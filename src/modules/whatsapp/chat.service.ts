@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { normalizeJid } from "@/lib/jid-utils";
 import { waManager } from "@/modules/whatsapp/manager";
 import { onMessageSent } from "@/lib/webhook";
-import Sticker from "wa-sticker-formatter";
+import * as waSticker from "wa-sticker-formatter";
+const Sticker: any = (waSticker as any).Sticker || (waSticker as any).default || waSticker;
 
 export class ChatService {
     /**

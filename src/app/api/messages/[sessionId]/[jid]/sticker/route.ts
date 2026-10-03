@@ -2,7 +2,8 @@ import { NextResponse, NextRequest } from "next/server";
 import { waManager } from "@/modules/whatsapp/manager";
 import { getAuthenticatedUser, canAccessSession } from "@/lib/api-auth";
 import { fireSentWebhook } from "@/lib/webhook";
-import Sticker from "wa-sticker-formatter";
+import * as waSticker from "wa-sticker-formatter";
+const Sticker: any = (waSticker as any).Sticker || (waSticker as any).default || waSticker;
 
 // POST: Send sticker from image
 export async function POST(
