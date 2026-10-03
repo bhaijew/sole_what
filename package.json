@@ -63,6 +63,8 @@
     "systeminformation": "^5.31.1",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "wa-sticker-formatter": "^1.6.0",
     "zod": "^4.3.5"
   },
@@ -83,9 +85,7 @@
     "swagger-ui-react": "^5.31.0",
     "tailwindcss": "^4",
     "ts-morph": "^28.0.0",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "ts-node": "^10.9.2"
   },
   "overrides": {
     "wa-sticker-formatter": {

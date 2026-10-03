@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Dependency layer — cache-friendly: only rerun when package*.json changes
 COPY package*.json ./
+COPY .npmrc ./
 COPY patches ./patches/
 COPY prisma ./prisma/
 RUN npm ci --legacy-peer-deps && npm cache clean --force
