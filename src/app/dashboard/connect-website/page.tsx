@@ -17,6 +17,11 @@ export default async function ConnectWebsitePage() {
         redirect("/login");
     }
 
+    // Only SUPERADMIN can access Connect Website
+    if (session.user.role !== "SUPERADMIN") {
+        redirect("/dashboard");
+    }
+
     const [sessions, user] = await Promise.all([
         getAccessibleSessions(session.user.id, session.user.role || "OWNER"),
         prisma.user.findUnique({

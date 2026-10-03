@@ -20,9 +20,10 @@ interface SessionItem {
 
 interface DashboardSessionCardsProps {
     sessions: SessionItem[];
+    isSuperAdmin?: boolean;
 }
 
-export function DashboardSessionCards({ sessions }: DashboardSessionCardsProps) {
+export function DashboardSessionCards({ sessions, isSuperAdmin = false }: DashboardSessionCardsProps) {
     const [copiedId, setCopiedId] = useState<string | null>(null);
 
     const handleCopy = (idToCopy: string, label: string, e: React.MouseEvent) => {
@@ -140,18 +141,33 @@ export function DashboardSessionCards({ sessions }: DashboardSessionCardsProps) 
 
                             {/* Quick Action Buttons */}
                             <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/40">
-                                <Link
-                                    href={`/dashboard/connect-website?session=${encodeURIComponent(s.sessionId)}`}
-                                    className="w-full"
-                                >
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="w-full h-8 text-xs font-medium gap-1.5 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                                {isSuperAdmin ? (
+                                    <Link
+                                        href={`/dashboard/connect-website?session=${encodeURIComponent(s.sessionId)}`}
+                                        className="w-full"
                                     >
-                                        <Globe className="h-3.5 w-3.5" /> Connect Site
-                                    </Button>
-                                </Link>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="w-full h-8 text-xs font-medium gap-1.5 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                                        >
+                                            <Globe className="h-3.5 w-3.5" /> Connect Site
+                                        </Button>
+                                    </Link>
+                                ) : (
+                                    <Link
+                                        href={`/dashboard/chat?session=${encodeURIComponent(s.sessionId)}`}
+                                        className="w-full"
+                                    >
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="w-full h-8 text-xs font-medium gap-1.5 hover:bg-muted"
+                                        >
+                                            <MessageSquare className="h-3.5 w-3.5" /> Open Chat
+                                        </Button>
+                                    </Link>
+                                )}
 
                                 <Link href={`/dashboard/sessions/${s.sessionId}`} className="w-full">
                                     <Button

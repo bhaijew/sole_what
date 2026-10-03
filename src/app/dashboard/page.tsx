@@ -86,11 +86,14 @@ export default async function DashboardPage() {
         },
     ];
 
+    const isSuperAdmin = session.user.role === "SUPERADMIN";
+
     const quickActions = [
-        { href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, description: "WooCommerce, Shopify & APIs" },
+        ...(isSuperAdmin ? [{ href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, description: "WooCommerce, Shopify & APIs" }] : []),
         { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode, description: "Manage WhatsApp devices" },
         { href: "/dashboard/chat", label: "Send Message", icon: Send, description: "Open chat interface" },
         { href: "/dashboard/ai-bot", label: "AI Auto-Responder", icon: Sparkles, description: "Free AI customer chatbot" },
+        ...(!isSuperAdmin ? [{ href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot, description: "Configure chatbot" }] : []),
     ];
 
     return (
@@ -102,11 +105,13 @@ export default async function DashboardPage() {
                     <p className="text-sm text-slate-500 mt-1">Overview of your WhatsApp gateway &amp; website integrations</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Link href="/dashboard/connect-website">
-                        <Button size="sm" variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary hover:text-white">
-                            <Globe className="h-4 w-4" /> Connect Website
-                        </Button>
-                    </Link>
+                    {isSuperAdmin && (
+                        <Link href="/dashboard/connect-website">
+                            <Button size="sm" variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary hover:text-white">
+                                <Globe className="h-4 w-4" /> Connect Website
+                            </Button>
+                        </Link>
+                    )}
                     <Link href="/dashboard/sessions">
                         <Button size="sm" className="gap-2">
                             <Plus className="h-4 w-4" /> Add Session
@@ -115,27 +120,29 @@ export default async function DashboardPage() {
                 </div>
             </div>
 
-            {/* Website Connect Banner */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-emerald-500/10 to-teal-500/10 border border-primary/20 p-5 sm:p-6 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1.5 max-w-2xl">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-bold">
-                            <Sparkles className="h-3 w-3" /> E-Commerce Order Alerts
+            {/* Website Connect Banner (SUPERADMIN only) */}
+            {isSuperAdmin && (
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-emerald-500/10 to-teal-500/10 border border-primary/20 p-5 sm:p-6 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1.5 max-w-2xl">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-bold">
+                                <Sparkles className="h-3 w-3" /> E-Commerce Order Alerts
+                            </div>
+                            <h3 className="text-lg font-bold text-foreground">
+                                Connect Your Online Store (WooCommerce, Shopify, PHP, Laravel)
+                            </h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                                Send instant automated WhatsApp confirmation messages, delivery updates, and receipts to customers when an order is completed.
+                            </p>
                         </div>
-                        <h3 className="text-lg font-bold text-foreground">
-                            Connect Your Online Store (WooCommerce, Shopify, PHP, Laravel)
-                        </h3>
-                        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                            Send instant automated WhatsApp confirmation messages, delivery updates, and receipts to customers when an order is completed.
-                        </p>
+                        <Link href="/dashboard/connect-website" className="flex-shrink-0">
+                            <Button className="gap-2 shadow-sm font-semibold">
+                                <Globe className="h-4 w-4" /> Integration Guide &amp; Code <ArrowRight className="h-4 w-4" />
+                            </Button>
+                        </Link>
                     </div>
-                    <Link href="/dashboard/connect-website" className="flex-shrink-0">
-                        <Button className="gap-2 shadow-sm font-semibold">
-                            <Globe className="h-4 w-4" /> Integration Guide &amp; Code <ArrowRight className="h-4 w-4" />
-                        </Button>
-                    </Link>
                 </div>
-            </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -201,7 +208,7 @@ export default async function DashboardPage() {
                     </Link>
                 </div>
 
-                <DashboardSessionCards sessions={sessions} />
+                <DashboardSessionCards sessions={sessions} isSuperAdmin={isSuperAdmin} />
             </div>
         </div>
     );
