@@ -27,7 +27,23 @@ const formSchema = z.object({
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const rawCallback = searchParams.get('callbackUrl') || '/dashboard';
+
+  // Sanitize callbackUrl to ensure it is always a safe relative URL and never redirects to 0.0.0.0
+  let callbackUrl = '/dashboard';
+  if (rawCallback) {
+    if (rawCallback.startsWith('/') && !rawCallback.startsWith('//')) {
+      callbackUrl = rawCallback;
+    } else {
+      try {
+        const parsed = new URL(rawCallback);
+        callbackUrl = parsed.pathname + parsed.search;
+      } catch {
+        callbackUrl = '/dashboard';
+      }
+    }
+  }
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 

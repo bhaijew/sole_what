@@ -180,7 +180,12 @@ export function MobileNav({ appName = "sole-what" }: { appName?: string }) {
                         className="w-full flex items-center justify-center gap-2 text-xs h-8"
                         onClick={async () => {
                             setOpen(false);
-                            await signOut({ callbackUrl: "/auth/login" });
+                            try {
+                                await signOut({ redirect: false });
+                            } catch (e) {
+                                // ignore
+                            }
+                            window.location.href = "/auth/login";
                         }}
                     >
                         <LogOut size={14} /> Sign Out

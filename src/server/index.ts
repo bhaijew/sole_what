@@ -11,6 +11,17 @@ import { waManager } from "../modules/whatsapp/manager";
 import { logger } from "../lib/logger";
 import pkg from "../../package.json";
 
+// Ensure production base URL is properly set for NextAuth and redirects
+const defaultPublicUrl = process.env.BASE_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "https://solewhat-production.up.railway.app");
+
+if (!process.env.NEXTAUTH_URL) {
+  process.env.NEXTAUTH_URL = defaultPublicUrl;
+}
+if (!process.env.AUTH_URL) {
+  process.env.AUTH_URL = defaultPublicUrl;
+}
+
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "localhost";
 const port = parseInt(process.env.PORT || "3030", 10);
@@ -27,6 +38,22 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       if (!req.url) return;
+
+      // Reverse proxy / Railway header normalization:
+      // Ensure host header reflects public domain instead of internal 0.0.0.0 or container port
+      const forwardedHost = req.headers["x-forwarded-host"] as string | undefined;
+      const host = req.headers.host;
+
+      if (forwardedHost && !forwardedHost.includes("0.0.0.0")) {
+        req.headers.host = forwardedHost;
+      } else if (!host || host.includes("0.0.0.0") || (host.includes("localhost") && !dev)) {
+        req.headers.host = process.env.RAILWAY_PUBLIC_DOMAIN || "solewhat-production.up.railway.app";
+      }
+
+      if (!req.headers["x-forwarded-proto"]) {
+        req.headers["x-forwarded-proto"] = dev ? "http" : "https";
+      }
+
       const parsedUrl = parse(req.url, true);
       await handle(req, res, parsedUrl);
     } catch (err) {

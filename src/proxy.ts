@@ -48,12 +48,30 @@ export async function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
+// Helper to ensure redirects always use the proper public domain instead of internal 0.0.0.0:8080
+function getSafeRedirectUrl(targetPath: string, request: NextRequest): URL {
+    const forwardedHost = request.headers.get("x-forwarded-host");
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+
+    let host = forwardedHost || request.headers.get("host") || "";
+
+    if (!host || host.includes("0.0.0.0") || (host.includes("localhost") && process.env.NODE_ENV === "production")) {
+        host = process.env.RAILWAY_PUBLIC_DOMAIN || "solewhat-production.up.railway.app";
+    }
+
+    const proto = (host.includes("localhost") || host.includes("127.0.0.1"))
+        ? "http"
+        : (forwardedProto || "https");
+
+    return new URL(targetPath, `${proto}://${host}`);
+}
+
     // Dashboard routes: Require login
     if (pathname.startsWith("/dashboard")) {
         const session = await auth();
 
         if (!session?.user) {
-            const loginUrl = new URL("/auth/login", request.url);
+            const loginUrl = getSafeRedirectUrl("/auth/login", request);
             loginUrl.searchParams.set("callbackUrl", pathname);
             return NextResponse.redirect(loginUrl);
         }
@@ -65,7 +83,7 @@ export async function proxy(request: NextRequest) {
     if (pathname === "/") {
         const session = await auth();
         if (session?.user) {
-            return NextResponse.redirect(new URL("/dashboard", request.url));
+            return NextResponse.redirect(getSafeRedirectUrl("/dashboard", request));
         }
         return NextResponse.next();
     }
@@ -74,7 +92,7 @@ export async function proxy(request: NextRequest) {
     if (isPublicRoute) {
         const session = await auth();
         if (session?.user && (pathname.startsWith("/auth/login") || pathname.startsWith("/auth/register"))) {
-            return NextResponse.redirect(new URL("/dashboard", request.url));
+            return NextResponse.redirect(getSafeRedirectUrl("/dashboard", request));
         }
         return NextResponse.next();
     }
@@ -82,7 +100,7 @@ export async function proxy(request: NextRequest) {
     // Default: require auth for everything else
     const session = await auth();
     if (!session?.user) {
-        const loginUrl = new URL("/auth/login", request.url);
+        const loginUrl = getSafeRedirectUrl("/auth/login", request);
         loginUrl.searchParams.set("callbackUrl", pathname);
         return NextResponse.redirect(loginUrl);
     }

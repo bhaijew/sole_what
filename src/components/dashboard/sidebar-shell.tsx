@@ -16,6 +16,15 @@ interface SidebarShellProps {
 export function SidebarShell({ appName, userName, userEmail, version }: SidebarShellProps) {
     const { isCollapsed } = useSidebar();
 
+    const handleLogout = async () => {
+        try {
+            await signOut({ redirect: false });
+        } catch (e) {
+            // ignore
+        }
+        window.location.href = "/auth/login";
+    };
+
     return (
         <aside
             className={`
@@ -58,7 +67,7 @@ export function SidebarShell({ appName, userName, userEmail, version }: SidebarS
                             {userName?.charAt(0)?.toUpperCase() || "U"}
                         </div>
                         <button
-                            onClick={() => signOut({ callbackUrl: "/auth/login" })}
+                            onClick={handleLogout}
                             className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                         >
                             <LogOut size={16} />
@@ -82,7 +91,7 @@ export function SidebarShell({ appName, userName, userEmail, version }: SidebarS
                             variant="outline"
                             size="sm"
                             className="w-full flex items-center justify-center gap-2 text-xs h-8 rounded-lg border-border/40 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
-                            onClick={() => signOut({ callbackUrl: "/auth/login" })}
+                            onClick={handleLogout}
                         >
                             <LogOut size={14} /> Sign Out
                         </Button>
