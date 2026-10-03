@@ -66,8 +66,17 @@ export async function generateAiResponse(
         }
 
         const provider = aiConfig.provider || "openrouter";
-        const apiKey = aiConfig.apiKey?.trim() || process.env.OPENROUTER_API_KEY || "";
-        const modelName = aiConfig.modelName || DEFAULT_OPENROUTER_MODEL;
+        // Check session apiKey first, then fall back to environment variables
+        const envApiKey = 
+            provider === "gemini" ? (process.env.GEMINI_API_KEY || "") :
+            provider === "openai" ? (process.env.OPENAI_API_KEY || "") :
+            (process.env.OPENROUTER_API_KEY || "");
+        const apiKey = aiConfig.apiKey?.trim() || envApiKey;
+        const modelName = aiConfig.modelName || (
+            provider === "gemini" ? "gemini-1.5-flash" :
+            provider === "openai" ? "gpt-4o-mini" :
+            "meta-llama/llama-3.1-8b-instruct:free"
+        );
         const systemPrompt = aiConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT;
         const knowledgeBase = aiConfig.knowledgeBase || "";
 
@@ -92,8 +101,8 @@ export async function generateAiResponse(
 
         return aiReply;
 
-    } catch (error) {
-        logger.error("AI-Service", "Error generating AI response:", error);
+    } catch (error: any) {
+        logger.error("AI-Service", `Error generating AI response: ${error?.message || error}`);
         return null;
     }
 }
@@ -131,12 +140,12 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
         };
 
         const finalApiKey = apiKey?.trim() || process.env.OPENROUTER_API_KEY || "";
-        if (finalApiKey) {
-            headers["Authorization"] = `Bearer ${finalApiKey}`;
+        if (!finalApiKey) {
+            throw new Error("OpenRouter API Key is required. Please enter your OpenRouter key in AI Bot settings or set OPENROUTER_API_KEY in Railway Variables.");
         }
+        headers["Authorization"] = `Bearer ${finalApiKey}`;
 
-        // Always use openrouter/free dynamic model router for OpenRouter provider
-        const targetModel = "openrouter/free";
+        const targetModel = modelName?.trim() || "meta-llama/llama-3.1-8b-instruct:free";
 
         const response = await fetch(url, {
             method: "POST",
@@ -150,12 +159,12 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                 temperature,
                 max_tokens: maxTokens
             }),
-            signal: AbortSignal.timeout(20000)
+            signal: AbortSignal.timeout(25000)
         });
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`OpenRouter returned HTTP ${response.status}: ${errText.substring(0, 200)}`);
+            throw new Error(`OpenRouter returned HTTP ${response.status}: ${errText.substring(0, 300)}`);
         }
 
         const data = await response.json();
@@ -165,8 +174,9 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
 
     // 2. OPENAI (ChatGPT Direct API)
     if (provider === "openai") {
-        if (!apiKey) {
-            throw new Error("OpenAI API Key is required for OpenAI provider.");
+        const finalApiKey = apiKey?.trim() || process.env.OPENAI_API_KEY || "";
+        if (!finalApiKey) {
+            throw new Error("OpenAI API Key is required. Please enter your OpenAI key in AI Bot settings or set OPENAI_API_KEY in Railway Variables.");
         }
 
         const url = "https://api.openai.com/v1/chat/completions";
@@ -174,7 +184,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
+                "Authorization": `Bearer ${finalApiKey}`
             },
             body: JSON.stringify({
                 model: modelName || "gpt-4o-mini",
@@ -185,12 +195,12 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                 temperature,
                 max_tokens: maxTokens
             }),
-            signal: AbortSignal.timeout(20000)
+            signal: AbortSignal.timeout(25000)
         });
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`OpenAI returned HTTP ${response.status}: ${errText.substring(0, 200)}`);
+            throw new Error(`OpenAI returned HTTP ${response.status}: ${errText.substring(0, 300)}`);
         }
 
         const data = await response.json();
@@ -200,12 +210,16 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
 
     // 3. GOOGLE GEMINI API
     if (provider === "gemini") {
-        if (!apiKey) {
-            throw new Error("Google Gemini API Key is required.");
+        const finalApiKey = apiKey?.trim() || process.env.GEMINI_API_KEY || "";
+        if (!finalApiKey) {
+            throw new Error("Google Gemini API Key is required. Please enter your Gemini key in AI Bot settings or set GEMINI_API_KEY in Railway Variables.");
         }
 
-        const geminiModel = modelName || "gemini-1.5-flash";
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`;
+        // Clean model name: remove "google/" or "models/" prefix if present
+        const geminiModel = (modelName || "gemini-1.5-flash")
+            .replace(/^google\//, "")
+            .replace(/^models\//, "");
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${finalApiKey}`;
 
         const response = await fetch(url, {
             method: "POST",
@@ -226,12 +240,12 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                     maxOutputTokens: maxTokens
                 }
             }),
-            signal: AbortSignal.timeout(20000)
+            signal: AbortSignal.timeout(25000)
         });
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(`Gemini API returned HTTP ${response.status}: ${errText.substring(0, 200)}`);
+            throw new Error(`Gemini API returned HTTP ${response.status}: ${errText.substring(0, 300)}`);
         }
 
         const data = await response.json();

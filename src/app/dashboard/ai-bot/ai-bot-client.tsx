@@ -148,9 +148,9 @@ export default function AiBotClient() {
     // AI Config State
     const [config, setConfig] = useState<AiConfigData>({
         enabled: false,
-        provider: "openai",
+        provider: "gemini",
         apiKey: "",
-        modelName: "gpt-4o-mini",
+        modelName: "gemini-1.5-flash",
         systemPrompt: PRESETS[0].systemPrompt,
         knowledgeBase: PRESETS[0].knowledgeBase,
         temperature: 0.7,
@@ -189,12 +189,19 @@ export default function AiBotClient() {
             .then((res) => res.json())
             .then((res) => {
                 if (res.status && res.data) {
-                    const fetchedProvider = res.data.provider === "gemini" ? "gemini" : "openai";
+                    const fetchedProvider = ["gemini", "openrouter", "openai"].includes(res.data.provider)
+                        ? res.data.provider
+                        : "gemini";
+                    const defaultModel =
+                        fetchedProvider === "gemini" ? "gemini-1.5-flash" :
+                        fetchedProvider === "openai" ? "gpt-4o-mini" :
+                        "meta-llama/llama-3.1-8b-instruct:free";
+
                     setConfig({
                         enabled: res.data.enabled ?? false,
                         provider: fetchedProvider,
                         apiKey: res.data.apiKey || "",
-                        modelName: res.data.modelName || (fetchedProvider === "openai" ? "gpt-4o-mini" : "gemini-1.5-flash"),
+                        modelName: res.data.modelName || defaultModel,
                         systemPrompt: res.data.systemPrompt || PRESETS[0].systemPrompt,
                         knowledgeBase: res.data.knowledgeBase || PRESETS[0].knowledgeBase,
                         temperature: res.data.temperature ?? 0.7,
@@ -412,20 +419,27 @@ export default function AiBotClient() {
                         {/* Provider Tabs */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-semibold text-foreground">Custom AI Provider (Optional):</label>
-                                <span className="text-[10px] text-muted-foreground">Click to select / unselect</span>
+                                <label className="text-xs font-semibold text-foreground">Select AI Provider:</label>
+                                <span className="text-[10px] text-muted-foreground">Pick your preferred AI engine</span>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                                 {[
-                                    { id: "openai", title: "OpenAI", subtitle: "ChatGPT Direct API" },
-                                    { id: "gemini", title: "Google Gemini", subtitle: "Gemini 1.5 Flash API" },
+                                    { id: "gemini", title: "Google Gemini", subtitle: "Gemini 1.5 & 2.0 Flash (Free & Fast)" },
+                                    { id: "openrouter", title: "OpenRouter", subtitle: "Llama 3.1, DeepSeek, Gemma" },
+                                    { id: "openai", title: "OpenAI", subtitle: "ChatGPT GPT-4o Mini & 4o" },
                                 ].map((p) => {
                                     const isSelected = config.provider === p.id;
                                     return (
                                         <button
                                             key={p.id}
                                             type="button"
-                                            onClick={() => setConfig((prev) => ({ ...prev, provider: isSelected ? "openrouter" : p.id }))}
+                                            onClick={() => {
+                                                const nextModel =
+                                                    p.id === "gemini" ? "gemini-1.5-flash" :
+                                                    p.id === "openai" ? "gpt-4o-mini" :
+                                                    "meta-llama/llama-3.1-8b-instruct:free";
+                                                setConfig((prev) => ({ ...prev, provider: p.id, modelName: nextModel }));
+                                            }}
                                             className={`p-3 rounded-xl border text-left transition-all relative flex items-start justify-between ${
                                                 isSelected
                                                     ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary font-semibold"
@@ -436,7 +450,7 @@ export default function AiBotClient() {
                                                 <div className="font-bold text-xs text-foreground">{p.title}</div>
                                                 <div className="text-[10px] text-muted-foreground mt-0.5">{p.subtitle}</div>
                                             </div>
-                                            <div className={`h-4 w-4 rounded-full border flex items-center justify-center transition-colors ${
+                                            <div className={`h-4 w-4 rounded-full border shrink-0 flex items-center justify-center transition-colors ${
                                                 isSelected ? "bg-primary border-primary text-primary-foreground" : "border-border/60"
                                             }`}>
                                                 {isSelected && <Check size={10} strokeWidth={3} />}
@@ -447,66 +461,76 @@ export default function AiBotClient() {
                             </div>
                         </div>
 
-                        {/* If no custom provider selected (unselected state) */}
-                        {config.provider === "openrouter" ? (
-                            <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-3.5 flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-500">
-                                        <Zap size={18} />
-                                    </div>
-                                    <div>
-                                        <div className="text-xs font-bold text-foreground">System Free AI Active</div>
-                                        <div className="text-[11px] text-muted-foreground">No custom key needed. Click OpenAI or Gemini above if you want to use your own API key.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Model Dropdown */}
-                                <div>
-                                    <label className="text-xs font-semibold text-foreground block mb-1.5">Model Selection:</label>
-                                    <select
-                                        value={config.modelName}
-                                        onChange={(e) => setConfig((prev) => ({ ...prev, modelName: e.target.value }))}
-                                        className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono cursor-pointer"
-                                    >
-                                        {config.provider === "openai" ? (
-                                            <>
-                                                <option value="gpt-4o-mini">GPT-4o Mini (Fast & Low Cost)</option>
-                                                <option value="gpt-4o">GPT-4o (High Accuracy)</option>
-                                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Fast)</option>
-                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro (Advanced)</option>
-                                            </>
-                                        )}
-                                    </select>
-                                </div>
+                        {/* Model Dropdown */}
+                        <div>
+                            <label className="text-xs font-semibold text-foreground block mb-1.5">Model Selection:</label>
+                            <select
+                                value={config.modelName}
+                                onChange={(e) => setConfig((prev) => ({ ...prev, modelName: e.target.value }))}
+                                className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono cursor-pointer"
+                            >
+                                {config.provider === "gemini" && (
+                                    <>
+                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Fast & Free Tier)</option>
+                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Next-Gen High Speed)</option>
+                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Advanced Reasoning)</option>
+                                    </>
+                                )}
+                                {config.provider === "openrouter" && (
+                                    <>
+                                        <option value="meta-llama/llama-3.1-8b-instruct:free">Meta Llama 3.1 8B Instruct (FREE)</option>
+                                        <option value="deepseek/deepseek-r1:free">DeepSeek R1 (FREE Reasoning)</option>
+                                        <option value="google/gemma-2-9b-it:free">Google Gemma 2 9B (FREE)</option>
+                                        <option value="qwen/qwen-2.5-7b-instruct:free">Qwen 2.5 7B Instruct (FREE)</option>
+                                        <option value="openrouter/free">OpenRouter Auto Free Router</option>
+                                        <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini (via OpenRouter)</option>
+                                    </>
+                                )}
+                                {config.provider === "openai" && (
+                                    <>
+                                        <option value="gpt-4o-mini">GPT-4o Mini (Fast & Low Cost)</option>
+                                        <option value="gpt-4o">GPT-4o (High Accuracy)</option>
+                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    </>
+                                )}
+                            </select>
+                        </div>
 
-                                {/* API Key Field */}
-                                <div>
-                                    <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1.5">
-                                        <span className="flex items-center gap-1.5">
-                                            <Key size={14} className="text-primary" />
-                                            <span>API Key ({config.provider.toUpperCase()}) *</span>
-                                        </span>
-                                    </label>
-                                    <input
-                                        type="password"
-                                        placeholder={`Enter your ${config.provider.toUpperCase()} API Key...`}
-                                        value={config.apiKey}
-                                        onChange={(e) => setConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
-                                        className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
-                                    />
-                                    <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
-                                        <Shield size={12} className="text-emerald-500" />
-                                        <span>Paste your {config.provider === "openai" ? "OpenAI" : "Google Gemini"} API key here.</span>
-                                    </p>
-                                </div>
-                            </>
-                        )}
+                        {/* API Key Field */}
+                        <div>
+                            <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1.5">
+                                <span className="flex items-center gap-1.5">
+                                    <Key size={14} className="text-primary" />
+                                    <span>API Key ({config.provider.toUpperCase()})</span>
+                                </span>
+                                <span className="text-[11px]">
+                                    {config.provider === "gemini" && (
+                                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">Get Free Gemini Key ↗</a>
+                                    )}
+                                    {config.provider === "openrouter" && (
+                                        <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">Get OpenRouter Key ↗</a>
+                                    )}
+                                    {config.provider === "openai" && (
+                                        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">Get OpenAI Key ↗</a>
+                                    )}
+                                </span>
+                            </label>
+                            <input
+                                type="password"
+                                placeholder={`Enter your ${config.provider.toUpperCase()} API Key (or leave blank if set in Railway ENV)...`}
+                                value={config.apiKey}
+                                onChange={(e) => setConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
+                                className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+                            />
+                            <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                                <Shield size={12} className="text-emerald-500 shrink-0" />
+                                <span>
+                                    {config.provider === "gemini" && "100% free API key from Google AI Studio. Or set GEMINI_API_KEY in Railway Variables."}
+                                    {config.provider === "openrouter" && "Free models require an OpenRouter key. Or set OPENROUTER_API_KEY in Railway Variables."}
+                                    {config.provider === "openai" && "OpenAI key (sk-...). Or set OPENAI_API_KEY in Railway Variables."}
+                                </span>
+                            </p>
+                        </div>
                     </div>
 
                     {/* Knowledge Base & FAQs Editor */}

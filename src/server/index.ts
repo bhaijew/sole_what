@@ -56,10 +56,11 @@ app.prepare().then(() => {
   // Start Scheduler
   import("../modules/whatsapp/scheduler").then(m => m.startScheduler());
 
-  // Cloudflare 520 Fix: increase keep-alive timeout so Node doesn't kill idle connections that Cloudflare expects to reuse
-  // See: https://github.com/vercel/next.js/issues/48962
-  server.keepAliveTimeout = 120 * 1000; // 120 seconds
-  server.headersTimeout = 120 * 1000; // 120 seconds
+  // Reverse proxy / Railway / Cloudflare fix:
+  // Node.js documentation mandates: headersTimeout MUST be strictly greater than keepAliveTimeout.
+  // When equal, Node abruptly resets idle TCP sockets, triggering ERR_CONNECTION_RESET on chunk requests.
+  server.keepAliveTimeout = 65 * 1000; // 65 seconds
+  server.headersTimeout = 70 * 1000;   // 70 seconds (> keepAliveTimeout)
 
   server.listen(port, () => {
     logger.banner(pkg.name.toUpperCase(), pkg.version, port);

@@ -19,8 +19,13 @@ export async function GET(
             return NextResponse.json({ status: false, message: "Forbidden" }, { status: 403 });
         }
 
-        const session = await prisma.session.findUnique({
-            where: { sessionId },
+        const session = await prisma.session.findFirst({
+            where: {
+                OR: [
+                    { sessionId },
+                    { id: sessionId }
+                ]
+            },
             select: { id: true }
         });
 
@@ -71,8 +76,13 @@ export async function POST(
             return NextResponse.json({ status: false, message: "Forbidden" }, { status: 403 });
         }
 
-        const session = await prisma.session.findUnique({
-            where: { sessionId },
+        const session = await prisma.session.findFirst({
+            where: {
+                OR: [
+                    { sessionId },
+                    { id: sessionId }
+                ]
+            },
             select: { id: true }
         });
 

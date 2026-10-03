@@ -594,29 +594,48 @@ export async function onMessageReceived(sessionId: string, message: any, existin
 
     // --- AI Auto-Responder Integration ---
     if (!fromMe && normalized.content && normalized.content.trim().length > 0) {
-        // Check Fallback Mode setting
-        const aiConfig = await prisma.aiConfig.findUnique({ where: { sessionId } });
-        const fallbackOnly = (aiConfig as any)?.fallbackOnly !== false;
+        try {
+            const dbSession = await prisma.session.findFirst({
+                where: {
+                    OR: [
+                        { sessionId: sessionId },
+                        { id: sessionId }
+                    ]
+                },
+                select: { id: true, sessionId: true }
+            });
 
-        let isKeywordMatched = false;
-        if (fallbackOnly) {
-            isKeywordMatched = await hasMatchingKeywordRule(sessionId, normalized.content, isGroup);
-        }
+            if (dbSession) {
+                // Check AI Config for this session
+                const aiConfig = await prisma.aiConfig.findUnique({ where: { sessionId: dbSession.id } });
 
-        if (isKeywordMatched) {
-            logger.info("AI-Bot", `Skipping AI response for ${normalizedFrom} because Keyword Rule matched (Fallback Mode ON).`);
-        } else {
-            logger.info("AI-Bot", `Incoming message from ${normalizedFrom}: "${normalized.content}"`);
-            generateAiResponse(sessionId, normalized.content, isGroup)
-                .then(async (aiReply) => {
-                    if (aiReply && aiReply.trim().length > 0) {
-                        logger.info("AI-Bot", `Auto replying to ${normalizedFrom} via AI...`);
-                        await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+                if (aiConfig && aiConfig.enabled) {
+                    const fallbackOnly = (aiConfig as any)?.fallbackOnly !== false;
+
+                    let isKeywordMatched = false;
+                    if (fallbackOnly) {
+                        isKeywordMatched = await hasMatchingKeywordRule(sessionId, normalized.content, isGroup);
                     }
-                })
-                .catch((err) => {
-                    logger.error("AI-Bot", "Failed to dispatch AI response:", err);
-                });
+
+                    if (isKeywordMatched) {
+                        logger.info("AI-Bot", `Skipping AI response for ${normalizedFrom} because Keyword Rule matched (Fallback Mode ON).`);
+                    } else {
+                        logger.info("AI-Bot", `Incoming message from ${normalizedFrom}: "${normalized.content}"`);
+                        generateAiResponse(sessionId, normalized.content, isGroup)
+                            .then(async (aiReply) => {
+                                if (aiReply && aiReply.trim().length > 0) {
+                                    logger.info("AI-Bot", `Auto replying to ${normalizedFrom} via AI...`);
+                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+                                }
+                            })
+                            .catch((err) => {
+                                logger.error("AI-Bot", "Failed to dispatch AI response:", err);
+                            });
+                    }
+                }
+            }
+        } catch (aiErr) {
+            logger.error("AI-Bot", "Error in AI Auto-Responder integration:", aiErr);
         }
     }
 }

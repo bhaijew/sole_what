@@ -106,6 +106,29 @@ export default function RootLayout({
         {/* DNS prefetch for performance */}
         <link rel="dns-prefetch" href={APP_URL} />
         <link rel="preconnect" href={APP_URL} crossOrigin="anonymous" />
+        {/* Automatic recovery for Next.js ChunkLoadError / version skew after redeployments */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('error', function(e) {
+                try {
+                  var msg = (e && (e.message || (e.error && e.error.message))) || '';
+                  var isChunk = msg.indexOf('ChunkLoadError') !== -1 || msg.indexOf('Loading chunk') !== -1 || msg.indexOf('Failed to load chunk') !== -1;
+                  var isChunkScript = e.target && e.target.tagName === 'SCRIPT' && e.target.src && e.target.src.indexOf('/_next/static/') !== -1;
+                  if (isChunk || isChunkScript) {
+                    var storageKey = 'chunk_reload_last';
+                    var lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+                    // Avoid infinite reload loop: max 1 reload per 10 seconds
+                    if (Date.now() - lastReload > 10000) {
+                      sessionStorage.setItem(storageKey, Date.now().toString());
+                      window.location.reload();
+                    }
+                  }
+                } catch(err) {}
+              }, true);
+            `,
+          }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased text-foreground bg-background selection:bg-primary/30 selection:text-primary-foreground min-h-screen flex flex-col`}
