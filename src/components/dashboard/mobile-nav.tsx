@@ -27,14 +27,28 @@ import {
     Tag,
     MessageCircleReply,
     UserPlus,
+    BarChart2,
+    Sparkles,
+    Repeat,
+    ShoppingBag,
+    Globe,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import pkg from "../../../package.json";
 
+interface NavItem {
+    href: string;
+    label: string;
+    icon: React.ElementType;
+    external?: boolean;
+    superadminOnly?: boolean;
+    allowedRoles?: string[];
+}
+
 interface NavGroup {
     label: string;
-    items: { href: string; label: string; icon: React.ElementType; external?: boolean; superadminOnly?: boolean }[];
+    items: NavItem[];
 }
 
 // Keep in sync with sidebar-nav.tsx
@@ -51,6 +65,7 @@ const navGroups: NavGroup[] = [
         items: [
             { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
             { href: "/dashboard/broadcast", label: "Broadcast", icon: Megaphone },
+            { href: "/dashboard/interactive", label: "Interactive Msgs", icon: BarChart2 },
             { href: "/dashboard/sticker", label: "Sticker Maker", icon: ImageIcon },
         ],
     },
@@ -65,10 +80,14 @@ const navGroups: NavGroup[] = [
     {
         label: "Automation",
         items: [
+            { href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, superadminOnly: true },
             { href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot },
+            { href: "/dashboard/ai-bot", label: "AI Auto-Responder", icon: Sparkles, allowedRoles: ["SUPERADMIN", "OWNER"] },
             { href: "/dashboard/autoreply", label: "Auto Reply", icon: MessageCircleReply },
+            { href: "/dashboard/sequences", label: "Drip Sequences", icon: Repeat },
             { href: "/dashboard/profile", label: "Bot Profile", icon: UserCircle },
             { href: "/dashboard/scheduler", label: "Scheduler", icon: CalendarClock },
+            { href: "/dashboard/templates", label: "E-Commerce Presets", icon: ShoppingBag },
             { href: "/dashboard/webhooks", label: "Webhooks & API", icon: Webhook },
         ],
     },
@@ -84,7 +103,7 @@ const navGroups: NavGroup[] = [
         items: [
             { href: "/dashboard/media", label: "Media Manager", icon: HardDrive },
             { href: "/dashboard/sessions/access", label: "Session Access", icon: UserPlus },
-            { href: "/dashboard/users", label: "Users", icon: Users },
+            { href: "/dashboard/users", label: "Users", icon: Users, superadminOnly: true },
             { href: "/dashboard/settings", label: "Settings", icon: Settings },
             { href: "/dashboard/system-monitor", label: "System Monitor", icon: Activity, superadminOnly: true },
             { href: "/dashboard/notifications", label: "Notifications", icon: Bell, superadminOnly: true },
@@ -119,9 +138,11 @@ export function MobileNav({ appName = "sole-what" }: { appName?: string }) {
 
                 <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-1">
                     {navGroups.map((group) => {
-                        const visibleItems = group.items.filter(
-                            (item) => !item.superadminOnly || userRole === "SUPERADMIN"
-                        );
+                        const visibleItems = group.items.filter((item) => {
+                            if (item.superadminOnly && userRole !== "SUPERADMIN") return false;
+                            if (item.allowedRoles && (!userRole || !item.allowedRoles.includes(userRole))) return false;
+                            return true;
+                        });
                         if (visibleItems.length === 0) return null;
 
                         return (

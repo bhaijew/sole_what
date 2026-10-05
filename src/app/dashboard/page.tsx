@@ -87,12 +87,14 @@ export default async function DashboardPage() {
     ];
 
     const isSuperAdmin = session.user.role === "SUPERADMIN";
+    const isOwner = session.user.role === "OWNER";
+    const canAccessAi = isSuperAdmin || isOwner;
 
     const quickActions = [
         ...(isSuperAdmin ? [{ href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, description: "WooCommerce, Shopify & APIs" }] : []),
         { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode, description: "Manage WhatsApp devices" },
         { href: "/dashboard/chat", label: "Send Message", icon: Send, description: "Open chat interface" },
-        { href: "/dashboard/ai-bot", label: "AI Auto-Responder", icon: Sparkles, description: "Free AI customer chatbot" },
+        ...(canAccessAi ? [{ href: "/dashboard/ai-bot", label: "AI Auto-Responder", icon: Sparkles, description: "Free AI customer chatbot" }] : []),
         ...(!isSuperAdmin ? [{ href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot, description: "Configure chatbot" }] : []),
     ];
 

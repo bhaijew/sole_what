@@ -14,6 +14,10 @@ export async function GET(
 
         const { sessionId } = await params;
 
+        if (user.role !== "SUPERADMIN" && user.role !== "OWNER") {
+            return NextResponse.json({ status: false, message: "Forbidden - AI Auto-Responder is only available for Admins and Superadmins" }, { status: 403 });
+        }
+
         const hasAccess = await canAccessSession(user.id, user.role, sessionId);
         if (!hasAccess) {
             return NextResponse.json({ status: false, message: "Forbidden" }, { status: 403 });
@@ -70,6 +74,10 @@ export async function POST(
         }
 
         const { sessionId } = await params;
+
+        if (user.role !== "SUPERADMIN" && user.role !== "OWNER") {
+            return NextResponse.json({ status: false, message: "Forbidden - AI Auto-Responder is only available for Admins and Superadmins" }, { status: 403 });
+        }
 
         const hasAccess = await canAccessSession(user.id, user.role, sessionId);
         if (!hasAccess) {

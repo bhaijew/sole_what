@@ -9,6 +9,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
         }
 
+        if (user.role !== "SUPERADMIN" && user.role !== "OWNER") {
+            return NextResponse.json({ status: false, message: "Forbidden - AI testing is only available for Admins and Superadmins" }, { status: 403 });
+        }
+
         const body = await request.json();
         const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt } = body;
 
