@@ -3,6 +3,9 @@ import { normalizeJid } from "@/lib/jid-utils";
 import { waManager } from "@/modules/whatsapp/manager";
 import { onMessageSent } from "@/lib/webhook";
 import * as waSticker from "wa-sticker-formatter";
+import path from "path";
+import { existsSync } from "fs";
+import { readFile } from "fs/promises";
 const Sticker: any = (waSticker as any).Sticker || (waSticker as any).default || waSticker;
 
 export class ChatService {
@@ -284,10 +287,25 @@ export class ChatService {
 
         if (msgPayload.image && typeof msgPayload.image === 'object' && msgPayload.image.url) {
             try {
-                const res = await fetch(msgPayload.image.url);
-                if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-                const buffer = await res.arrayBuffer();
-                msgPayload.image = Buffer.from(buffer);
+                const targetUrl = msgPayload.image.url;
+                if (targetUrl.startsWith("/api/uploads/") || targetUrl.startsWith("/uploads/")) {
+                    const filename = targetUrl.split("/").pop();
+                    const localPath = filename ? path.join(process.cwd(), "data", "uploads", filename) : "";
+                    if (localPath && existsSync(localPath)) {
+                        msgPayload.image = await readFile(localPath);
+                    } else {
+                        const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+                        const res = await fetch(`${baseUrl}${targetUrl}`);
+                        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+                        const buffer = await res.arrayBuffer();
+                        msgPayload.image = Buffer.from(buffer);
+                    }
+                } else {
+                    const res = await fetch(targetUrl);
+                    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+                    const buffer = await res.arrayBuffer();
+                    msgPayload.image = Buffer.from(buffer);
+                }
             } catch (e: any) {
                 throw new Error(`Failed to fetch image from URL: ${e.message}`);
             }

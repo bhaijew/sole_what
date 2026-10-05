@@ -137,7 +137,7 @@ export async function callAiApi(params: {
         const urlMatches = knowledgeBase.match(/https?:\/\/[^\s\)\"\'\,]+(?:jpg|jpeg|png|webp|gif)/gi) || [];
         detectedImages.push(...urlMatches);
 
-        const labeledMatches = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*(https?:\/\/[^\s\)\"\']+)/gi) || [];
+        const labeledMatches = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/gi) || [];
         for (const m of labeledMatches) {
             const parts = m.split(/:\s*/);
             const u = parts.length > 1 ? parts.slice(1).join(":").trim() : null;

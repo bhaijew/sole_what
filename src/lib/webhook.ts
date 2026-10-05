@@ -627,8 +627,8 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                     logger.info("AI-Bot", `Auto replying to ${normalizedFrom} via AI...`);
 
                                     // Check if AI output includes an image trigger tag: [SEND_IMAGE: <url>] or markdown ![...](<url>)
-                                    const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*(https?:\/\/[^\s\]]+)\]/i;
-                                    const mdImgRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i;
+                                    const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+)\]/i;
+                                    const mdImgRegex = /!\[.*?\]\(((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+)\)/i;
                                     const imgMatch = aiReply.match(imgTagRegex) || aiReply.match(mdImgRegex);
 
                                     if (imgMatch) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     Sparkles,
     Bot,
@@ -20,7 +20,9 @@ import {
     Check,
     Globe,
     Shield,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Upload,
+    Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -190,6 +192,92 @@ export default function AiBotClient() {
     ]);
     const [userInput, setUserInput] = useState<string>("");
     const [testingAi, setTestingAi] = useState<boolean>(false);
+    const [uploadingImage, setUploadingImage] = useState<boolean>(false);
+    const menuFileInputRef = useRef<HTMLInputElement>(null);
+
+    // Extract active menu image from knowledgeBase
+    const extractMenuImage = (kb: string) => {
+        const match = kb.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*(https?:\/\/[^\s\)\"\']+|\/api\/uploads\/[^\s\)\"\']+)/i);
+        if (match) {
+            const parts = match[0].split(/:\s*/);
+            return parts.length > 1 ? parts.slice(1).join(":").trim() : null;
+        }
+        return null;
+    };
+
+    const currentMenuImage = extractMenuImage(config.knowledgeBase);
+
+    const handleMenuImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploadingImage(true);
+        const toastId = toast.loading("Uploading menu image...");
+
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await res.json();
+            if (data.status && data.data?.url) {
+                const uploadedUrl = data.data.url;
+
+                // Update knowledgeBase & systemPrompt
+                setConfig((prev) => {
+                    let updatedKb = prev.knowledgeBase;
+                    const regex = /(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\n\r]+/i;
+                    if (regex.test(updatedKb)) {
+                        updatedKb = updatedKb.replace(regex, `MENU IMAGE: ${uploadedUrl}`);
+                    } else {
+                        updatedKb = `MENU IMAGE: ${uploadedUrl}\n` + updatedKb;
+                    }
+
+                    let updatedPrompt = prev.systemPrompt;
+                    if (!updatedPrompt.includes("[SEND_IMAGE:")) {
+                        updatedPrompt = `${updatedPrompt.trim()}\nWhen the customer asks for the menu, food items, or prices, politely answer and append: [SEND_IMAGE: ${uploadedUrl}]`;
+                    } else {
+                        updatedPrompt = updatedPrompt.replace(/\[SEND_IMAGE:\s*[^\]]+\]/g, `[SEND_IMAGE: ${uploadedUrl}]`);
+                    }
+
+                    return {
+                        ...prev,
+                        knowledgeBase: updatedKb,
+                        systemPrompt: updatedPrompt
+                    };
+                });
+
+                toast.success("Menu image uploaded successfully! Click 'Save AI Configuration' to activate.", { id: toastId });
+            } else {
+                toast.error(data.message || "Failed to upload image", { id: toastId });
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Upload error", { id: toastId });
+        } finally {
+            setUploadingImage(false);
+            if (menuFileInputRef.current) {
+                menuFileInputRef.current.value = "";
+            }
+        }
+    };
+
+    const handleRemoveMenuImage = () => {
+        setConfig((prev) => {
+            const regex = /(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\n\r]+(\r?\n)?/gi;
+            const updatedKb = prev.knowledgeBase.replace(regex, "").trim();
+            const updatedPrompt = prev.systemPrompt.replace(/(\r?\n)?When the customer asks for the menu[^\n\r]+\[SEND_IMAGE:[^\]]+\]/gi, "").trim();
+            return {
+                ...prev,
+                knowledgeBase: updatedKb,
+                systemPrompt: updatedPrompt
+            };
+        });
+        toast.info("Menu image removed from Knowledge Base.");
+    };
 
     useEffect(() => {
         // Fetch sessions
@@ -600,9 +688,93 @@ export default function AiBotClient() {
                             <div className="text-xs space-y-1">
                                 <p className="font-semibold text-primary">Smart Menu & Media Image Detection</p>
                                 <p className="text-muted-foreground leading-relaxed text-[11px]">
-                                    Agar aapki knowledge base mein menu ya catalog image ka link mojood ho (maslan: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-mono text-[10px]">MENU IMAGE: https://...</code>), toh customer jab bhi menu, khana ya rates maangay ga, AI automatically samajh kar customer ko <strong>Menu Image</strong> bhej dega!
+                                    Aap neeche direct apni <strong>Menu Image upload</strong> kar sakte hain. Customer jab bhi menu, khana ya rates maangay ga, AI automatically samajh kar customer ko <strong>Menu Image</strong> WhatsApp par send karega!
                                 </p>
                             </div>
+                        </div>
+
+                        {/* Menu & Catalog Image Uploader Card */}
+                        <div className="bg-muted/30 border border-border/60 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                                        <ImageIcon size={16} />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-foreground">Menu / Catalog Image (Auto-Sender)</h4>
+                                        <p className="text-[10px] text-muted-foreground">Upload menu picture jo AI customer ke maangne par automatically send karega</p>
+                                    </div>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    ref={menuFileInputRef}
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleMenuImageUpload}
+                                />
+
+                                <button
+                                    type="button"
+                                    onClick={() => menuFileInputRef.current?.click()}
+                                    disabled={uploadingImage}
+                                    className="text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+                                >
+                                    <Upload size={13} />
+                                    {uploadingImage ? "Uploading..." : currentMenuImage ? "Change Image" : "Upload Menu Image"}
+                                </button>
+                            </div>
+
+                            {currentMenuImage ? (
+                                <div className="flex items-center gap-3 bg-background border border-border/60 rounded-lg p-2.5">
+                                    <div className="relative w-16 h-16 shrink-0 rounded-md overflow-hidden border border-border/50 bg-muted">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={currentMenuImage}
+                                            alt="Active Menu"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                    <div className="flex-1 min-w-0 space-y-1 text-left">
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                                <CheckCircle2 size={11} /> Ready for WhatsApp Auto-Send
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] font-mono text-muted-foreground truncate">{currentMenuImage}</p>
+                                        <div className="flex items-center gap-2 text-[10px]">
+                                            <button
+                                                type="button"
+                                                onClick={() => menuFileInputRef.current?.click()}
+                                                className="text-primary hover:underline font-medium"
+                                            >
+                                                Replace photo
+                                            </button>
+                                            <span className="text-muted-foreground/40">•</span>
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveMenuImage}
+                                                className="text-destructive hover:underline font-medium flex items-center gap-1"
+                                            >
+                                                <Trash2 size={10} /> Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div
+                                    onClick={() => menuFileInputRef.current?.click()}
+                                    className="border-2 border-dashed border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all rounded-lg p-4 text-center cursor-pointer space-y-1.5 group"
+                                >
+                                    <div className="mx-auto w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+                                        <Upload size={15} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-foreground">Click here to upload Menu or Catalog picture</p>
+                                        <p className="text-[10px] text-muted-foreground">JPG, PNG, WEBP (Direct from phone or laptop)</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div>
@@ -661,8 +833,8 @@ export default function AiBotClient() {
                         {/* Messages Box */}
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2 styled-scrollbar mb-4">
                             {playgroundMessages.map((msg, idx) => {
-                                const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*(https?:\/\/[^\s\]]+)\]/i;
-                                const mdImgRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i;
+                                const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+)\]/i;
+                                const mdImgRegex = /!\[.*?\]\(((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+)\)/i;
                                 const match = msg.content.match(imgTagRegex) || msg.content.match(mdImgRegex);
                                 const imageUrl = match ? match[1].trim() : null;
                                 const cleanContent = match ? msg.content.replace(match[0], "").trim() : msg.content;
