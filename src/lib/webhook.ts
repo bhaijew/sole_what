@@ -625,7 +625,39 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                             .then(async (aiReply) => {
                                 if (aiReply && aiReply.trim().length > 0) {
                                     logger.info("AI-Bot", `Auto replying to ${normalizedFrom} via AI...`);
-                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+
+                                    // Check if AI output includes an image trigger tag: [SEND_IMAGE: <url>] or markdown ![...](<url>)
+                                    const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*(https?:\/\/[^\s\]]+)\]/i;
+                                    const mdImgRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i;
+                                    const imgMatch = aiReply.match(imgTagRegex) || aiReply.match(mdImgRegex);
+
+                                    if (imgMatch) {
+                                        const imageUrl = imgMatch[1].trim();
+                                        const cleanText = aiReply.replace(imgMatch[0], "").trim();
+                                        logger.info("AI-Bot", `AI triggered image send: ${imageUrl} for ${normalizedFrom}`);
+
+                                        try {
+                                            // Send image with caption if cleanText fits in WhatsApp caption
+                                            if (cleanText.length <= 1000) {
+                                                await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                    image: { url: imageUrl },
+                                                    caption: cleanText || undefined
+                                                });
+                                            } else {
+                                                // Send text first, then image
+                                                await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                    image: { url: imageUrl }
+                                                });
+                                            }
+                                            logger.success("AI-Bot", `Successfully sent image attachment via AI to ${normalizedFrom}`);
+                                        } catch (imgError) {
+                                            logger.error("AI-Bot", "Failed to send image attachment, falling back to text:", imgError);
+                                            await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+                                        }
+                                    } else {
+                                        await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+                                    }
                                 }
                             })
                             .catch((err) => {

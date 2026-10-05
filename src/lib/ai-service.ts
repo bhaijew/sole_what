@@ -13,7 +13,16 @@ export interface AiTestRequest {
 const DEFAULT_SYSTEM_PROMPT = `You are a polite, helpful customer support assistant for a business. 
 Your goal is to answer customer questions accurately based ONLY on the provided Knowledge Base.
 If you don't know the answer or if it is not in the knowledge base, politely inform the customer and offer to connect them with a human team member.
-Keep responses concise, friendly, and easy to read on WhatsApp.`;
+Keep responses concise, friendly, and easy to read on WhatsApp.
+
+MEDIA & IMAGE SENDING CAPABILITY:
+If the Knowledge Base contains any image URL (e.g. Menu card, Catalog, Price list, Product photo) AND the customer asks for the menu, food list, catalog, price list, or pictures:
+1. Provide a polite, warm, and helpful answer.
+2. At the end of your response, output the image trigger tag: [SEND_IMAGE: <imageUrl>]
+Example:
+"G bilkul! Yeh lijiye hamara latest menu card. [SEND_IMAGE: https://example.com/menu.jpg]"
+
+Our automated WhatsApp dispatcher will parse this tag and send the real image directly to the customer on WhatsApp!`;
 
 const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
 
@@ -122,12 +131,33 @@ export async function callAiApi(params: {
 }): Promise<string | null> {
     const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, temperature = 0.7, maxTokens = 800 } = params;
 
+    // Detect image URLs in Knowledge Base (e.g. Menu card, Catalog, etc.)
+    const detectedImages: string[] = [];
+    if (knowledgeBase) {
+        const urlMatches = knowledgeBase.match(/https?:\/\/[^\s\)\"\'\,]+(?:jpg|jpeg|png|webp|gif)/gi) || [];
+        detectedImages.push(...urlMatches);
+
+        const labeledMatches = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*(https?:\/\/[^\s\)\"\']+)/gi) || [];
+        for (const m of labeledMatches) {
+            const parts = m.split(/:\s*/);
+            const u = parts.length > 1 ? parts.slice(1).join(":").trim() : null;
+            if (u && !detectedImages.includes(u)) detectedImages.push(u);
+        }
+    }
+
+    let mediaInstruction = "";
+    if (detectedImages.length > 0) {
+        mediaInstruction = `\n\nAVAILABLE MEDIA / IMAGES TO SEND:
+${detectedImages.map((u, i) => `- Image ${i + 1}: ${u}`).join("\n")}
+Important: Jab bhi customer menu, items list, catalogue, ya price list maangay, unko text answer ke sath end mein [SEND_IMAGE: ${detectedImages[0]}] attach zaroor karein.`;
+    }
+
     // Construct full system instruction
     const fullSystemMessage = `${systemPrompt || DEFAULT_SYSTEM_PROMPT}
 
 ==================================================
 BUSINESS KNOWLEDGE BASE & FAQS:
-${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific knowledge base provided. Answer standard customer service queries politely."}
+${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific knowledge base provided. Answer standard customer service queries politely."}${mediaInstruction}
 ==================================================`;
 
     // 1. OPENROUTER (Default & Free Models with Automatic Fallback Chain)

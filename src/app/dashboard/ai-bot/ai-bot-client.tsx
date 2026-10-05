@@ -19,7 +19,8 @@ import {
     HelpCircle,
     Check,
     Globe,
-    Shield
+    Shield,
+    Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -85,6 +86,30 @@ const OPENROUTER_MODELS = [
 ];
 
 const PRESETS = [
+    {
+        name: "Restaurant & Cafe (Menu Bot)",
+        systemPrompt: `You are a polite, helpful customer service assistant for "Royal Spice Restaurant & Cafe".
+Answer customer questions about food, deals, prices, and home delivery politely and warmly in Urdu/English.
+When a customer asks for the menu, food list, deals, or prices, politely answer and append: [SEND_IMAGE: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800]`,
+        knowledgeBase: `RESTAURANT NAME: Royal Spice Cafe & Grill
+MENU IMAGE: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800
+TIMINGS: 12:00 PM to 1:00 AM Daily
+HOME DELIVERY: Free delivery on orders above Rs. 1,000. Delivery time: 30-45 minutes.
+PHONE / WHATSAPP: +92-300-1234567
+
+POPULAR MENU ITEMS & PRICES:
+- Chicken Special Biryani: Rs. 450
+- Chicken Karahi (Full / Half): Rs. 1,800 / Rs. 950
+- Chicken Malai Boti (Plate): Rs. 650
+- Beef Seekh Kabab (4 pcs): Rs. 600
+- Crispy Zinger Burger + Fries: Rs. 550
+- Large Pizza (13 inch): Rs. 1,450
+- Cold Drinks & Shakes: Rs. 150 - Rs. 350
+
+SPECIAL DEALS:
+- Deal 1 (Family Deal): 1 Full Karahi + 4 Naan + 1.5L Drink = Rs. 2,100
+- Deal 2 (Zinger Combo): 2 Zingers + 2 Fries + 2 Cold Drinks = Rs. 1,250`
+    },
     {
         name: "Jeweller & Gold Shop",
         systemPrompt: `You are an expert sales representative for a premier Jewelry & Gold store.
@@ -569,6 +594,17 @@ export default function AiBotClient() {
                             </div>
                         </div>
 
+                        {/* Smart Menu Media Detection Banner */}
+                        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3.5 flex items-start gap-3">
+                            <Sparkles size={16} className="text-primary shrink-0 mt-0.5" />
+                            <div className="text-xs space-y-1">
+                                <p className="font-semibold text-primary">Smart Menu & Media Image Detection</p>
+                                <p className="text-muted-foreground leading-relaxed text-[11px]">
+                                    Agar aapki knowledge base mein menu ya catalog image ka link mojood ho (maslan: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-mono text-[10px]">MENU IMAGE: https://...</code>), toh customer jab bhi menu, khana ya rates maangay ga, AI automatically samajh kar customer ko <strong>Menu Image</strong> bhej dega!
+                                </p>
+                            </div>
+                        </div>
+
                         <div>
                             <label className="text-xs font-semibold text-foreground block mb-1">
                                 Store Knowledge Base (Gold rates, Delivery rules, Return policy, Address, Prices):
@@ -624,22 +660,47 @@ export default function AiBotClient() {
 
                         {/* Messages Box */}
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2 styled-scrollbar mb-4">
-                            {playgroundMessages.map((msg, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                                >
+                            {playgroundMessages.map((msg, idx) => {
+                                const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*(https?:\/\/[^\s\]]+)\]/i;
+                                const mdImgRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/i;
+                                const match = msg.content.match(imgTagRegex) || msg.content.match(mdImgRegex);
+                                const imageUrl = match ? match[1].trim() : null;
+                                const cleanContent = match ? msg.content.replace(match[0], "").trim() : msg.content;
+
+                                return (
                                     <div
-                                        className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs font-sans whitespace-pre-wrap leading-relaxed shadow-sm ${
-                                            msg.role === "user"
-                                                ? "bg-primary text-primary-foreground rounded-br-xs"
-                                                : "bg-muted/70 text-foreground border border-border/50 rounded-bl-xs"
-                                        }`}
+                                        key={idx}
+                                        className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                                     >
-                                        {msg.content}
+                                        <div
+                                            className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs font-sans whitespace-pre-wrap leading-relaxed shadow-sm ${
+                                                msg.role === "user"
+                                                    ? "bg-primary text-primary-foreground rounded-br-xs"
+                                                    : "bg-muted/70 text-foreground border border-border/50 rounded-bl-xs"
+                                            }`}
+                                        >
+                                            <div>{cleanContent || (imageUrl ? "Yeh lijiye hamara menu:" : "")}</div>
+                                            {imageUrl && (
+                                                <div className="mt-2.5 rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/10 p-2 space-y-1.5">
+                                                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                                        <ImageIcon size={12} />
+                                                        <span>WhatsApp Menu / Image Attachment</span>
+                                                    </div>
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={imageUrl}
+                                                        alt="Attached Menu"
+                                                        className="w-full max-h-48 object-cover rounded-lg border border-border/40 shadow-sm"
+                                                        onError={(e) => {
+                                                            (e.target as HTMLElement).style.display = "none";
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
 
                             {testingAi && (
                                 <div className="flex justify-start">
