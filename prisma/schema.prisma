@@ -400,7 +400,7 @@ model BroadcastRecipient {
 model AiConfig {
   id              String   @id @default(cuid())
   sessionId       String   @unique
-  enabled         Boolean  @default(false)
+  enabled         Boolean  @default(true)
   provider        String   @default("openrouter") // openrouter, openai, gemini
   apiKey          String?  @db.Text
   modelName       String   @default("meta-llama/llama-3.1-8b-instruct:free")

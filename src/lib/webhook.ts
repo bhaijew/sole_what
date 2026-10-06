@@ -606,10 +606,24 @@ export async function onMessageReceived(sessionId: string, message: any, existin
             });
 
             if (dbSession) {
-                // Check AI Config for this session
-                const aiConfig = await prisma.aiConfig.findUnique({ where: { sessionId: dbSession.id } });
+                // Check AI Config for this session (auto-create if missing)
+                let aiConfig = await prisma.aiConfig.findUnique({ where: { sessionId: dbSession.id } });
+                if (!aiConfig) {
+                    try {
+                        aiConfig = await prisma.aiConfig.create({
+                            data: {
+                                sessionId: dbSession.id,
+                                enabled: true,
+                                provider: "openrouter",
+                                modelName: "meta-llama/llama-3.1-8b-instruct:free"
+                            }
+                        });
+                    } catch (e) {
+                        aiConfig = await prisma.aiConfig.findUnique({ where: { sessionId: dbSession.id } });
+                    }
+                }
 
-                if (aiConfig && aiConfig.enabled) {
+                if (aiConfig && aiConfig.enabled !== false) {
                     const fallbackOnly = (aiConfig as any)?.fallbackOnly !== false;
 
                     let isKeywordMatched = false;

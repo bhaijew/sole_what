@@ -45,10 +45,10 @@ export async function GET(
         return NextResponse.json({
             status: true,
             data: aiConfig || {
-                enabled: false,
+                enabled: true,
                 provider: "openrouter",
                 apiKey: "",
-                modelName: "openrouter/free",
+                modelName: "meta-llama/llama-3.1-8b-instruct:free",
                 systemPrompt: `You are a polite, helpful customer support assistant for a business. Answer customer questions accurately based ONLY on the provided Knowledge Base. Keep responses concise, friendly, and easy to read on WhatsApp.`,
                 knowledgeBase: "",
                 temperature: 0.7,

@@ -35,6 +35,41 @@ COMMUNICATION GUIDELINES:
 const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
 
 /**
+ * Extract image URLs from Knowledge Base (Menu Image 1 & 2, Catalog, etc.)
+ */
+export function extractImagesFromKnowledgeBase(knowledgeBase?: string): string[] {
+    const detectedImages: string[] = [];
+    if (!knowledgeBase) return detectedImages;
+
+    // 1. Explicit MENU IMAGE 1 & MENU IMAGE 2
+    const img1Match = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
+    const img2Match = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
+
+    if (img1Match && img1Match[1]) {
+        detectedImages.push(img1Match[1].trim());
+    }
+    if (img2Match && img2Match[1] && !detectedImages.includes(img2Match[1].trim())) {
+        detectedImages.push(img2Match[1].trim());
+    }
+
+    // 2. Generic labeled images
+    const labeledMatches = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/gi) || [];
+    for (const m of labeledMatches) {
+        const parts = m.split(/:\s*/);
+        const u = parts.length > 1 ? parts.slice(1).join(":").trim() : null;
+        if (u && !detectedImages.includes(u)) detectedImages.push(u);
+    }
+
+    // 3. Any standard web image URLs
+    const urlMatches = knowledgeBase.match(/https?:\/\/[^\s\)\"\'\,]+(?:jpg|jpeg|png|webp|gif)/gi) || [];
+    for (const u of urlMatches) {
+        if (!detectedImages.includes(u)) detectedImages.push(u);
+    }
+
+    return detectedImages;
+}
+
+/**
  * Generate AI response for incoming WhatsApp message
  */
 export async function generateAiResponse(
@@ -42,6 +77,7 @@ export async function generateAiResponse(
     userMessageText: string,
     isGroup: boolean = false
 ): Promise<string | null> {
+    let detectedImages: string[] = [];
     try {
         logger.info("AI-Bot", `[Check] Evaluating AI response for session ${sessionId} (isGroup: ${isGroup})...`);
 
@@ -63,41 +99,59 @@ export async function generateAiResponse(
 
         // Fetch AI Config for this session
         // @ts-ignore - Prisma model dynamic lookup
-        const aiConfig = await (prisma as any).aiConfig.findUnique({
+        let aiConfig = await (prisma as any).aiConfig.findUnique({
             where: { sessionId: session.id }
         });
 
         if (!aiConfig) {
-            logger.info("AI-Bot", `No AI Config found for session ${sessionId}.`);
+            logger.info("AI-Bot", `No AI Config found for session ${sessionId}. Creating active default...`);
+            try {
+                aiConfig = await (prisma as any).aiConfig.create({
+                    data: {
+                        sessionId: session.id,
+                        enabled: true,
+                        provider: "openrouter",
+                        modelName: "meta-llama/llama-3.1-8b-instruct:free",
+                        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+                        knowledgeBase: ""
+                    }
+                });
+            } catch (e) {
+                aiConfig = await (prisma as any).aiConfig.findUnique({
+                    where: { sessionId: session.id }
+                });
+            }
+        }
+
+        if (aiConfig && aiConfig.enabled === false) {
+            logger.info("AI-Bot", `AI Auto-Responder is explicitly DISABLED for session ${sessionId}.`);
             return null;
         }
 
-        if (!aiConfig.enabled) {
-            logger.info("AI-Bot", `AI Auto-Responder is DISABLED for session ${sessionId}.`);
-            return null;
-        }
-
-        if (isGroup && !aiConfig.triggerInGroups) {
+        if (isGroup && aiConfig && !aiConfig.triggerInGroups) {
             logger.info("AI-Bot", `Skipping AI response for group message (triggerInGroups is false).`);
             return null;
         }
 
-        const provider = aiConfig.provider || "openrouter";
+        const provider = aiConfig?.provider || "openrouter";
         // Check session apiKey first, then fall back to environment variables
         const envApiKey = 
             provider === "gemini" ? (process.env.GEMINI_API_KEY || "") :
             provider === "openai" ? (process.env.OPENAI_API_KEY || "") :
             (process.env.OPENROUTER_API_KEY || "");
-        const apiKey = aiConfig.apiKey?.trim() || envApiKey;
-        const modelName = aiConfig.modelName || (
+        const apiKey = aiConfig?.apiKey?.trim() || envApiKey;
+        const modelName = aiConfig?.modelName || (
             provider === "gemini" ? "gemini-1.5-flash" :
             provider === "openai" ? "gpt-4o-mini" :
             "openrouter/free"
         );
-        const systemPrompt = aiConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT;
-        const knowledgeBase = aiConfig.knowledgeBase || "";
+        const systemPrompt = aiConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+        const knowledgeBase = aiConfig?.knowledgeBase || "";
 
-        logger.info("AI-Bot", `[Generating] Calling AI API (provider: ${provider}, model: ${modelName})...`);
+        // Extract detected images immediately so they are available in both success & fallback
+        detectedImages = extractImagesFromKnowledgeBase(knowledgeBase);
+
+        logger.info("AI-Bot", `[Generating] Calling AI API (provider: ${provider}, model: ${modelName}, images: ${detectedImages.length})...`);
 
         const aiReply = await callAiApi({
             provider,
@@ -106,21 +160,21 @@ export async function generateAiResponse(
             systemPrompt,
             knowledgeBase,
             userPrompt: userMessageText,
-            temperature: aiConfig.temperature || 0.7,
-            maxTokens: aiConfig.maxTokens || 800
+            temperature: aiConfig?.temperature || 0.7,
+            maxTokens: aiConfig?.maxTokens || 800
         });
 
         if (aiReply) {
             logger.success("AI-Bot", `[Success] AI generated ${aiReply.length} chars response.`);
+            return aiReply;
         } else {
-            logger.warn("AI-Bot", `AI generated empty response.`);
+            logger.warn("AI-Bot", `AI generated empty response. Using natural fallback.`);
+            return getNaturalFallbackReply(userMessageText, detectedImages);
         }
-
-        return aiReply;
 
     } catch (error: any) {
         logger.error("AI-Service", `Error generating AI response: ${error?.message || error}`);
-        return getNaturalFallbackReply(userMessageText, []);
+        return getNaturalFallbackReply(userMessageText, detectedImages);
     }
 }
 
@@ -262,12 +316,8 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
         }
 
         const fallback = getNaturalFallbackReply(userPrompt, detectedImages);
-        if (fallback) {
-            logger.info("AI-Bot", `Used natural conversational fallback for: "${userPrompt}"`);
-            return fallback;
-        }
-
-        throw new Error(`All OpenRouter free models failed. Last error: ${lastErrorMsg}`);
+        logger.info("AI-Bot", `Used natural conversational fallback for: "${userPrompt}"`);
+        return fallback;
     }
 
     // 2. OPENAI (ChatGPT Direct API)
@@ -352,11 +402,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     }
 
     const fallback = getNaturalFallbackReply(userPrompt, detectedImages);
-    if (fallback) {
-        return fallback;
-    }
-
-    throw new Error(`Unsupported AI provider: ${provider}`);
+    return fallback;
 }
 
 /**
@@ -368,15 +414,12 @@ function finalizeAiReply(
     rawReply: string | null,
     userPrompt: string,
     detectedImages: string[]
-): string | null {
+): string {
     const trimmedPrompt = (userPrompt || "").trim().toLowerCase();
-    const isMenuQuery = /\b(menu|khana|deals?|rate|rates|price|prices|food|catalog|catalogue|card|list)\b/i.test(trimmedPrompt);
+    const isMenuQuery = /\b(menu|khana|deals?|rate|rates|price|prices|food|catalog|catalogue|card|list)\b/i.test(trimmedPrompt) ||
+        /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu)/i.test(trimmedPrompt);
 
     if (!rawReply || rawReply.trim().length === 0) {
-        if (isMenuQuery && detectedImages.length > 0) {
-            const tags = detectedImages.map((u) => `[SEND_IMAGE: ${u}]`).join(" ");
-            return `G bilkul! Yeh lijiye hamara complete menu aur special deals:\n${tags}`;
-        }
         return getNaturalFallbackReply(userPrompt, detectedImages);
     }
 
@@ -396,30 +439,60 @@ function finalizeAiReply(
 
 /**
  * Natural Pakistani Roman Urdu conversational fallback
+ * Never returns null, guaranteeing that the bot always responds politely!
  */
-function getNaturalFallbackReply(userPrompt: string, detectedImages: string[]): string | null {
+export function getNaturalFallbackReply(userPrompt: string, detectedImages: string[]): string {
     const p = (userPrompt || "").trim().toLowerCase();
 
-    // Greetings + How are you
-    if (/^(?:aoa\s*kay\s*hal\s*ha|aoa\s*kia\s*hal\s*ha|aoa\s*kaise\s*ho|salam\s*kia\s*hal\s*hai?|salam\s*kay\s*hal\s*ha)/i.test(p)) {
+    // 1. Check for Menu / Food / Deals / Rates / Catalog queries FIRST (Highest priority)
+    // Matches "menu send karo", "kaho menu send karo", "menu dikhao", "menu bhejo", "bhai menu", "rates", "deals", etc.
+    const isMenuQuery = /\b(menu|khana|deal|deals|rate|rates|price|prices|food|catalog|catalogue|card|list|items?|dish|dishes)\b/i.test(p) ||
+        /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu|menu\s*chahiye|rate\s*list)/i.test(p);
+
+    if (isMenuQuery) {
+        const isGreetingPresent = /\b(aoa|salam|assalam|hi|hello)\b/i.test(p);
+        const greetingPrefix = isGreetingPresent ? "Walaikum Assalam! " : "G bilkul! ";
+
+        if (detectedImages.length >= 2) {
+            return `${greetingPrefix}Yeh lijiye hamara complete menu aur special deals:\n[SEND_IMAGE: ${detectedImages[0]}] [SEND_IMAGE: ${detectedImages[1]}]`;
+        } else if (detectedImages.length === 1) {
+            return `${greetingPrefix}Yeh lijiye hamara complete menu aur special deals:\n[SEND_IMAGE: ${detectedImages[0]}]`;
+        } else {
+            return `${greetingPrefix}Hamare cafe / restaurant ka menu aur special deals dekhne ke liye shukriya. Aap yahan kisi bhi item, deals ya order ke bare mein pooch sakte hain, hamara staff aapki mukammal rehnumai kare ga!`;
+        }
+    }
+
+    // 2. Greetings + How are you combined
+    if (/(?:aoa|salam|assalam).*?(?:kay|kia|kya).*?(?:hal|haal)|(?:kay|kia|kya).*?(?:hal|haal).*?(?:aoa|salam)/i.test(p) ||
+        /(?:aoa|salam|assalam).*?(?:kaise\s*ho|how\s*are\s*you)/i.test(p)) {
         return "Walaikum Assalam! Alhamdulillah main bilkul theek hoon. Aap sunayein aap kaise hain? Main aapki kya khidmat kar sakta hoon?";
     }
 
-    // Pure Greetings
-    if (/^(?:aoa|salam|assalam\s*o\s*alaikum|asalam\s*u\s*alaikum|aslam\s*o\s*alikum|hi|hello)\b/i.test(p) && !/\b(menu|khana|deal|rate|price)\b/i.test(p)) {
+    // 3. Pure Greetings
+    if (/\b(aoa|salam|assalam\s*o\s*alaikum|asalam\s*u\s*alaikum|aslam\s*o\s*alikum|aslam\s*alikum|hi|hello|hey)\b/i.test(p)) {
         return "Walaikum Assalam! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon?";
     }
 
-    // Pure How are you
-    if (/^(?:kay\s*hal\s*ha|kia\s*hal\s*ha|kia\s*hal\s*hai?|kya\s*haal\s*hai?|kaise\s*ho|how\s*are\s*you)$/i.test(p)) {
+    // 4. Pure How are you
+    if (/(?:kay\s*hal\s*ha|kia\s*hal\s*ha|kia\s*hal\s*hai?|kya\s*haal\s*hai?|kaise\s*ho|kese\s*ho|how\s*are\s*you)/i.test(p)) {
         return "Alhamdulillah main bilkul theek hoon! Aap sunayein aap kaise hain? Main aapki kya madad ya khidmat kar sakta hoon?";
     }
 
-    // Single word Menu request
-    if (/^(?:menu|rate\s*list|rates|food\s*menu|deals)$/i.test(p) && detectedImages.length > 0) {
-        const tags = detectedImages.map((u) => `[SEND_IMAGE: ${u}]`).join(" ");
-        return `G bilkul! Yeh lijiye hamara complete menu aur special deals:\n${tags}`;
+    // 5. Timings & Working Hours
+    if (/\b(timing|timings|timing\s*kya|open|close|kab\s*open|waqt)\b/i.test(p)) {
+        return "Hamare restaurant / cafe ki timing daily open rehti hai. Aap apna order ya booking kisi bhi waqt yahan confirm karwa sakte hain.";
     }
 
-    return null;
+    // 6. Location & Address
+    if (/\b(location|address|kahan\s*hai|kahan\s*par|kider\s*hai|branch)\b/i.test(p)) {
+        return "Aap hamari exact branch location aur directions ke liye hamare staff se rabta kar sakte hain ya apna area bata dein.";
+    }
+
+    // 7. Order & Delivery queries
+    if (/\b(order|delivery|home\s*delivery|parcel|book|booking)\b/i.test(p)) {
+        return "G bilkul! Aap apna order items aur delivery address yahan message kar dein, hamari team foran confirm kare gi.";
+    }
+
+    // 8. Polite General Fallback (ensures bot NEVER goes silent)
+    return "Assalam-o-Alaikum! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon? Aap apna sawal, menu request ya order yahan message kar sakte hain.";
 }

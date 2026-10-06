@@ -190,10 +190,10 @@ export default function AiBotClient() {
 
     // AI Config State
     const [config, setConfig] = useState<AiConfigData>({
-        enabled: false,
-        provider: "gemini",
+        enabled: true,
+        provider: "openrouter",
         apiKey: "",
-        modelName: "gemini-1.5-flash",
+        modelName: "meta-llama/llama-3.1-8b-instruct:free",
         systemPrompt: PRESETS[0].systemPrompt,
         knowledgeBase: PRESETS[0].knowledgeBase,
         temperature: 0.7,
