@@ -49,17 +49,25 @@ export async function POST(request: NextRequest) {
             }, { status: 400 });
         }
 
-        // Ensure directory exists
+        // Ensure directories exist
+        const publicUploadDir = path.join(process.cwd(), "public", "uploads");
         await mkdir(UPLOAD_DIR, { recursive: true });
+        await mkdir(publicUploadDir, { recursive: true });
 
         // Generate unique safe filename
         const safeExt = ext === ".jpeg" ? ".jpg" : ext;
         const randomId = crypto.randomBytes(8).toString("hex");
         const filename = `menu-${Date.now()}-${randomId}${safeExt}`;
         const filePath = path.join(UPLOAD_DIR, filename);
+        const publicFilePath = path.join(publicUploadDir, filename);
 
         const buffer = Buffer.from(await file.arrayBuffer());
         await writeFile(filePath, buffer);
+        try {
+            await writeFile(publicFilePath, buffer);
+        } catch (e) {
+            console.warn("Could not copy to public/uploads:", e);
+        }
 
         // Derive base URL for WhatsApp & client access
         const origin = request.nextUrl.origin || process.env.NEXTAUTH_URL || process.env.BASE_URL || "http://localhost:3000";

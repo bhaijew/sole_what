@@ -290,9 +290,12 @@ export class ChatService {
                 const targetUrl = msgPayload.image.url;
                 if (targetUrl.startsWith("/api/uploads/") || targetUrl.startsWith("/uploads/")) {
                     const filename = targetUrl.split("/").pop();
-                    const localPath = filename ? path.join(process.cwd(), "data", "uploads", filename) : "";
-                    if (localPath && existsSync(localPath)) {
-                        msgPayload.image = await readFile(localPath);
+                    const localDataPath = filename ? path.join(process.cwd(), "data", "uploads", filename) : "";
+                    const localPublicPath = filename ? path.join(process.cwd(), "public", "uploads", filename) : "";
+                    if (localDataPath && existsSync(localDataPath)) {
+                        msgPayload.image = await readFile(localDataPath);
+                    } else if (localPublicPath && existsSync(localPublicPath)) {
+                        msgPayload.image = await readFile(localPublicPath);
                     } else {
                         const baseUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
                         const res = await fetch(`${baseUrl}${targetUrl}`);

@@ -192,7 +192,7 @@ export async function callAiApi(params: {
     temperature?: number;
     maxTokens?: number;
 }): Promise<string> {
-    const { systemPrompt, knowledgeBase, userPrompt, temperature = 0.7, maxTokens = 800 } = params;
+    const { systemPrompt, knowledgeBase, userPrompt, temperature = 0.7, maxTokens = 800, provider, apiKey } = params;
 
     // Detect image URLs in Knowledge Base (Menu Image 1 & 2, Catalog, etc.)
     const detectedImages: string[] = extractImagesFromKnowledgeBase(knowledgeBase);

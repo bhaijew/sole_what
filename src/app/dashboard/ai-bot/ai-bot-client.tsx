@@ -245,12 +245,71 @@ export default function AiBotClient() {
 
     const { image1: currentMenuImage1, image2: currentMenuImage2 } = extractMenuImages(config.knowledgeBase);
 
+    const applyImagesToConfig = (
+        prevKb: string,
+        prevPrompt: string,
+        newImg1: string | null,
+        newImg2: string | null
+    ) => {
+        let updatedKb = prevKb
+            .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+            .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+            .replace(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+            .trim();
+
+        const headers: string[] = [];
+        if (newImg1) headers.push(`MENU IMAGE 1: ${newImg1}`);
+        if (newImg2) headers.push(`MENU IMAGE 2: ${newImg2}`);
+
+        if (headers.length > 0) {
+            updatedKb = `${headers.join("\n")}\n\n${updatedKb}`;
+        }
+
+        let updatedPrompt = prevPrompt
+            .replace(/(\r?\n)?When the customer asks for the menu[^\n\r]+\[SEND_IMAGE:[^\]]+\](?:\s*\[SEND_IMAGE:[^\]]+\])?/gi, "")
+            .trim();
+
+        if (newImg1 && newImg2) {
+            updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${newImg1}] [SEND_IMAGE: ${newImg2}]`;
+        } else if (newImg1 || newImg2) {
+            const single = newImg1 || newImg2;
+            updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${single}]`;
+        }
+
+        return { updatedKb, updatedPrompt };
+    };
+
+    const persistConfigToDb = async (updatedConfig: AiConfigData, toastId?: string | number) => {
+        if (!selectedSessionId) {
+            if (toastId) toast.error("Please select a session first", { id: toastId });
+            return false;
+        }
+        try {
+            const res = await fetch(`/api/sessions/${selectedSessionId}/ai-config`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updatedConfig)
+            });
+            const data = await res.json();
+            if (data.status) {
+                if (toastId) toast.success("Image saved & active in AI Bot!", { id: toastId });
+                return true;
+            } else {
+                if (toastId) toast.error(data.message || "Failed to save configuration", { id: toastId });
+                return false;
+            }
+        } catch (err: any) {
+            if (toastId) toast.error(err.message || "Network error while saving", { id: toastId });
+            return false;
+        }
+    };
+
     const handleMenuImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         setUploadingSlot(slot);
-        const toastId = toast.loading(`Uploading Menu Image ${slot}...`);
+        const toastId = toast.loading(`Uploading & Saving Image ${slot}...`);
 
         try {
             const formData = new FormData();
@@ -265,49 +324,25 @@ export default function AiBotClient() {
             if (data.status && data.data?.url) {
                 const uploadedUrl = data.data.url;
 
-                // Update knowledgeBase & systemPrompt
-                setConfig((prev) => {
-                    let updatedKb = prev.knowledgeBase;
-                    const { image1, image2 } = extractMenuImages(updatedKb);
-                    const newImg1 = slot === 1 ? uploadedUrl : image1;
-                    const newImg2 = slot === 2 ? uploadedUrl : image2;
+                const { image1, image2 } = extractMenuImages(config.knowledgeBase);
+                const newImg1 = slot === 1 ? uploadedUrl : image1;
+                const newImg2 = slot === 2 ? uploadedUrl : image2;
 
-                    // Remove old MENU IMAGE lines
-                    updatedKb = updatedKb
-                        .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
-                        .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
-                        .replace(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
-                        .trim();
+                const { updatedKb, updatedPrompt } = applyImagesToConfig(
+                    config.knowledgeBase,
+                    config.systemPrompt,
+                    newImg1,
+                    newImg2
+                );
 
-                    // Prepend new image tags at top
-                    const headers: string[] = [];
-                    if (newImg1) headers.push(`MENU IMAGE 1: ${newImg1}`);
-                    if (newImg2) headers.push(`MENU IMAGE 2: ${newImg2}`);
+                const newConfig: AiConfigData = {
+                    ...config,
+                    knowledgeBase: updatedKb,
+                    systemPrompt: updatedPrompt
+                };
 
-                    if (headers.length > 0) {
-                        updatedKb = `${headers.join("\n")}\n\n${updatedKb}`;
-                    }
-
-                    // Update system prompt instruction
-                    let updatedPrompt = prev.systemPrompt
-                        .replace(/(\r?\n)?When the customer asks for the menu[^\n\r]+\[SEND_IMAGE:[^\]]+\](?:\s*\[SEND_IMAGE:[^\]]+\])?/gi, "")
-                        .trim();
-
-                    if (newImg1 && newImg2) {
-                        updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${newImg1}] [SEND_IMAGE: ${newImg2}]`;
-                    } else if (newImg1 || newImg2) {
-                        const single = newImg1 || newImg2;
-                        updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${single}]`;
-                    }
-
-                    return {
-                        ...prev,
-                        knowledgeBase: updatedKb,
-                        systemPrompt: updatedPrompt
-                    };
-                });
-
-                toast.success(`Menu Image ${slot} uploaded successfully! Click 'Save AI Configuration' to activate.`, { id: toastId });
+                setConfig(newConfig);
+                await persistConfigToDb(newConfig, toastId);
             } else {
                 toast.error(data.message || "Failed to upload image", { id: toastId });
             }
@@ -320,45 +355,52 @@ export default function AiBotClient() {
         }
     };
 
-    const handleRemoveMenuImage = (slot: 1 | 2) => {
-        setConfig((prev) => {
-            let updatedKb = prev.knowledgeBase;
-            const { image1, image2 } = extractMenuImages(updatedKb);
-            const newImg1 = slot === 1 ? null : image1;
-            const newImg2 = slot === 2 ? null : image2;
+    const handleRemoveMenuImage = async (slot: 1 | 2) => {
+        const toastId = toast.loading(`Removing Image ${slot}...`);
+        const { image1, image2 } = extractMenuImages(config.knowledgeBase);
+        const newImg1 = slot === 1 ? null : image1;
+        const newImg2 = slot === 2 ? null : image2;
 
-            updatedKb = updatedKb
-                .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
-                .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
-                .replace(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
-                .trim();
+        const { updatedKb, updatedPrompt } = applyImagesToConfig(
+            config.knowledgeBase,
+            config.systemPrompt,
+            newImg1,
+            newImg2
+        );
 
-            const headers: string[] = [];
-            if (newImg1) headers.push(`MENU IMAGE 1: ${newImg1}`);
-            if (newImg2) headers.push(`MENU IMAGE 2: ${newImg2}`);
+        const newConfig: AiConfigData = {
+            ...config,
+            knowledgeBase: updatedKb,
+            systemPrompt: updatedPrompt
+        };
 
-            if (headers.length > 0) {
-                updatedKb = `${headers.join("\n")}\n\n${updatedKb}`;
-            }
+        setConfig(newConfig);
+        await persistConfigToDb(newConfig, toastId);
+    };
 
-            let updatedPrompt = prev.systemPrompt
-                .replace(/(\r?\n)?When the customer asks for the menu[^\n\r]+\[SEND_IMAGE:[^\]]+\](?:\s*\[SEND_IMAGE:[^\]]+\])?/gi, "")
-                .trim();
+    const handleSetImageUrl = async (slot: 1 | 2, url: string) => {
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        const toastId = toast.loading(`Saving Image ${slot} URL...`);
+        const { image1, image2 } = extractMenuImages(config.knowledgeBase);
+        const newImg1 = slot === 1 ? trimmed : image1;
+        const newImg2 = slot === 2 ? trimmed : image2;
 
-            if (newImg1 && newImg2) {
-                updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${newImg1}] [SEND_IMAGE: ${newImg2}]`;
-            } else if (newImg1 || newImg2) {
-                const single = newImg1 || newImg2;
-                updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${single}]`;
-            }
+        const { updatedKb, updatedPrompt } = applyImagesToConfig(
+            config.knowledgeBase,
+            config.systemPrompt,
+            newImg1,
+            newImg2
+        );
 
-            return {
-                ...prev,
-                knowledgeBase: updatedKb,
-                systemPrompt: updatedPrompt
-            };
-        });
-        toast.info(`Menu Image ${slot} removed.`);
+        const newConfig: AiConfigData = {
+            ...config,
+            knowledgeBase: updatedKb,
+            systemPrompt: updatedPrompt
+        };
+
+        setConfig(newConfig);
+        await persistConfigToDb(newConfig, toastId);
     };
 
     useEffect(() => {
@@ -397,8 +439,8 @@ export default function AiBotClient() {
                         provider: fetchedProvider,
                         apiKey: res.data.apiKey || "",
                         modelName: res.data.modelName || defaultModel,
-                        systemPrompt: res.data.systemPrompt || PRESETS[0].systemPrompt,
-                        knowledgeBase: res.data.knowledgeBase || PRESETS[0].knowledgeBase,
+                        systemPrompt: res.data.systemPrompt !== null && res.data.systemPrompt !== undefined ? res.data.systemPrompt : PRESETS[0].systemPrompt,
+                        knowledgeBase: res.data.knowledgeBase !== null && res.data.knowledgeBase !== undefined ? res.data.knowledgeBase : PRESETS[0].knowledgeBase,
                         temperature: res.data.temperature ?? 0.7,
                         maxTokens: res.data.maxTokens ?? 800,
                         triggerInGroups: res.data.triggerInGroups ?? false,

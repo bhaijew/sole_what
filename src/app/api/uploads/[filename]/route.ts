@@ -25,10 +25,14 @@ export async function GET(
             return NextResponse.json({ status: false, message: "Invalid filename" }, { status: 400 });
         }
 
-        const filePath = path.join(UPLOAD_DIR, filename);
-
+        let filePath = path.join(UPLOAD_DIR, filename);
         if (!existsSync(filePath)) {
-            return NextResponse.json({ status: false, message: "File not found" }, { status: 404 });
+            const publicPath = path.join(process.cwd(), "public", "uploads", filename);
+            if (existsSync(publicPath)) {
+                filePath = publicPath;
+            } else {
+                return NextResponse.json({ status: false, message: "File not found" }, { status: 404 });
+            }
         }
 
         const ext = path.extname(filename).toLowerCase();
