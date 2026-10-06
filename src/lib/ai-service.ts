@@ -10,19 +10,27 @@ export interface AiTestRequest {
     userPrompt: string;
 }
 
-const DEFAULT_SYSTEM_PROMPT = `You are a polite, helpful customer support assistant for a business. 
-Your goal is to answer customer questions accurately based ONLY on the provided Knowledge Base.
-If you don't know the answer or if it is not in the knowledge base, politely inform the customer and offer to connect them with a human team member.
-Keep responses concise, friendly, and easy to read on WhatsApp.
+const DEFAULT_SYSTEM_PROMPT = `You are a polite, natural, and friendly customer support assistant for this business on WhatsApp.
+Communicate naturally in polite Pakistani Roman Urdu (or English if the customer speaks English).
 
-MEDIA & IMAGE SENDING CAPABILITY:
-If the Knowledge Base contains any image URL (e.g. Menu card, Catalog, Price list, Product photo) AND the customer asks for the menu, food list, catalog, price list, or pictures:
-1. Provide a polite, warm, and helpful answer.
-2. At the end of your response, output the image trigger tag: [SEND_IMAGE: <imageUrl>]
-Example:
-"G bilkul! Yeh lijiye hamara latest menu card. [SEND_IMAGE: https://example.com/menu.jpg]"
+COMMUNICATION GUIDELINES:
+1. GREETINGS & CASUAL CHAT (Natural Roman Urdu):
+- Agar customer "aoa", "AOA", "salam", "assalam o alaikum", "hi", "hello" likhay:
+  Pyaar aur adab se jawab dein: "Walaikum Assalam! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon?"
+- Agar customer "kay hal ha", "kia hal ha", "kya haal hai", "kaise ho", "how are you" likhay:
+  Natural aur dostana jawab dein: "Alhamdulillah, main bilkul theek hoon! Aap sunayein aap kaise hain? Main aapki kya madad ya khidmat kar sakta hoon?"
+- Agar customer dono poochay (e.g. "aoa kay hal ha" ya "salam kia hal ha"):
+  "Walaikum Assalam! Alhamdulillah main theek hoon. Aap sunayein kaise hain? Main aapki kya khidmat kar sakta hoon?"
 
-Our automated WhatsApp dispatcher will parse this tag and send the real image directly to the customer on WhatsApp!`;
+2. MENU & FOOD REQUESTS (Even for single-word queries):
+- Agar customer sirf aik lafz "menu", "Menu", "MENU", "khana", "deals", "rates", "rate list" bhi likhay ya maangay:
+  Foran polite jawab dein (e.g. "G zaroor! Yeh lijiye hamara complete menu aur special deals:") aur message ke end mein image tags zaroor attach karein.
+- Agar customer "aoa menu" ya "salam menu dikhao" likhay to pehle salam ka jawab dein phr menu aur image tags attach karein.
+
+3. ACCURACY & KNOWLEDGE BASE:
+- Har sawal ka jawab strictly neeche di gayi Business Knowledge Base ke mutabiq dein.
+- Jawab mukhtasar, clear aur WhatsApp ke liye easy-to-read rakhein.
+- Agar koi aisi baat ho jo Knowledge Base mein na ho, to politely kahein: "Is bare mein mazeed maloomat ke liye hamare staff se rabta karein."`;
 
 const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
 
@@ -112,7 +120,7 @@ export async function generateAiResponse(
 
     } catch (error: any) {
         logger.error("AI-Service", `Error generating AI response: ${error?.message || error}`);
-        return null;
+        return getNaturalFallbackReply(userMessageText, []);
     }
 }
 
@@ -245,12 +253,18 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                 const content = data?.choices?.[0]?.message?.content;
                 if (content && content.trim().length > 0) {
                     logger.success("AI-Bot", `OpenRouter successfully generated response using: ${currentModel}`);
-                    return content.trim();
+                    return finalizeAiReply(content, userPrompt, detectedImages);
                 }
             } catch (err: any) {
                 lastErrorMsg = err?.message || String(err);
                 logger.warn("AI-Bot", `OpenRouter model "${currentModel}" encountered error: ${lastErrorMsg}. Falling back to next free model...`);
             }
+        }
+
+        const fallback = getNaturalFallbackReply(userPrompt, detectedImages);
+        if (fallback) {
+            logger.info("AI-Bot", `Used natural conversational fallback for: "${userPrompt}"`);
+            return fallback;
         }
 
         throw new Error(`All OpenRouter free models failed. Last error: ${lastErrorMsg}`);
@@ -289,7 +303,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
 
         const data = await response.json();
         const content = data?.choices?.[0]?.message?.content;
-        return content ? content.trim() : null;
+        return finalizeAiReply(content, userPrompt, detectedImages);
     }
 
     // 3. GOOGLE GEMINI API
@@ -334,8 +348,78 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
 
         const data = await response.json();
         const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        return content ? content.trim() : null;
+        return finalizeAiReply(content, userPrompt, detectedImages);
+    }
+
+    const fallback = getNaturalFallbackReply(userPrompt, detectedImages);
+    if (fallback) {
+        return fallback;
     }
 
     throw new Error(`Unsupported AI provider: ${provider}`);
+}
+
+/**
+ * Post-processes AI reply:
+ * - If user asked for menu / khana / deals / rates, guarantees image tags are attached.
+ * - If user asked natural greetings (aoa, kay hal ha), keeps conversational tone clean.
+ */
+function finalizeAiReply(
+    rawReply: string | null,
+    userPrompt: string,
+    detectedImages: string[]
+): string | null {
+    const trimmedPrompt = (userPrompt || "").trim().toLowerCase();
+    const isMenuQuery = /\b(menu|khana|deals?|rate|rates|price|prices|food|catalog|catalogue|card|list)\b/i.test(trimmedPrompt);
+
+    if (!rawReply || rawReply.trim().length === 0) {
+        if (isMenuQuery && detectedImages.length > 0) {
+            const tags = detectedImages.map((u) => `[SEND_IMAGE: ${u}]`).join(" ");
+            return `G bilkul! Yeh lijiye hamara complete menu aur special deals:\n${tags}`;
+        }
+        return getNaturalFallbackReply(userPrompt, detectedImages);
+    }
+
+    let processed = rawReply.trim();
+
+    // If customer asked for menu / khana / deals / rates, ensure image tags are attached
+    if (detectedImages.length > 0 && isMenuQuery) {
+        const hasImageTag = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*[^\]]+\]/i.test(processed);
+        if (!hasImageTag) {
+            const tags = detectedImages.map((u) => `[SEND_IMAGE: ${u}]`).join(" ");
+            processed = `${processed}\n\n${tags}`;
+        }
+    }
+
+    return processed;
+}
+
+/**
+ * Natural Pakistani Roman Urdu conversational fallback
+ */
+function getNaturalFallbackReply(userPrompt: string, detectedImages: string[]): string | null {
+    const p = (userPrompt || "").trim().toLowerCase();
+
+    // Greetings + How are you
+    if (/^(?:aoa\s*kay\s*hal\s*ha|aoa\s*kia\s*hal\s*ha|aoa\s*kaise\s*ho|salam\s*kia\s*hal\s*hai?|salam\s*kay\s*hal\s*ha)/i.test(p)) {
+        return "Walaikum Assalam! Alhamdulillah main bilkul theek hoon. Aap sunayein aap kaise hain? Main aapki kya khidmat kar sakta hoon?";
+    }
+
+    // Pure Greetings
+    if (/^(?:aoa|salam|assalam\s*o\s*alaikum|asalam\s*u\s*alaikum|aslam\s*o\s*alikum|hi|hello)\b/i.test(p) && !/\b(menu|khana|deal|rate|price)\b/i.test(p)) {
+        return "Walaikum Assalam! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon?";
+    }
+
+    // Pure How are you
+    if (/^(?:kay\s*hal\s*ha|kia\s*hal\s*ha|kia\s*hal\s*hai?|kya\s*haal\s*hai?|kaise\s*ho|how\s*are\s*you)$/i.test(p)) {
+        return "Alhamdulillah main bilkul theek hoon! Aap sunayein aap kaise hain? Main aapki kya madad ya khidmat kar sakta hoon?";
+    }
+
+    // Single word Menu request
+    if (/^(?:menu|rate\s*list|rates|food\s*menu|deals)$/i.test(p) && detectedImages.length > 0) {
+        const tags = detectedImages.map((u) => `[SEND_IMAGE: ${u}]`).join(" ");
+        return `G bilkul! Yeh lijiye hamara complete menu aur special deals:\n${tags}`;
+    }
+
+    return null;
 }
