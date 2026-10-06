@@ -626,34 +626,80 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                 if (aiReply && aiReply.trim().length > 0) {
                                     logger.info("AI-Bot", `Auto replying to ${normalizedFrom} via AI...`);
 
-                                    // Check if AI output includes an image trigger tag: [SEND_IMAGE: <url>] or markdown ![...](<url>)
-                                    const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+)\]/i;
-                                    const mdImgRegex = /!\[.*?\]\(((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+)\)/i;
-                                    const imgMatch = aiReply.match(imgTagRegex) || aiReply.match(mdImgRegex);
+                                    // Check if AI output includes image trigger tags: [SEND_IMAGE: <url>] or markdown ![...](<url>)
+                                    const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+)\]/gi;
+                                    const mdImgRegex = /!\[.*?\]\(((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+)\)/gi;
 
-                                    if (imgMatch) {
-                                        const imageUrl = imgMatch[1].trim();
-                                        const cleanText = aiReply.replace(imgMatch[0], "").trim();
-                                        logger.info("AI-Bot", `AI triggered image send: ${imageUrl} for ${normalizedFrom}`);
+                                    const imageMatches: string[] = [];
+                                    let tagMatch;
+                                    while ((tagMatch = imgTagRegex.exec(aiReply)) !== null) {
+                                        if (tagMatch[1] && !imageMatches.includes(tagMatch[1].trim())) {
+                                            imageMatches.push(tagMatch[1].trim());
+                                        }
+                                    }
+                                    let mdMatch;
+                                    while ((mdMatch = mdImgRegex.exec(aiReply)) !== null) {
+                                        if (mdMatch[1] && !imageMatches.includes(mdMatch[1].trim())) {
+                                            imageMatches.push(mdMatch[1].trim());
+                                        }
+                                    }
+
+                                    // Clean text by stripping image tags
+                                    const cleanText = aiReply
+                                        .replace(/\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*(?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+\]/gi, "")
+                                        .replace(/!\[.*?\]\((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+\)/gi, "")
+                                        .trim();
+
+                                    if (imageMatches.length > 0) {
+                                        logger.info("AI-Bot", `AI triggered ${imageMatches.length} image(s) send for ${normalizedFrom}: ${imageMatches.join(", ")}`);
 
                                         try {
-                                            // Send image with caption if cleanText fits in WhatsApp caption
-                                            if (cleanText.length <= 1000) {
-                                                await ChatService.sendTextMessage(sessionId, normalizedFrom, {
-                                                    image: { url: imageUrl },
-                                                    caption: cleanText || undefined
-                                                });
+                                            if (imageMatches.length === 1) {
+                                                // Single image dispatch
+                                                if (cleanText.length <= 1000) {
+                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                        image: { url: imageMatches[0] },
+                                                        caption: cleanText || undefined
+                                                    });
+                                                } else {
+                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                        image: { url: imageMatches[0] }
+                                                    });
+                                                }
                                             } else {
-                                                // Send text first, then image
-                                                await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
-                                                await ChatService.sendTextMessage(sessionId, normalizedFrom, {
-                                                    image: { url: imageUrl }
-                                                });
+                                                // Multiple images (e.g. Menu Page 1 & Page 2)
+                                                if (cleanText.length > 0 && cleanText.length <= 1000) {
+                                                    // Send Image 1 with main AI response text caption
+                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                        image: { url: imageMatches[0] },
+                                                        caption: cleanText
+                                                    });
+                                                } else {
+                                                    if (cleanText.length > 1000) {
+                                                        await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                        await new Promise((r) => setTimeout(r, 400));
+                                                    }
+                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                        image: { url: imageMatches[0] },
+                                                        caption: "📄 Menu (Page 1)"
+                                                    });
+                                                }
+
+                                                // Small delay (600ms) before sending subsequent images to preserve WhatsApp order
+                                                for (let i = 1; i < imageMatches.length; i++) {
+                                                    await new Promise((r) => setTimeout(r, 600));
+                                                    const pageLabel = i === 1 ? "📄 Menu (Page 2)" : `📄 Image ${i + 1}`;
+                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                        image: { url: imageMatches[i] },
+                                                        caption: pageLabel
+                                                    });
+                                                }
                                             }
-                                            logger.success("AI-Bot", `Successfully sent image attachment via AI to ${normalizedFrom}`);
+                                            logger.success("AI-Bot", `Successfully sent ${imageMatches.length} image attachment(s) via AI to ${normalizedFrom}`);
                                         } catch (imgError) {
-                                            logger.error("AI-Bot", "Failed to send image attachment, falling back to text:", imgError);
-                                            await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+                                            logger.error("AI-Bot", "Failed to send image attachment(s), falling back to text:", imgError);
+                                            await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText || aiReply.trim());
                                         }
                                     } else {
                                         await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());

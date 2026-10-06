@@ -92,9 +92,10 @@ const PRESETS = [
         name: "Restaurant & Cafe (Menu Bot)",
         systemPrompt: `You are a polite, helpful customer service assistant for "Royal Spice Restaurant & Cafe".
 Answer customer questions about food, deals, prices, and home delivery politely and warmly in Urdu/English.
-When a customer asks for the menu, food list, deals, or prices, politely answer and append: [SEND_IMAGE: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800]`,
+When a customer asks for the menu, food list, deals, or prices, politely answer and append: [SEND_IMAGE: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800] [SEND_IMAGE: https://images.unsplash.com/photo-1544025162-d76694265947?w=800]`,
         knowledgeBase: `RESTAURANT NAME: Royal Spice Cafe & Grill
-MENU IMAGE: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800
+MENU IMAGE 1: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800
+MENU IMAGE 2: https://images.unsplash.com/photo-1544025162-d76694265947?w=800
 TIMINGS: 12:00 PM to 1:00 AM Daily
 HOME DELIVERY: Free delivery on orders above Rs. 1,000. Delivery time: 30-45 minutes.
 PHONE / WHATSAPP: +92-300-1234567
@@ -192,27 +193,49 @@ export default function AiBotClient() {
     ]);
     const [userInput, setUserInput] = useState<string>("");
     const [testingAi, setTestingAi] = useState<boolean>(false);
-    const [uploadingImage, setUploadingImage] = useState<boolean>(false);
-    const menuFileInputRef = useRef<HTMLInputElement>(null);
+    const [uploadingSlot, setUploadingSlot] = useState<1 | 2 | null>(null);
+    const menuFile1Ref = useRef<HTMLInputElement>(null);
+    const menuFile2Ref = useRef<HTMLInputElement>(null);
 
-    // Extract active menu image from knowledgeBase
-    const extractMenuImage = (kb: string) => {
-        const match = kb.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*(https?:\/\/[^\s\)\"\']+|\/api\/uploads\/[^\s\)\"\']+)/i);
-        if (match) {
-            const parts = match[0].split(/:\s*/);
-            return parts.length > 1 ? parts.slice(1).join(":").trim() : null;
+    // Extract active menu images (Slot 1 and Slot 2) from knowledgeBase
+    const extractMenuImages = (kb: string) => {
+        let image1: string | null = null;
+        let image2: string | null = null;
+
+        // 1. Look for explicit MENU IMAGE 1 / MENU IMAGE 2
+        const img1Match = kb.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
+        if (img1Match && img1Match[1]) image1 = img1Match[1].trim();
+
+        const img2Match = kb.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
+        if (img2Match && img2Match[1]) image2 = img2Match[1].trim();
+
+        // 2. Generic labeled fallback
+        if (!image1) {
+            const singleMatch = kb.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
+            if (singleMatch && singleMatch[1]) {
+                image1 = singleMatch[1].trim();
+            }
         }
-        return null;
+
+        // 3. Fallback to any detected image URLs
+        if (!image1 || !image2) {
+            const allUrls = kb.match(/(?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\'\,]+(?:jpg|jpeg|png|webp|gif)?/gi) || [];
+            const cleanUrls = allUrls.filter(u => u.includes("/uploads/") || /\.(jpg|jpeg|png|webp|gif)/i.test(u));
+            if (!image1 && cleanUrls[0]) image1 = cleanUrls[0];
+            if (!image2 && cleanUrls[1] && cleanUrls[1] !== image1) image2 = cleanUrls[1];
+        }
+
+        return { image1, image2 };
     };
 
-    const currentMenuImage = extractMenuImage(config.knowledgeBase);
+    const { image1: currentMenuImage1, image2: currentMenuImage2 } = extractMenuImages(config.knowledgeBase);
 
-    const handleMenuImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMenuImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        setUploadingImage(true);
-        const toastId = toast.loading("Uploading menu image...");
+        setUploadingSlot(slot);
+        const toastId = toast.loading(`Uploading Menu Image ${slot}...`);
 
         try {
             const formData = new FormData();
@@ -230,18 +253,36 @@ export default function AiBotClient() {
                 // Update knowledgeBase & systemPrompt
                 setConfig((prev) => {
                     let updatedKb = prev.knowledgeBase;
-                    const regex = /(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\n\r]+/i;
-                    if (regex.test(updatedKb)) {
-                        updatedKb = updatedKb.replace(regex, `MENU IMAGE: ${uploadedUrl}`);
-                    } else {
-                        updatedKb = `MENU IMAGE: ${uploadedUrl}\n` + updatedKb;
+                    const { image1, image2 } = extractMenuImages(updatedKb);
+                    const newImg1 = slot === 1 ? uploadedUrl : image1;
+                    const newImg2 = slot === 2 ? uploadedUrl : image2;
+
+                    // Remove old MENU IMAGE lines
+                    updatedKb = updatedKb
+                        .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+                        .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+                        .replace(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+                        .trim();
+
+                    // Prepend new image tags at top
+                    const headers: string[] = [];
+                    if (newImg1) headers.push(`MENU IMAGE 1: ${newImg1}`);
+                    if (newImg2) headers.push(`MENU IMAGE 2: ${newImg2}`);
+
+                    if (headers.length > 0) {
+                        updatedKb = `${headers.join("\n")}\n\n${updatedKb}`;
                     }
 
-                    let updatedPrompt = prev.systemPrompt;
-                    if (!updatedPrompt.includes("[SEND_IMAGE:")) {
-                        updatedPrompt = `${updatedPrompt.trim()}\nWhen the customer asks for the menu, food items, or prices, politely answer and append: [SEND_IMAGE: ${uploadedUrl}]`;
-                    } else {
-                        updatedPrompt = updatedPrompt.replace(/\[SEND_IMAGE:\s*[^\]]+\]/g, `[SEND_IMAGE: ${uploadedUrl}]`);
+                    // Update system prompt instruction
+                    let updatedPrompt = prev.systemPrompt
+                        .replace(/(\r?\n)?When the customer asks for the menu[^\n\r]+\[SEND_IMAGE:[^\]]+\](?:\s*\[SEND_IMAGE:[^\]]+\])?/gi, "")
+                        .trim();
+
+                    if (newImg1 && newImg2) {
+                        updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${newImg1}] [SEND_IMAGE: ${newImg2}]`;
+                    } else if (newImg1 || newImg2) {
+                        const single = newImg1 || newImg2;
+                        updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${single}]`;
                     }
 
                     return {
@@ -251,32 +292,58 @@ export default function AiBotClient() {
                     };
                 });
 
-                toast.success("Menu image uploaded successfully! Click 'Save AI Configuration' to activate.", { id: toastId });
+                toast.success(`Menu Image ${slot} uploaded successfully! Click 'Save AI Configuration' to activate.`, { id: toastId });
             } else {
                 toast.error(data.message || "Failed to upload image", { id: toastId });
             }
         } catch (err: any) {
             toast.error(err.message || "Upload error", { id: toastId });
         } finally {
-            setUploadingImage(false);
-            if (menuFileInputRef.current) {
-                menuFileInputRef.current.value = "";
-            }
+            setUploadingSlot(null);
+            if (slot === 1 && menuFile1Ref.current) menuFile1Ref.current.value = "";
+            if (slot === 2 && menuFile2Ref.current) menuFile2Ref.current.value = "";
         }
     };
 
-    const handleRemoveMenuImage = () => {
+    const handleRemoveMenuImage = (slot: 1 | 2) => {
         setConfig((prev) => {
-            const regex = /(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\n\r]+(\r?\n)?/gi;
-            const updatedKb = prev.knowledgeBase.replace(regex, "").trim();
-            const updatedPrompt = prev.systemPrompt.replace(/(\r?\n)?When the customer asks for the menu[^\n\r]+\[SEND_IMAGE:[^\]]+\]/gi, "").trim();
+            let updatedKb = prev.knowledgeBase;
+            const { image1, image2 } = extractMenuImages(updatedKb);
+            const newImg1 = slot === 1 ? null : image1;
+            const newImg2 = slot === 2 ? null : image2;
+
+            updatedKb = updatedKb
+                .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+                .replace(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+                .replace(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*[^\r\n]+(\r?\n)?/gi, "")
+                .trim();
+
+            const headers: string[] = [];
+            if (newImg1) headers.push(`MENU IMAGE 1: ${newImg1}`);
+            if (newImg2) headers.push(`MENU IMAGE 2: ${newImg2}`);
+
+            if (headers.length > 0) {
+                updatedKb = `${headers.join("\n")}\n\n${updatedKb}`;
+            }
+
+            let updatedPrompt = prev.systemPrompt
+                .replace(/(\r?\n)?When the customer asks for the menu[^\n\r]+\[SEND_IMAGE:[^\]]+\](?:\s*\[SEND_IMAGE:[^\]]+\])?/gi, "")
+                .trim();
+
+            if (newImg1 && newImg2) {
+                updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${newImg1}] [SEND_IMAGE: ${newImg2}]`;
+            } else if (newImg1 || newImg2) {
+                const single = newImg1 || newImg2;
+                updatedPrompt = `${updatedPrompt}\nWhen the customer asks for the menu, food items, deals, or prices, politely answer and append: [SEND_IMAGE: ${single}]`;
+            }
+
             return {
                 ...prev,
                 knowledgeBase: updatedKb,
                 systemPrompt: updatedPrompt
             };
         });
-        toast.info("Menu image removed from Knowledge Base.");
+        toast.info(`Menu Image ${slot} removed.`);
     };
 
     useEffect(() => {
@@ -686,95 +753,180 @@ export default function AiBotClient() {
                         <div className="bg-primary/5 border border-primary/20 rounded-xl p-3.5 flex items-start gap-3">
                             <Sparkles size={16} className="text-primary shrink-0 mt-0.5" />
                             <div className="text-xs space-y-1">
-                                <p className="font-semibold text-primary">Smart Menu & Media Image Detection</p>
+                                <p className="font-semibold text-primary">Smart 2-Image Auto-Sender (Menu Page 1 & Page 2)</p>
                                 <p className="text-muted-foreground leading-relaxed text-[11px]">
-                                    Aap neeche direct apni <strong>Menu Image upload</strong> kar sakte hain. Customer jab bhi menu, khana ya rates maangay ga, AI automatically samajh kar customer ko <strong>Menu Image</strong> WhatsApp par send karega!
+                                    Aap yahan <strong>2 Menu Images (Page 1 aur Page 2 / Deals)</strong> upload kar sakte hain. Customer jab bhi WhatsApp par menu ya prices maangay ga, AI automatically <strong>dono images</strong> sequence mein send karega!
                                 </p>
                             </div>
                         </div>
 
-                        {/* Menu & Catalog Image Uploader Card */}
-                        <div className="bg-muted/30 border border-border/60 rounded-xl p-4 space-y-3">
+                        {/* Dual Menu Image Uploader (Slot 1 & Slot 2) */}
+                        <div className="space-y-2.5">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                                        <ImageIcon size={16} />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-foreground">Menu / Catalog Image (Auto-Sender)</h4>
-                                        <p className="text-[10px] text-muted-foreground">Upload menu picture jo AI customer ke maangne par automatically send karega</p>
-                                    </div>
-                                </div>
-
-                                <input
-                                    type="file"
-                                    ref={menuFileInputRef}
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleMenuImageUpload}
-                                />
-
-                                <button
-                                    type="button"
-                                    onClick={() => menuFileInputRef.current?.click()}
-                                    disabled={uploadingImage}
-                                    className="text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
-                                >
-                                    <Upload size={13} />
-                                    {uploadingImage ? "Uploading..." : currentMenuImage ? "Change Image" : "Upload Menu Image"}
-                                </button>
+                                <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                    <ImageIcon size={15} className="text-primary" />
+                                    <span>Menu & Media Images (2 Upload Slots)</span>
+                                </label>
+                                <span className="text-[10px] text-muted-foreground">
+                                    {currentMenuImage1 && currentMenuImage2 ? "2 Images Active" : currentMenuImage1 || currentMenuImage2 ? "1 Image Active" : "No Images Uploaded"}
+                                </span>
                             </div>
 
-                            {currentMenuImage ? (
-                                <div className="flex items-center gap-3 bg-background border border-border/60 rounded-lg p-2.5">
-                                    <div className="relative w-16 h-16 shrink-0 rounded-md overflow-hidden border border-border/50 bg-muted">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={currentMenuImage}
-                                            alt="Active Menu"
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                    <div className="flex-1 min-w-0 space-y-1 text-left">
+                            {/* Hidden file inputs for both slots */}
+                            <input
+                                type="file"
+                                ref={menuFile1Ref}
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleMenuImageUpload(e, 1)}
+                            />
+                            <input
+                                type="file"
+                                ref={menuFile2Ref}
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => handleMenuImageUpload(e, 2)}
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {/* SLOT 1: Menu Image 1 (Front / Page 1) */}
+                                <div className="bg-muted/30 border border-border/60 rounded-xl p-3.5 space-y-2.5">
+                                    <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                                <CheckCircle2 size={11} /> Ready for WhatsApp Auto-Send
-                                            </span>
+                                            <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">1</span>
+                                            <div>
+                                                <h4 className="text-xs font-semibold text-foreground">Menu Image 1 (Front / Page 1)</h4>
+                                                <p className="text-[10px] text-muted-foreground">Main menu card</p>
+                                            </div>
                                         </div>
-                                        <p className="text-[11px] font-mono text-muted-foreground truncate">{currentMenuImage}</p>
-                                        <div className="flex items-center gap-2 text-[10px]">
-                                            <button
-                                                type="button"
-                                                onClick={() => menuFileInputRef.current?.click()}
-                                                className="text-primary hover:underline font-medium"
-                                            >
-                                                Replace photo
-                                            </button>
-                                            <span className="text-muted-foreground/40">•</span>
-                                            <button
-                                                type="button"
-                                                onClick={handleRemoveMenuImage}
-                                                className="text-destructive hover:underline font-medium flex items-center gap-1"
-                                            >
-                                                <Trash2 size={10} /> Remove
-                                            </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => menuFile1Ref.current?.click()}
+                                            disabled={uploadingSlot === 1}
+                                            className="text-[11px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all disabled:opacity-50"
+                                        >
+                                            <Upload size={12} />
+                                            {uploadingSlot === 1 ? "Uploading..." : currentMenuImage1 ? "Change" : "Upload"}
+                                        </button>
+                                    </div>
+
+                                    {currentMenuImage1 ? (
+                                        <div className="flex items-center gap-2.5 bg-background border border-border/60 rounded-lg p-2">
+                                            <div className="relative w-14 h-14 shrink-0 rounded-md overflow-hidden border border-border/50 bg-muted">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={currentMenuImage1}
+                                                    alt="Menu 1"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-0 space-y-1">
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20">
+                                                    <CheckCircle2 size={10} /> Ready to send
+                                                </span>
+                                                <p className="text-[10px] font-mono text-muted-foreground truncate">{currentMenuImage1}</p>
+                                                <div className="flex items-center gap-2 text-[10px]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => menuFile1Ref.current?.click()}
+                                                        className="text-primary hover:underline font-medium"
+                                                    >
+                                                        Replace
+                                                    </button>
+                                                    <span className="text-muted-foreground/40">•</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveMenuImage(1)}
+                                                        className="text-destructive hover:underline font-medium flex items-center gap-0.5"
+                                                    >
+                                                        <Trash2 size={10} /> Remove
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div
+                                            onClick={() => menuFile1Ref.current?.click()}
+                                            className="border-2 border-dashed border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all rounded-lg p-3 text-center cursor-pointer space-y-1 group"
+                                        >
+                                            <div className="mx-auto w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+                                                <Upload size={13} />
+                                            </div>
+                                            <p className="text-xs font-semibold text-foreground">Upload Image 1</p>
+                                            <p className="text-[10px] text-muted-foreground">Menu Front / Page 1 (JPG, PNG)</p>
+                                        </div>
+                                    )}
                                 </div>
-                            ) : (
-                                <div
-                                    onClick={() => menuFileInputRef.current?.click()}
-                                    className="border-2 border-dashed border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all rounded-lg p-4 text-center cursor-pointer space-y-1.5 group"
-                                >
-                                    <div className="mx-auto w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
-                                        <Upload size={15} />
+
+                                {/* SLOT 2: Menu Image 2 (Back / Page 2 / Deals) */}
+                                <div className="bg-muted/30 border border-border/60 rounded-xl p-3.5 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">2</span>
+                                            <div>
+                                                <h4 className="text-xs font-semibold text-foreground">Menu Image 2 (Back / Page 2)</h4>
+                                                <p className="text-[10px] text-muted-foreground">Deals, drinks or back side</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => menuFile2Ref.current?.click()}
+                                            disabled={uploadingSlot === 2}
+                                            className="text-[11px] bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all disabled:opacity-50"
+                                        >
+                                            <Upload size={12} />
+                                            {uploadingSlot === 2 ? "Uploading..." : currentMenuImage2 ? "Change" : "Upload"}
+                                        </button>
                                     </div>
-                                    <div>
-                                        <p className="text-xs font-semibold text-foreground">Click here to upload Menu or Catalog picture</p>
-                                        <p className="text-[10px] text-muted-foreground">JPG, PNG, WEBP (Direct from phone or laptop)</p>
-                                    </div>
+
+                                    {currentMenuImage2 ? (
+                                        <div className="flex items-center gap-2.5 bg-background border border-border/60 rounded-lg p-2">
+                                            <div className="relative w-14 h-14 shrink-0 rounded-md overflow-hidden border border-border/50 bg-muted">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={currentMenuImage2}
+                                                    alt="Menu 2"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-0 space-y-1">
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20">
+                                                    <CheckCircle2 size={10} /> Ready to send
+                                                </span>
+                                                <p className="text-[10px] font-mono text-muted-foreground truncate">{currentMenuImage2}</p>
+                                                <div className="flex items-center gap-2 text-[10px]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => menuFile2Ref.current?.click()}
+                                                        className="text-primary hover:underline font-medium"
+                                                    >
+                                                        Replace
+                                                    </button>
+                                                    <span className="text-muted-foreground/40">•</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveMenuImage(2)}
+                                                        className="text-destructive hover:underline font-medium flex items-center gap-0.5"
+                                                    >
+                                                        <Trash2 size={10} /> Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            onClick={() => menuFile2Ref.current?.click()}
+                                            className="border-2 border-dashed border-border/60 hover:border-primary/50 hover:bg-primary/5 transition-all rounded-lg p-3 text-center cursor-pointer space-y-1 group"
+                                        >
+                                            <div className="mx-auto w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
+                                                <Upload size={13} />
+                                            </div>
+                                            <p className="text-xs font-semibold text-foreground">Upload Image 2</p>
+                                            <p className="text-[10px] text-muted-foreground">Menu Back / Page 2 (Optional)</p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         <div>
@@ -833,11 +985,27 @@ export default function AiBotClient() {
                         {/* Messages Box */}
                         <div className="flex-1 overflow-y-auto space-y-3 pr-2 styled-scrollbar mb-4">
                             {playgroundMessages.map((msg, idx) => {
-                                const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+)\]/i;
-                                const mdImgRegex = /!\[.*?\]\(((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+)\)/i;
-                                const match = msg.content.match(imgTagRegex) || msg.content.match(mdImgRegex);
-                                const imageUrl = match ? match[1].trim() : null;
-                                const cleanContent = match ? msg.content.replace(match[0], "").trim() : msg.content;
+                                const imgTagRegex = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+)\]/gi;
+                                const mdImgRegex = /!\[.*?\]\(((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+)\)/gi;
+
+                                const msgImages: string[] = [];
+                                let tagM;
+                                while ((tagM = imgTagRegex.exec(msg.content)) !== null) {
+                                    if (tagM[1] && !msgImages.includes(tagM[1].trim())) {
+                                        msgImages.push(tagM[1].trim());
+                                    }
+                                }
+                                let mdM;
+                                while ((mdM = mdImgRegex.exec(msg.content)) !== null) {
+                                    if (mdM[1] && !msgImages.includes(mdM[1].trim())) {
+                                        msgImages.push(mdM[1].trim());
+                                    }
+                                }
+
+                                const cleanContent = msg.content
+                                    .replace(/\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*(?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\]]+\]/gi, "")
+                                    .replace(/!\[.*?\]\((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+\)/gi, "")
+                                    .trim();
 
                                 return (
                                     <div
@@ -851,22 +1019,31 @@ export default function AiBotClient() {
                                                     : "bg-muted/70 text-foreground border border-border/50 rounded-bl-xs"
                                             }`}
                                         >
-                                            <div>{cleanContent || (imageUrl ? "Yeh lijiye hamara menu:" : "")}</div>
-                                            {imageUrl && (
-                                                <div className="mt-2.5 rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/10 p-2 space-y-1.5">
+                                            <div>{cleanContent || (msgImages.length > 0 ? "Yeh lijiye hamara menu:" : "")}</div>
+                                            {msgImages.length > 0 && (
+                                                <div className="mt-2.5 space-y-1.5">
                                                     <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                                                         <ImageIcon size={12} />
-                                                        <span>WhatsApp Menu / Image Attachment</span>
+                                                        <span>WhatsApp Auto-Send ({msgImages.length} Image{msgImages.length > 1 ? "s" : ""})</span>
                                                     </div>
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img
-                                                        src={imageUrl}
-                                                        alt="Attached Menu"
-                                                        className="w-full max-h-48 object-cover rounded-lg border border-border/40 shadow-sm"
-                                                        onError={(e) => {
-                                                            (e.target as HTMLElement).style.display = "none";
-                                                        }}
-                                                    />
+                                                    <div className={`grid gap-2 ${msgImages.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                                                        {msgImages.map((imgUrl, imgIdx) => (
+                                                            <div key={imgIdx} className="rounded-xl overflow-hidden border border-emerald-500/30 bg-emerald-500/10 p-1.5 space-y-1">
+                                                                <span className="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 block px-0.5">
+                                                                    {imgIdx === 0 ? "📄 Page 1 (Front)" : imgIdx === 1 ? "📄 Page 2 (Back / Deals)" : `Image ${imgIdx + 1}`}
+                                                                </span>
+                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                <img
+                                                                    src={imgUrl}
+                                                                    alt={`Attached Menu ${imgIdx + 1}`}
+                                                                    className="w-full h-32 object-cover rounded-lg border border-border/40 shadow-sm"
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLElement).style.display = "none";
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

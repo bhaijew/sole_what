@@ -131,25 +131,45 @@ export async function callAiApi(params: {
 }): Promise<string | null> {
     const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, temperature = 0.7, maxTokens = 800 } = params;
 
-    // Detect image URLs in Knowledge Base (e.g. Menu card, Catalog, etc.)
+    // Detect image URLs in Knowledge Base (Menu Image 1 & 2, Catalog, etc.)
     const detectedImages: string[] = [];
     if (knowledgeBase) {
-        const urlMatches = knowledgeBase.match(/https?:\/\/[^\s\)\"\'\,]+(?:jpg|jpeg|png|webp|gif)/gi) || [];
-        detectedImages.push(...urlMatches);
+        // 1. Explicit MENU IMAGE 1 & MENU IMAGE 2
+        const img1Match = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
+        const img2Match = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
 
+        if (img1Match && img1Match[1]) {
+            detectedImages.push(img1Match[1].trim());
+        }
+        if (img2Match && img2Match[1] && !detectedImages.includes(img2Match[1].trim())) {
+            detectedImages.push(img2Match[1].trim());
+        }
+
+        // 2. Generic labeled images
         const labeledMatches = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/gi) || [];
         for (const m of labeledMatches) {
             const parts = m.split(/:\s*/);
             const u = parts.length > 1 ? parts.slice(1).join(":").trim() : null;
             if (u && !detectedImages.includes(u)) detectedImages.push(u);
         }
+
+        // 3. Any standard web image URLs
+        const urlMatches = knowledgeBase.match(/https?:\/\/[^\s\)\"\'\,]+(?:jpg|jpeg|png|webp|gif)/gi) || [];
+        for (const u of urlMatches) {
+            if (!detectedImages.includes(u)) detectedImages.push(u);
+        }
     }
 
     let mediaInstruction = "";
-    if (detectedImages.length > 0) {
+    if (detectedImages.length >= 2) {
+        mediaInstruction = `\n\nAVAILABLE MEDIA / IMAGES TO SEND (2 IMAGES READY):
+- Menu Image 1 (Front / Page 1): ${detectedImages[0]}
+- Menu Image 2 (Back / Page 2 / Deals): ${detectedImages[1]}
+CRITICAL INSTRUCTION: Jab bhi customer menu, khana, deals, items list, catalogue, rates ya prices maangay, unko polite text answer ke end mein DONO images zaroor attach karein: [SEND_IMAGE: ${detectedImages[0]}] [SEND_IMAGE: ${detectedImages[1]}]`;
+    } else if (detectedImages.length === 1) {
         mediaInstruction = `\n\nAVAILABLE MEDIA / IMAGES TO SEND:
-${detectedImages.map((u, i) => `- Image ${i + 1}: ${u}`).join("\n")}
-Important: Jab bhi customer menu, items list, catalogue, ya price list maangay, unko text answer ke sath end mein [SEND_IMAGE: ${detectedImages[0]}] attach zaroor karein.`;
+- Menu Image 1: ${detectedImages[0]}
+CRITICAL INSTRUCTION: Jab bhi customer menu, khana, deals, items list, catalogue, rates ya prices maangay, unko polite text answer ke end mein image zaroor attach karein: [SEND_IMAGE: ${detectedImages[0]}]`;
     }
 
     // Construct full system instruction
