@@ -179,48 +179,23 @@ export async function generateAiResponse(
 }
 
 /**
- * Execute API call to OpenRouter, OpenAI, or Gemini
+ * Execute API call with Multi-Provider Automatic Failover:
+ * Groq LPU -> OpenRouter Multi-Model -> Google Gemini -> Together AI -> Smart Natural Fallback
  */
 export async function callAiApi(params: {
-    provider: string;
-    apiKey: string;
-    modelName: string;
+    userPrompt: string;
     systemPrompt?: string;
     knowledgeBase?: string;
-    userPrompt: string;
+    provider?: string;
+    apiKey?: string;
+    modelName?: string;
     temperature?: number;
     maxTokens?: number;
-}): Promise<string | null> {
-    const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, temperature = 0.7, maxTokens = 800 } = params;
+}): Promise<string> {
+    const { systemPrompt, knowledgeBase, userPrompt, temperature = 0.7, maxTokens = 800 } = params;
 
     // Detect image URLs in Knowledge Base (Menu Image 1 & 2, Catalog, etc.)
-    const detectedImages: string[] = [];
-    if (knowledgeBase) {
-        // 1. Explicit MENU IMAGE 1 & MENU IMAGE 2
-        const img1Match = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*1\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
-        const img2Match = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST)?\s*IMAGE\s*2\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/i);
-
-        if (img1Match && img1Match[1]) {
-            detectedImages.push(img1Match[1].trim());
-        }
-        if (img2Match && img2Match[1] && !detectedImages.includes(img2Match[1].trim())) {
-            detectedImages.push(img2Match[1].trim());
-        }
-
-        // 2. Generic labeled images
-        const labeledMatches = knowledgeBase.match(/(?:MENU|CATALOG|PRICE LIST|CARD)\s*(?:IMAGE|PIC|URL)?\s*:\s*((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)\"\']+)/gi) || [];
-        for (const m of labeledMatches) {
-            const parts = m.split(/:\s*/);
-            const u = parts.length > 1 ? parts.slice(1).join(":").trim() : null;
-            if (u && !detectedImages.includes(u)) detectedImages.push(u);
-        }
-
-        // 3. Any standard web image URLs
-        const urlMatches = knowledgeBase.match(/https?:\/\/[^\s\)\"\'\,]+(?:jpg|jpeg|png|webp|gif)/gi) || [];
-        for (const u of urlMatches) {
-            if (!detectedImages.includes(u)) detectedImages.push(u);
-        }
-    }
+    const detectedImages: string[] = extractImagesFromKnowledgeBase(knowledgeBase);
 
     let mediaInstruction = "";
     if (detectedImages.length >= 2) {
@@ -242,50 +217,23 @@ BUSINESS KNOWLEDGE BASE & FAQS:
 ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific knowledge base provided. Answer standard customer service queries politely."}${mediaInstruction}
 ==================================================`;
 
-    // 1. OPENROUTER (Default & Free Models with Automatic Fallback Chain)
-    if (provider === "openrouter") {
-        const url = "https://openrouter.ai/api/v1/chat/completions";
-        const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://sole-what.com",
-            "X-Title": "sole-what WA Engine"
-        };
-
-        const finalApiKey = apiKey?.trim() || process.env.OPENROUTER_API_KEY || "";
-        if (!finalApiKey) {
-            throw new Error("OpenRouter API Key is required. Please enter your OpenRouter key in AI Bot settings or set OPENROUTER_API_KEY in Railway Variables.");
-        }
-        headers["Authorization"] = `Bearer ${finalApiKey}`;
-
-        // Top reliable free models on OpenRouter
-        const freeFallbackModels = [
-            "openrouter/free",
-            "deepseek/deepseek-r1:free",
-            "google/gemma-2-9b-it:free",
-            "qwen/qwen-2.5-7b-instruct:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "mistralai/mistral-7b-instruct:free",
-            "meta-llama/llama-3.1-8b-instruct:free"
-        ];
-
-        const requestedModel = modelName?.trim() || "openrouter/free";
-        // Build sequence: try requested model first, then remaining free models
-        const modelsToTry = [
-            requestedModel,
-            ...freeFallbackModels.filter((m) => m !== requestedModel)
-        ];
-
-        let lastErrorMsg = "";
-
-        for (const currentModel of modelsToTry) {
+    // =========================================================================
+    // 1. GROQ LPU ENGINE (Priority 1: Ultra Fast ~0.3s Latency)
+    // =========================================================================
+    const groqKey = process.env.GROQ_API_KEY?.trim() || (provider === "groq" ? apiKey?.trim() : "") || "";
+    if (groqKey) {
+        const groqModels = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"];
+        for (const model of groqModels) {
             try {
-                logger.info("AI-Bot", `Calling OpenRouter with model: ${currentModel}...`);
-
-                const response = await fetch(url, {
+                logger.info("AI-Gateway", `[1/4] Trying Groq LPU (${model})...`);
+                const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
-                    headers,
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${groqKey}`
+                    },
                     body: JSON.stringify({
-                        model: currentModel,
+                        model,
                         messages: [
                             { role: "system", content: fullSystemMessage },
                             { role: "user", content: userPrompt }
@@ -293,116 +241,169 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                         temperature,
                         max_tokens: maxTokens
                     }),
-                    signal: AbortSignal.timeout(25000)
+                    signal: AbortSignal.timeout(12000)
                 });
 
-                if (!response.ok) {
-                    const errText = await response.text();
-                    lastErrorMsg = `HTTP ${response.status}: ${errText.substring(0, 300)}`;
-                    logger.warn("AI-Bot", `OpenRouter model "${currentModel}" failed (${response.status}): ${errText.substring(0, 150)}. Falling back to next free model...`);
-                    continue; // Try next model in chain
-                }
-
-                const data = await response.json();
-                const content = data?.choices?.[0]?.message?.content;
-                if (content && content.trim().length > 0) {
-                    logger.success("AI-Bot", `OpenRouter successfully generated response using: ${currentModel}`);
-                    return finalizeAiReply(content, userPrompt, detectedImages);
+                if (res.ok) {
+                    const data = await res.json();
+                    const content = data?.choices?.[0]?.message?.content;
+                    if (content && content.trim().length > 0) {
+                        logger.success("AI-Gateway", `[Success via Groq: ${model}] Generated ${content.length} chars`);
+                        return finalizeAiReply(content, userPrompt, detectedImages);
+                    }
+                } else {
+                    const err = await res.text();
+                    logger.warn("AI-Gateway", `Groq (${model}) returned status ${res.status}: ${err.substring(0, 100)}. Switching to next engine...`);
                 }
             } catch (err: any) {
-                lastErrorMsg = err?.message || String(err);
-                logger.warn("AI-Bot", `OpenRouter model "${currentModel}" encountered error: ${lastErrorMsg}. Falling back to next free model...`);
+                logger.warn("AI-Gateway", `Groq (${model}) error: ${err.message}. Switching to next engine...`);
             }
         }
-
-        const fallback = getNaturalFallbackReply(userPrompt, detectedImages);
-        logger.info("AI-Bot", `Used natural conversational fallback for: "${userPrompt}"`);
-        return fallback;
     }
 
-    // 2. OPENAI (ChatGPT Direct API)
-    if (provider === "openai") {
-        const finalApiKey = apiKey?.trim() || process.env.OPENAI_API_KEY || "";
-        if (!finalApiKey) {
-            throw new Error("OpenAI API Key is required. Please enter your OpenAI key in AI Bot settings or set OPENAI_API_KEY in Railway Variables.");
-        }
+    // =========================================================================
+    // 2. OPENROUTER CLOUD ENGINE (Priority 2: Multi-Model Free Cloud Router)
+    // =========================================================================
+    const openrouterKey = process.env.OPENROUTER_API_KEY?.trim() || (provider === "openrouter" ? apiKey?.trim() : "") || "";
+    const openrouterFallbackKey = process.env.OPENROUTER_FALLBACK_KEY?.trim() || "";
+    const openrouterKeys = [openrouterKey, openrouterFallbackKey].filter(Boolean);
 
-        const url = "https://api.openai.com/v1/chat/completions";
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${finalApiKey}`
-            },
-            body: JSON.stringify({
-                model: modelName || "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: fullSystemMessage },
-                    { role: "user", content: userPrompt }
-                ],
-                temperature,
-                max_tokens: maxTokens
-            }),
-            signal: AbortSignal.timeout(25000)
-        });
+    const openrouterModels = [
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "openrouter/free",
+        "deepseek/deepseek-r1:free",
+        "google/gemma-2-9b-it:free",
+        "qwen/qwen-2.5-7b-instruct:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "mistralai/mistral-7b-instruct:free"
+    ];
 
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`OpenAI returned HTTP ${response.status}: ${errText.substring(0, 300)}`);
-        }
+    for (const key of openrouterKeys) {
+        let keyExhausted = false;
+        for (const model of openrouterModels) {
+            if (keyExhausted) break;
+            try {
+                logger.info("AI-Gateway", `[2/4] Trying OpenRouter (${model})...`);
+                const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${key}`,
+                        "HTTP-Referer": "https://solewhat.com",
+                        "X-Title": "SoleWhat WA Engine"
+                    },
+                    body: JSON.stringify({
+                        model,
+                        messages: [
+                            { role: "system", content: fullSystemMessage },
+                            { role: "user", content: userPrompt }
+                        ],
+                        temperature,
+                        max_tokens: maxTokens
+                    }),
+                    signal: AbortSignal.timeout(15000)
+                });
 
-        const data = await response.json();
-        const content = data?.choices?.[0]?.message?.content;
-        return finalizeAiReply(content, userPrompt, detectedImages);
-    }
-
-    // 3. GOOGLE GEMINI API
-    if (provider === "gemini") {
-        const finalApiKey = apiKey?.trim() || process.env.GEMINI_API_KEY || "";
-        if (!finalApiKey) {
-            throw new Error("Google Gemini API Key is required. Please enter your Gemini key in AI Bot settings or set GEMINI_API_KEY in Railway Variables.");
-        }
-
-        // Clean model name: remove "google/" or "models/" prefix if present
-        const geminiModel = (modelName || "gemini-1.5-flash")
-            .replace(/^google\//, "")
-            .replace(/^models\//, "");
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${finalApiKey}`;
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                systemInstruction: {
-                    parts: [{ text: fullSystemMessage }]
-                },
-                contents: [
-                    {
-                        parts: [{ text: userPrompt }]
+                if (res.ok) {
+                    const data = await res.json();
+                    const content = data?.choices?.[0]?.message?.content;
+                    if (content && content.trim().length > 0) {
+                        logger.success("AI-Gateway", `[Success via OpenRouter: ${model}] Generated ${content.length} chars`);
+                        return finalizeAiReply(content, userPrompt, detectedImages);
                     }
-                ],
-                generationConfig: {
-                    temperature,
-                    maxOutputTokens: maxTokens
+                } else {
+                    const err = await res.text();
+                    logger.warn("AI-Gateway", `OpenRouter (${model}) returned status ${res.status}: ${err.substring(0, 100)}`);
+                    if (res.status === 429 || res.status === 402) {
+                        keyExhausted = true;
+                        break;
+                    }
                 }
-            }),
-            signal: AbortSignal.timeout(25000)
-        });
-
-        if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Gemini API returned HTTP ${response.status}: ${errText.substring(0, 300)}`);
+            } catch (err: any) {
+                logger.warn("AI-Gateway", `OpenRouter (${model}) error: ${err.message}`);
+            }
         }
-
-        const data = await response.json();
-        const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        return finalizeAiReply(content, userPrompt, detectedImages);
     }
 
-    const fallback = getNaturalFallbackReply(userPrompt, detectedImages);
-    return fallback;
+    // =========================================================================
+    // 3. GOOGLE GEMINI ENGINE (Priority 3: Gemini 3.8 / Flash)
+    // =========================================================================
+    const geminiKey = process.env.GEMINI_API_KEY?.trim() || (provider === "gemini" ? apiKey?.trim() : "") || "";
+    if (geminiKey) {
+        const geminiModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-3.1-flash-lite"];
+        for (const model of geminiModels) {
+            try {
+                logger.info("AI-Gateway", `[3/4] Trying Gemini (${model})...`);
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: fullSystemMessage }] },
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        generationConfig: { temperature, maxOutputTokens: maxTokens }
+                    }),
+                    signal: AbortSignal.timeout(15000)
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (content && content.trim().length > 0) {
+                        logger.success("AI-Gateway", `[Success via Gemini: ${model}] Generated ${content.length} chars`);
+                        return finalizeAiReply(content, userPrompt, detectedImages);
+                    }
+                } else {
+                    const err = await res.text();
+                    logger.warn("AI-Gateway", `Gemini (${model}) returned status ${res.status}: ${err.substring(0, 100)}`);
+                }
+            } catch (err: any) {
+                logger.warn("AI-Gateway", `Gemini (${model}) error: ${err.message}`);
+            }
+        }
+    }
+
+    // =========================================================================
+    // 4. TOGETHER AI ENGINE (Priority 4)
+    // =========================================================================
+    const togetherKey = process.env.TOGETHER_API_KEY?.trim() || (provider === "together" ? apiKey?.trim() : "") || "";
+    if (togetherKey) {
+        try {
+            logger.info("AI-Gateway", `[4/4] Trying Together AI...`);
+            const res = await fetch("https://api.together.xyz/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${togetherKey}`
+                },
+                body: JSON.stringify({
+                    model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                    messages: [
+                        { role: "system", content: fullSystemMessage },
+                        { role: "user", content: userPrompt }
+                    ],
+                    max_tokens: maxTokens
+                }),
+                signal: AbortSignal.timeout(12000)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                const content = data?.choices?.[0]?.message?.content;
+                if (content && content.trim().length > 0) {
+                    logger.success("AI-Gateway", `[Success via Together AI] Generated ${content.length} chars`);
+                    return finalizeAiReply(content, userPrompt, detectedImages);
+                }
+            }
+        } catch (err: any) {
+            logger.warn("AI-Gateway", `Together AI error: ${err.message}`);
+        }
+    }
+
+    // =========================================================================
+    // 5. NATURAL ROMAN URDU FALLBACK ENGINE (Priority 5: 100% Guaranteed Always-On)
+    // =========================================================================
+    logger.info("AI-Gateway", `[5/5] Using Smart Natural Fallback for: "${userPrompt}"`);
+    return getNaturalFallbackReply(userPrompt, detectedImages);
 }
 
 /**

@@ -604,139 +604,45 @@ export default function AiBotClient() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Left Column: Configuration Settings (7 cols) */}
                 <div className="lg:col-span-7 space-y-6">
-                    {/* Provider & Model Selection */}
-                    <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-5 shadow-sm">
-                        <h3 className="text-base font-bold text-foreground flex items-center gap-2 border-b border-border/40 pb-3">
-                            <Cpu size={18} className="text-primary" />
-                            AI Provider & Model Configuration
-                        </h3>
+                    {/* Automated Multi-Engine AI Gateway */}
+                    <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4 shadow-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 pb-3">
+                            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                                <Cpu size={18} className="text-primary" />
+                                Automated Multi-Engine AI Gateway
+                            </h3>
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 w-fit">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                Multi-Provider Auto Failover
+                            </span>
+                        </div>
 
-                        {/* Provider Tabs */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-semibold text-foreground">Select AI Provider:</label>
-                                <span className="text-[10px] text-muted-foreground">Pick your preferred AI engine</span>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Backend automatic failover active hai. Jab kisi aik AI engine ke tokens ya rate-limits khatam hotay hain, system <b>foran aur automatically</b> aglay provider par switch kar leta hai.
+                        </p>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                            <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-center space-y-1">
+                                <div className="text-[11px] font-bold text-foreground">Groq LPU</div>
+                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">⚡ Ultra Fast (0.3s)</div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                {[
-                                    { id: "gemini", title: "Google Gemini", subtitle: "Gemini 1.5 & 2.0 Flash (Free & Fast)" },
-                                    { id: "openrouter", title: "OpenRouter", subtitle: "Llama 3.1, DeepSeek, Gemma" },
-                                    { id: "openai", title: "OpenAI", subtitle: "ChatGPT GPT-4o Mini & 4o" },
-                                ].map((p) => {
-                                    const isSelected = config.provider === p.id;
-                                    return (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            onClick={() => {
-                                                const nextModel =
-                                                    p.id === "gemini" ? "gemini-1.5-flash" :
-                                                    p.id === "openai" ? "gpt-4o-mini" :
-                                                    "openrouter/free";
-                                                setConfig((prev) => ({ ...prev, provider: p.id, modelName: nextModel }));
-                                            }}
-                                            className={`p-3 rounded-xl border text-left transition-all relative flex items-start justify-between ${
-                                                isSelected
-                                                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary font-semibold"
-                                                    : "border-border/60 bg-muted/20 hover:bg-muted/40 text-muted-foreground"
-                                            }`}
-                                        >
-                                            <div>
-                                                <div className="font-bold text-xs text-foreground">{p.title}</div>
-                                                <div className="text-[10px] text-muted-foreground mt-0.5">{p.subtitle}</div>
-                                            </div>
-                                            <div className={`h-4 w-4 rounded-full border shrink-0 flex items-center justify-center transition-colors ${
-                                                isSelected ? "bg-primary border-primary text-primary-foreground" : "border-border/60"
-                                            }`}>
-                                                {isSelected && <Check size={10} strokeWidth={3} />}
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                            <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 text-center space-y-1">
+                                <div className="text-[11px] font-bold text-foreground">OpenRouter</div>
+                                <div className="text-[10px] text-primary font-semibold">Llama 3.1 & DeepSeek</div>
+                            </div>
+                            <div className="p-3 rounded-xl border border-cyan-500/30 bg-cyan-500/5 text-center space-y-1">
+                                <div className="text-[11px] font-bold text-foreground">Google Gemini</div>
+                                <div className="text-[10px] text-cyan-600 dark:text-cyan-400 font-semibold">Gemini 3.8 & Flash</div>
+                            </div>
+                            <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 text-center space-y-1">
+                                <div className="text-[11px] font-bold text-foreground">Smart Fallback</div>
+                                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">Roman Urdu Always-On</div>
                             </div>
                         </div>
 
-                        {/* Model Dropdown */}
-                        <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="text-xs font-semibold text-foreground">Model Selection:</label>
-                                {config.provider === "openrouter" && (
-                                    <span className="text-[10px] text-emerald-500 font-medium">⚡ Auto-Fallback Enabled</span>
-                                )}
-                            </div>
-                            <select
-                                value={config.modelName}
-                                onChange={(e) => setConfig((prev) => ({ ...prev, modelName: e.target.value }))}
-                                className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono cursor-pointer"
-                            >
-                                {config.provider === "gemini" && (
-                                    <>
-                                        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Ultra Fast & Free Tier)</option>
-                                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Next-Gen High Speed)</option>
-                                        <option value="gemini-1.5-pro">Gemini 1.5 Pro (Advanced Reasoning)</option>
-                                    </>
-                                )}
-                                {config.provider === "openrouter" && (
-                                    <>
-                                        <option value="openrouter/free">OpenRouter Auto (All Free Models Dynamic Router - Recommended)</option>
-                                        <option value="deepseek/deepseek-r1:free">DeepSeek R1 (FREE Reasoning)</option>
-                                        <option value="google/gemma-2-9b-it:free">Google Gemma 2 9B (FREE)</option>
-                                        <option value="qwen/qwen-2.5-7b-instruct:free">Qwen 2.5 7B Instruct (FREE)</option>
-                                        <option value="meta-llama/llama-3.3-70b-instruct:free">Meta Llama 3.3 70B Instruct (FREE)</option>
-                                        <option value="mistralai/mistral-7b-instruct:free">Mistral 7B Instruct (FREE)</option>
-                                        <option value="meta-llama/llama-3.1-8b-instruct:free">Meta Llama 3.1 8B Instruct</option>
-                                        <option value="openai/gpt-4o-mini">OpenAI GPT-4o Mini (via OpenRouter)</option>
-                                    </>
-                                )}
-                                {config.provider === "openai" && (
-                                    <>
-                                        <option value="gpt-4o-mini">GPT-4o Mini (Fast & Low Cost)</option>
-                                        <option value="gpt-4o">GPT-4o (High Accuracy)</option>
-                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                                    </>
-                                )}
-                            </select>
-                            {config.provider === "openrouter" && (
-                                <p className="text-[11px] text-muted-foreground mt-1">
-                                    💡 Tip: Agar koi model busy ya paid ho jaye, engine automatically aglay free model par switch kar leta hai.
-                                </p>
-                            )}
-                        </div>
-
-                        {/* API Key Field */}
-                        <div>
-                            <label className="text-xs font-semibold text-foreground flex items-center justify-between mb-1.5">
-                                <span className="flex items-center gap-1.5">
-                                    <Key size={14} className="text-primary" />
-                                    <span>API Key ({config.provider.toUpperCase()})</span>
-                                </span>
-                                <span className="text-[11px]">
-                                    {config.provider === "gemini" && (
-                                        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">Get Free Gemini Key ↗</a>
-                                    )}
-                                    {config.provider === "openrouter" && (
-                                        <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">Get OpenRouter Key ↗</a>
-                                    )}
-                                    {config.provider === "openai" && (
-                                        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-primary underline hover:text-primary/80">Get OpenAI Key ↗</a>
-                                    )}
-                                </span>
-                            </label>
-                            <input
-                                type="password"
-                                placeholder={`Enter your ${config.provider.toUpperCase()} API Key (or leave blank if set in Railway ENV)...`}
-                                value={config.apiKey}
-                                onChange={(e) => setConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
-                                className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
-                            />
-                            <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
-                                <Shield size={12} className="text-emerald-500 shrink-0" />
-                                <span>
-                                    {config.provider === "gemini" && "100% free API key from Google AI Studio. Or set GEMINI_API_KEY in Railway Variables."}
-                                    {config.provider === "openrouter" && "Free models require an OpenRouter key. Or set OPENROUTER_API_KEY in Railway Variables."}
-                                    {config.provider === "openai" && "OpenAI key (sk-...). Or set OPENAI_API_KEY in Railway Variables."}
-                                </span>
-                            </p>
+                        <div className="p-3 rounded-xl bg-muted/40 border border-border/50 text-[11px] text-muted-foreground flex items-center gap-2">
+                            <Shield size={16} className="text-primary shrink-0" />
+                            <span>Zero Manual Setup: Sab API keys backend par configured hain. Token khatam honay par auto-switch ho jata hai.</span>
                         </div>
                     </div>
 
