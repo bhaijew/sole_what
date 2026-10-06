@@ -14,10 +14,10 @@ export default function SettingsPage() {
     const isSuperAdmin = (authSession?.user as any)?.role === "SUPERADMIN";
 
     const [systemConfig, setSystemConfig] = useState({
-        appName: "sole-what",
+        appName: "SoleWhat",
         logoUrl: "",
         timezone: "Asia/Karachi",
-        enableRegistration: true
+        enableRegistration: false
     });
     const [systemLoading, setSystemLoading] = useState(false);
     const [timezones, setTimezones] = useState<string[]>(["UTC", "Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura"]);
@@ -44,12 +44,12 @@ export default function SettingsPage() {
                 const data = responseData?.data;
                 if (data && !responseData.error) {
                     setSystemConfig({
-                        appName: data.appName || "sole-what",
+                        appName: data.appName || "SoleWhat",
                         logoUrl: data.logoUrl || "",
                         // @ts-ignore
                         faviconUrl: data.faviconUrl || "/favicon.ico",
                         timezone: data.timezone || "Asia/Karachi",
-                        enableRegistration: data.enableRegistration !== undefined ? data.enableRegistration : true
+                        enableRegistration: data.enableRegistration !== undefined ? data.enableRegistration : false
                     });
                 }
             })

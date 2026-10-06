@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Bot, ArrowRight, Loader2 } from "lucide-react";
+import { Bot, ArrowRight, Loader2, Shield } from "lucide-react";
 import Link from 'next/link';
 
 const formSchema = z.object({
@@ -154,11 +154,14 @@ function LoginForm() {
           </Form>
         </div>
 
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/auth/register" className="font-semibold text-primary hover:text-primary/80 transition-colors">
-            Create an account
-          </Link>
+        <div className="mt-8 pt-4 border-t border-border/40 text-center flex flex-col items-center gap-1.5">
+          <div className="flex items-center gap-2 text-xs font-semibold text-foreground/80">
+            <Shield className="h-3.5 w-3.5 text-primary" />
+            <span>Private Gateway &bull; Admin Provisioned Access</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed max-w-xs">
+            Public sign-ups are closed. Please contact your workspace administrator to receive login credentials.
+          </p>
         </div>
       </div>
     </div>

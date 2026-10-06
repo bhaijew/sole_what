@@ -134,9 +134,9 @@ export default function Home() {
                     <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Button>
                 </Link>
-                <Link href="/auth/register" className="w-full sm:w-auto">
+                <Link href="/auth/login" className="w-full sm:w-auto">
                   <Button size="lg" variant="outline" className="w-full h-13 px-8 rounded-full text-sm sm:text-base font-semibold border-border/80 hover:bg-muted/60 transition-all">
-                    Create Free Account
+                    Sign In to Portal
                   </Button>
                 </Link>
                 <Link href="/docs" className="w-full sm:w-auto">
@@ -553,9 +553,9 @@ export default function Home() {
                 </p>
               </div>
               <div className="relative z-10 flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <Link href="/auth/register">
+                <Link href="/auth/login">
                   <Button size="lg" className="h-12 px-8 rounded-full font-bold bg-white text-emerald-950 hover:bg-white/90 shadow-lg">
-                    Create Free Account
+                    Sign In to Portal
                   </Button>
                 </Link>
                 <Link href="/dashboard">

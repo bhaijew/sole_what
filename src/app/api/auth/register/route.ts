@@ -14,12 +14,12 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { email, password, name } = registerSchema.parse(body);
 
-        // Check if registration is enabled
+        // Check if registration is enabled (Method 1: Private / Admin-Only)
         const systemConfig = await prisma.systemConfig.findUnique({ where: { id: "default" } });
         // @ts-ignore
-        if (systemConfig && systemConfig.enableRegistration === false) {
+        if (!systemConfig || systemConfig.enableRegistration !== true) {
             return NextResponse.json(
-                { error: "Registration is currently disabled by the administrator" },
+                { error: "Public registration is disabled. Accounts can only be created by the System Administrator." },
                 { status: 403 }
             );
         }
