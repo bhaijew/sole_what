@@ -11,6 +11,8 @@ import { generateAiResponse } from "./ai-service";
 import { ChatService } from "@/modules/whatsapp/chat.service";
 import { cancelDripOnCustomerReply } from "@/modules/whatsapp/drip-engine";
 import { hasMatchingKeywordRule } from "@/modules/whatsapp/store/autoreply";
+import { isHandoverActive, enableHandover, checkIfHandoverRequested } from "./handover-service";
+import { sendQuotationViaWhatsApp } from "./quotation-service";
 
 // Event types that can trigger webhooks
 export type WebhookEventType =
@@ -634,6 +636,71 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                     if (isKeywordMatched) {
                         logger.info("AI-Bot", `Skipping AI response for ${normalizedFrom} because Keyword Rule matched (Fallback Mode ON).`);
                     } else {
+                        // 1. Check for Quotation generation command / request (#quote 1.5 tola 22k Ring)
+                        const senderPushName = (message as any)?.pushName || undefined;
+                        const quoteMatch = normalized.content.match(/^#(?:quote|quotation)\s+([\d.]+)\s*(tola|gram|g)?\s*(24k|22k|21k|18k)?\s*(.*)$/i);
+                        if (quoteMatch) {
+                            try {
+                                const weight = parseFloat(quoteMatch[1]);
+                                const weightUnit = (quoteMatch[2]?.toLowerCase() === "gram" || quoteMatch[2]?.toLowerCase() === "g") ? "gram" : "tola";
+                                const purity = (quoteMatch[3]?.toLowerCase() as any) || "22k";
+                                const itemName = quoteMatch[4]?.trim() || "22K Gold Jewellery Item";
+
+                                logger.info("AI-Bot", `Generating on-demand WhatsApp quotation for ${normalizedFrom}: ${weight} ${weightUnit} ${purity} ${itemName}`);
+                                await sendQuotationViaWhatsApp(sessionId, normalizedFrom, {
+                                    customerName: senderPushName,
+                                    itemName,
+                                    weight,
+                                    weightUnit,
+                                    purity
+                                });
+                                return;
+                            } catch (qErr: any) {
+                                logger.error("AI-Bot", "Failed to generate on-demand quotation:", qErr.message);
+                            }
+                        }
+
+                        // 2. Check if Human Handover is currently ACTIVE for this chat
+                        if (isHandoverActive(sessionId, normalizedFrom)) {
+                            logger.info("AI-Bot", `[Handover Active] AI Bot is paused for ${normalizedFrom}. Live agent is handling this conversation.`);
+                            return;
+                        }
+
+                        // 3. Check if customer is asking for human staff / expressing frustration
+                        const handoverCheck = checkIfHandoverRequested(normalized.content);
+                        if (handoverCheck.requested) {
+                            logger.warn("AI-Bot", `Customer ${normalizedFrom} requested human staff: "${handoverCheck.reason}". Activating handover...`);
+                            enableHandover(sessionId, normalizedFrom, 60, handoverCheck.reason, senderPushName);
+
+                            // Courteous auto-acknowledgment
+                            await ChatService.sendTextMessage(
+                                sessionId,
+                                normalizedFrom,
+                                "Walaikum Assalam! Aapka rabta hamare live staff se karwaya ja raha hai. Bot ko pause kar dia gaya hai. Hamara representative foran aapko reply karega. Shukriya! 🤝"
+                            );
+
+                            // Create system notification for dashboard
+                            try {
+                                const sessionRec = await prisma.session.findFirst({
+                                    where: { OR: [{ sessionId }, { id: sessionId }] },
+                                    select: { userId: true }
+                                });
+                                if (sessionRec?.userId) {
+                                    await prisma.notification.create({
+                                        data: {
+                                            userId: sessionRec.userId,
+                                            title: "🚨 Live Agent Requested",
+                                            message: `Customer ${senderPushName || normalizedFrom} requested human staff: "${normalized.content.substring(0, 70)}"`,
+                                            type: "WARNING",
+                                            href: `/dashboard/chat`
+                                        }
+                                    });
+                                }
+                            } catch (notifErr) {}
+
+                            return;
+                        }
+
                         logger.info("AI-Bot", `Incoming message from ${normalizedFrom}: "${normalized.content}"`);
                         generateAiResponse(sessionId, normalized.content, isGroup)
                             .then(async (aiReply) => {

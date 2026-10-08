@@ -44,8 +44,9 @@ next-env.d.ts
 # media files (downloaded by app)
 /data/media/*
 !/data/media/.gitkeep
-/public/media/*
 server.log
 /logs/
+/data/*.json
+/public/uploads/
 
 *.log

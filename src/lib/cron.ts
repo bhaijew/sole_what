@@ -100,11 +100,22 @@ export function initScheduler() {
                     }
                 }
             }
-
         } catch (error) {
             logger.error("Cron", "Scheduler error:", error);
         }
     });
+
+    // Daily Live Gold Rate Auto-Sync (Every 6 hours)
+    cron.schedule("0 */6 * * *", async () => {
+        try {
+            logger.info("Cron", "Running scheduled Gold Rate auto-sync...");
+            const { syncLiveGoldRates } = await import("@/lib/gold-service");
+            await syncLiveGoldRates();
+        } catch (err: any) {
+            logger.error("Cron", "Gold Rate auto-sync error:", err.message);
+        }
+    });
     
-    logger.info("Cron", "Scheduler initialized");
+    logger.info("Cron", "Scheduler initialized (Message scheduler + Gold Rate auto-sync)");
 }
+

@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { logger } from "./logger";
+import { getGoldRates, formatGoldRatePrompt } from "./gold-service";
 
 export interface AiTestRequest {
     provider: string; // "openrouter" | "openai" | "gemini"
@@ -209,12 +210,15 @@ CRITICAL INSTRUCTION: Jab bhi customer menu, khana, deals, items list, catalogue
 CRITICAL INSTRUCTION: Jab bhi customer menu, khana, deals, items list, catalogue, rates ya prices maangay, unko polite text answer ke end mein image zaroor attach karein: [SEND_IMAGE: ${detectedImages[0]}]`;
     }
 
+    const goldPrompt = formatGoldRatePrompt();
+
     // Construct full system instruction
     const fullSystemMessage = `${systemPrompt || DEFAULT_SYSTEM_PROMPT}
 
 ==================================================
 BUSINESS KNOWLEDGE BASE & FAQS:
 ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific knowledge base provided. Answer standard customer service queries politely."}${mediaInstruction}
+${goldPrompt}
 ==================================================`;
 
     // =========================================================================
@@ -445,9 +449,20 @@ function finalizeAiReply(
 export function getNaturalFallbackReply(userPrompt: string, detectedImages: string[]): string {
     const p = (userPrompt || "").trim().toLowerCase();
 
+    // 0. Check for Gold / Jewellery / Silver Rate queries (Bhai Jewellers)
+    const isGoldRateQuery = /\b(gold|sonar?|sona|chandi|silver|24k|22k|21k|18k|tola|per\s*tola)\b/i.test(p) ||
+        (/(?:rate|bhao|bhav|keemat|price|rates)/i.test(p) && /(?:aaj|today|gold|sona|chandi)/i.test(p));
+
+    if (isGoldRateQuery) {
+        const rates = getGoldRates();
+        const isGreetingPresent = /\b(aoa|salam|assalam|hi|hello)\b/i.test(p);
+        const greetingPrefix = isGreetingPresent ? "Walaikum Assalam! " : "Assalam-o-Alaikum! ";
+        return `${greetingPrefix}Aaj ke official gold aur silver rates:\n• 24K Gold: PKR ${rates.rate24k.toLocaleString()} per tola\n• 22K Jewellery Gold: PKR ${rates.rate22k.toLocaleString()} per tola\n• Silver (Chandi): PKR ${rates.silver.toLocaleString()} per tola\n\nHamari tamam jewellery 100% hallmark guaranteed hoti hai. Kisi bhi design ka quotation banwane ke liye aap item name aur weight bata sakte hain! 💍`;
+    }
+
     // 1. Check for Menu / Food / Deals / Rates / Catalog queries FIRST (Highest priority)
     // Matches "menu send karo", "kaho menu send karo", "menu dikhao", "menu bhejo", "bhai menu", "rates", "deals", etc.
-    const isMenuQuery = /\b(menu|khana|deal|deals|rate|rates|price|prices|food|catalog|catalogue|card|list|items?|dish|dishes)\b/i.test(p) ||
+    const isMenuQuery = /\b(menu|khana|deal|deals|food|dish|dishes)\b/i.test(p) ||
         /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu|menu\s*chahiye|rate\s*list)/i.test(p);
 
     if (isMenuQuery) {

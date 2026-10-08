@@ -22,7 +22,8 @@ import {
     Shield,
     Image as ImageIcon,
     Upload,
-    Trash2
+    Trash2,
+    Coins
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -211,6 +212,78 @@ export default function AiBotClient() {
     const [uploadingSlot, setUploadingSlot] = useState<1 | 2 | null>(null);
     const menuFile1Ref = useRef<HTMLInputElement>(null);
     const menuFile2Ref = useRef<HTMLInputElement>(null);
+
+    // Live Gold Rates State
+    const [goldRates, setGoldRates] = useState<any>(null);
+    const [syncingGold, setSyncingGold] = useState<boolean>(false);
+    const [savingGold, setSavingGold] = useState<boolean>(false);
+    const [rate24kInput, setRate24kInput] = useState<string>("");
+    const [rate22kInput, setRate22kInput] = useState<string>("");
+    const [silverInput, setSilverInput] = useState<string>("");
+
+    const fetchGoldRates = async () => {
+        try {
+            const res = await fetch("/api/gold-rates");
+            const data = await res.json();
+            if (data.success && data.data) {
+                setGoldRates(data.data);
+                setRate24kInput(String(data.data.rate24k));
+                setRate22kInput(String(data.data.rate22k));
+                setSilverInput(String(data.data.silver));
+            }
+        } catch (e) {}
+    };
+
+    useEffect(() => {
+        fetchGoldRates();
+    }, []);
+
+    const handleSyncGold = async () => {
+        setSyncingGold(true);
+        try {
+            const res = await fetch("/api/gold-rates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "sync" })
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                setGoldRates(data.data);
+                setRate24kInput(String(data.data.rate24k));
+                setRate22kInput(String(data.data.rate22k));
+                setSilverInput(String(data.data.silver));
+                toast.success("Live Gold Rates Synced successfully!");
+            }
+        } catch (e: any) {
+            toast.error("Failed to sync gold rates");
+        } finally {
+            setSyncingGold(false);
+        }
+    };
+
+    const handleSaveGold = async () => {
+        setSavingGold(true);
+        try {
+            const res = await fetch("/api/gold-rates", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    rate24k: parseFloat(rate24kInput),
+                    rate22k: parseFloat(rate22kInput),
+                    silver: parseFloat(silverInput)
+                })
+            });
+            const data = await res.json();
+            if (data.success && data.data) {
+                setGoldRates(data.data);
+                toast.success("Gold rates updated & active!");
+            }
+        } catch (e: any) {
+            toast.error("Failed to save gold rates");
+        } finally {
+            setSavingGold(false);
+        }
+    };
 
     // Extract active menu images (Slot 1 and Slot 2) from knowledgeBase
     const extractMenuImages = (kb: string) => {
@@ -640,6 +713,114 @@ export default function AiBotClient() {
                     onCheckedChange={(val) => setConfig((prev) => ({ ...prev, fallbackOnly: val }))}
                     className="data-[state=checked]:bg-amber-500"
                 />
+            </div>
+
+            {/* Live Daily Gold Rates Manager Card (Bhai Jewellers) */}
+            <div className="p-5 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-card to-amber-500/5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-sm">
+                            <Coins size={20} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                                Live Daily Gold & Metal Rates (Bhai Jewellers)
+                                <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full border border-amber-500/20">
+                                    Auto-Synced (11:30 AM PKT)
+                                </span>
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                                These verified rates are dynamically injected into AI responses so customers on WhatsApp always get exact today&apos;s rates.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleSyncGold}
+                            disabled={syncingGold}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-border/60 hover:bg-muted text-foreground transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                            <RefreshCw size={13} className={syncingGold ? "animate-spin" : ""} />
+                            <span>{syncingGold ? "Syncing..." : "Sync Live Rate"}</span>
+                        </button>
+                        <button
+                            onClick={handleSaveGold}
+                            disabled={savingGold}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                            <Save size={13} />
+                            <span>{savingGold ? "Saving..." : "Save Overrides"}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-background border border-border/50 space-y-1.5">
+                        <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">24K Gold (Pure / Tola)</div>
+                        <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground font-mono text-[11px]">PKR</span>
+                            <input
+                                type="number"
+                                value={rate24kInput}
+                                onChange={(e) => setRate24kInput(e.target.value)}
+                                className="w-full bg-muted/40 rounded px-1.5 py-0.5 font-bold text-foreground text-xs border border-transparent focus:border-amber-500 outline-none"
+                            />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                            ≈ PKR {goldRates?.rate24k ? Math.round(goldRates.rate24k / 11.6638).toLocaleString() : "24,391"}/gram
+                        </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-background border border-border/50 space-y-1.5">
+                        <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">22K Gold (Jewellery / Tola)</div>
+                        <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground font-mono text-[11px]">PKR</span>
+                            <input
+                                type="number"
+                                value={rate22kInput}
+                                onChange={(e) => setRate22kInput(e.target.value)}
+                                className="w-full bg-muted/40 rounded px-1.5 py-0.5 font-bold text-foreground text-xs border border-transparent focus:border-amber-500 outline-none"
+                            />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                            ≈ PKR {goldRates?.rate22k ? Math.round(goldRates.rate22k / 11.6638).toLocaleString() : "22,358"}/gram
+                        </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-background border border-border/50 space-y-1.5">
+                        <div className="text-[11px] font-semibold text-muted-foreground">10 Gram (24K / 22K)</div>
+                        <div className="font-bold text-foreground text-xs pt-0.5">
+                            PKR {goldRates?.rate10g24k?.toLocaleString() || "243,912"}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                            22K: PKR {goldRates?.rate10g22k?.toLocaleString() || "223,585"}
+                        </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-background border border-border/50 space-y-1.5">
+                        <div className="text-[11px] font-semibold text-muted-foreground">Silver (Chandi / Tola)</div>
+                        <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground font-mono text-[11px]">PKR</span>
+                            <input
+                                type="number"
+                                value={silverInput}
+                                onChange={(e) => setSilverInput(e.target.value)}
+                                className="w-full bg-muted/40 rounded px-1.5 py-0.5 font-bold text-foreground text-xs border border-transparent focus:border-amber-500 outline-none"
+                            />
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                            Official Sarafa Benchmark
+                        </div>
+                    </div>
+                </div>
+
+                {goldRates?.lastUpdated && (
+                    <div className="text-[10px] text-muted-foreground flex items-center justify-between pt-1">
+                        <span>Source: {goldRates.source || "All Pakistan Sarafa Gems & Jewellers Association"}</span>
+                        <span>Last Verified: {new Date(goldRates.lastUpdated).toLocaleString("en-PK")}</span>
+                    </div>
+                )}
             </div>
 
             {/* Main 2-Column Grid */}

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Send, Paperclip, ArrowLeft, FileText, Image as ImageIcon, Music, Video, Download, ArrowDown, CornerUpLeft, Copy, Trash2, Info, X, BarChart2, MapPin, UserCheck, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Send, Paperclip, ArrowLeft, FileText, Image as ImageIcon, Music, Video, Download, ArrowDown, CornerUpLeft, Copy, Trash2, Info, X, BarChart2, MapPin, UserCheck, Plus, Bot, Sparkles, Receipt } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
     AlertDialog,
@@ -209,6 +211,107 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
     const [cName, setCName] = useState("");
     const [cPhone, setCPhone] = useState("");
     const [cOrg, setCOrg] = useState("");
+
+    // Handover (Human Takeover) State
+    const [handoverActive, setHandoverActive] = useState(false);
+    const [handoverLoading, setHandoverLoading] = useState(false);
+
+    // Quotation PDF State
+    const [quotationOpen, setQuotationOpen] = useState(false);
+    const [quoteItemName, setQuoteItemName] = useState("22K Gold Bridal Ring");
+    const [quoteWeight, setQuoteWeight] = useState("1.5");
+    const [quoteUnit, setQuoteUnit] = useState<"tola" | "gram">("tola");
+    const [quotePurity, setQuotePurity] = useState<"24k" | "22k" | "21k" | "18k">("22k");
+    const [quoteMaking, setQuoteMaking] = useState("4000");
+    const [liveGoldRates, setLiveGoldRates] = useState<any>(null);
+    const [sendingQuote, setSendingQuote] = useState(false);
+
+    useEffect(() => {
+        // Fetch handover state for this chat
+        fetch(`/api/handover?sessionId=${sessionId}&jid=${encodeURIComponent(jid)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    setHandoverActive(!!data.active);
+                }
+            })
+            .catch(() => {});
+
+        // Fetch current gold rates for live calculations
+        fetch("/api/gold-rates")
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    setLiveGoldRates(data.data);
+                }
+            })
+            .catch(() => {});
+    }, [sessionId, jid]);
+
+    const handleToggleHandover = async () => {
+        setHandoverLoading(true);
+        try {
+            const nextAction = handoverActive ? "resume" : "pause";
+            const res = await fetch("/api/handover", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sessionId,
+                    jid,
+                    action: nextAction,
+                    minutes: 60,
+                    reason: "Manual staff takeover from dashboard"
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setHandoverActive(!handoverActive);
+                toast.success(handoverActive ? "AI Bot resumed for this chat" : "AI Bot paused (Human Takeover active)");
+            } else {
+                toast.error(data.error || "Action failed");
+            }
+        } catch (e: any) {
+            toast.error(e.message || "Failed to update handover");
+        } finally {
+            setHandoverLoading(false);
+        }
+    };
+
+    const handleSendQuotation = async () => {
+        if (!quoteItemName || !quoteWeight) {
+            toast.error("Please enter item name and weight");
+            return;
+        }
+        setSendingQuote(true);
+        try {
+            const res = await fetch("/api/quotation", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sessionId,
+                    jid,
+                    itemName: quoteItemName,
+                    weight: parseFloat(quoteWeight),
+                    weightUnit: quoteUnit,
+                    purity: quotePurity,
+                    makingCharges: parseFloat(quoteMaking || "0"),
+                    customerName: name || undefined
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(`Quotation PDF #${data.data?.quoteNumber} sent on WhatsApp!`);
+                setQuotationOpen(false);
+                setTimeout(() => fetchMessages(), 800);
+            } else {
+                toast.error(data.error || "Failed to generate quotation");
+            }
+        } catch (e: any) {
+            toast.error(e.message || "Quotation failed");
+        } finally {
+            setSendingQuote(false);
+        }
+    };
 
     const handleSendPollModal = async () => {
         if (!pollQuestion.trim()) return toast.error("Poll question required");
@@ -481,6 +584,127 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
                 </div>
             )}
 
+            {/* Quotation Dialog */}
+            <Dialog open={quotationOpen} onOpenChange={setQuotationOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+                            <FileText className="h-4 w-4 text-amber-500" />
+                            Generate Official Quotation (PDF)
+                        </DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Calculate gold weight, purity & making charges, then dispatch a PDF to this chat.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {(() => {
+                        const parsedWeight = parseFloat(quoteWeight) || 0;
+                        const currentRate = (quotePurity === "24k" ? liveGoldRates?.rate24k : quotePurity === "22k" ? liveGoldRates?.rate22k : quotePurity === "21k" ? liveGoldRates?.rate21k : liveGoldRates?.rate18k) || 260790;
+                        const weightInTola = quoteUnit === "gram" ? Number((parsedWeight / 11.6638).toFixed(3)) : parsedWeight;
+                        const goldAmountCalc = Math.round(weightInTola * currentRate);
+                        const totalEstimate = goldAmountCalc + (parseFloat(quoteMaking) || 0);
+
+                        return (
+                            <div className="space-y-3 py-1 text-xs">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-medium">Item Description</Label>
+                                    <Input
+                                        placeholder="e.g. 22K Gold Bridal Ring"
+                                        value={quoteItemName}
+                                        onChange={(e) => setQuoteItemName(e.target.value)}
+                                        className="h-8 text-xs"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-medium">Weight</Label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            placeholder="1.5"
+                                            value={quoteWeight}
+                                            onChange={(e) => setQuoteWeight(e.target.value)}
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-medium">Unit</Label>
+                                        <select
+                                            value={quoteUnit}
+                                            onChange={(e) => setQuoteUnit(e.target.value as any)}
+                                            className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                                        >
+                                            <option value="tola">Tola (1 Tola = 11.66g)</option>
+                                            <option value="gram">Grams</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-medium">Gold Purity</Label>
+                                        <select
+                                            value={quotePurity}
+                                            onChange={(e) => setQuotePurity(e.target.value as any)}
+                                            className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs outline-none focus:ring-1 focus:ring-primary"
+                                        >
+                                            <option value="22k">22K Gold (Standard Jewellery)</option>
+                                            <option value="24k">24K Gold (Bullion)</option>
+                                            <option value="21k">21K Gold</option>
+                                            <option value="18k">18K Gold</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-medium">Making Charges (PKR)</Label>
+                                        <Input
+                                            type="number"
+                                            placeholder="4000"
+                                            value={quoteMaking}
+                                            onChange={(e) => setQuoteMaking(e.target.value)}
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5 space-y-1">
+                                    <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                                        <span>Gold Rate ({quotePurity.toUpperCase()}):</span>
+                                        <span className="font-semibold text-foreground">PKR {currentRate.toLocaleString()}/tola</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                                        <span>Weight:</span>
+                                        <span>{weightInTola} Tola ({quoteUnit === "gram" ? parsedWeight : Number((parsedWeight * 11.6638).toFixed(2))}g)</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                                        <span>Gold Value:</span>
+                                        <span>PKR {goldAmountCalc.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs font-bold text-amber-600 dark:text-amber-400 pt-1 border-t border-amber-500/20">
+                                        <span>Total Estimated:</span>
+                                        <span>PKR {totalEstimate.toLocaleString()}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setQuotationOpen(false)}>
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+                                        onClick={handleSendQuotation}
+                                        disabled={sendingQuote}
+                                    >
+                                        {sendingQuote ? "Generating PDF..." : "Send Quotation PDF"}
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </DialogContent>
+            </Dialog>
+
             {/* Header */}
             <div className="shrink-0 px-3 py-2.5 border-b bg-background/80 backdrop-blur-sm flex items-center gap-3 z-10">
                 {onBack && (
@@ -496,6 +720,48 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-foreground truncate">{displayName}</h3>
                     <p className="text-[10px] text-muted-foreground truncate">{jid}</p>
+                </div>
+
+                {/* Handover & Quotation Action Buttons */}
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    {/* Quotation PDF Dialog Trigger */}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 sm:h-8 text-xs border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 gap-1.5 px-2 sm:px-2.5"
+                        onClick={() => setQuotationOpen(true)}
+                        title="Generate & Send PDF Quotation"
+                    >
+                        <FileText className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Quotation</span>
+                    </Button>
+
+                    {/* Human Takeover / Bot Pause Toggle */}
+                    <Button
+                        size="sm"
+                        variant={handoverActive ? "default" : "outline"}
+                        className={cn(
+                            "h-7 sm:h-8 text-xs gap-1.5 px-2 sm:px-2.5 transition-all",
+                            handoverActive
+                                ? "bg-amber-600 hover:bg-amber-700 text-white shadow-sm border-transparent animate-pulse"
+                                : "text-muted-foreground hover:text-foreground border-border/50"
+                        )}
+                        onClick={handleToggleHandover}
+                        disabled={handoverLoading}
+                        title={handoverActive ? "AI Bot is paused for this chat. Click to resume." : "Click to pause AI Bot and take over chat."}
+                    >
+                        {handoverActive ? (
+                            <>
+                                <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                                <span className="font-medium text-xs">Takeover Active</span>
+                            </>
+                        ) : (
+                            <>
+                                <Bot className="h-3.5 w-3.5 text-emerald-500" />
+                                <span className="hidden sm:inline text-xs">Bot Active</span>
+                            </>
+                        )}
+                    </Button>
                 </div>
             </div>
 
