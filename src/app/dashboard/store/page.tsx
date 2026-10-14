@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     Store,
     ShoppingBag,
@@ -18,10 +18,22 @@ import {
     CheckCircle2,
     RefreshCw,
     X,
-    Filter
+    Filter,
+    Printer,
+    Search,
+    ChevronDown,
+    ArrowUpRight,
+    TrendingUp,
+    DollarSign,
+    Layers,
+    MessageCircle,
+    Share2,
+    Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 import { PRESET_CATALOG_PRODUCTS } from "@/lib/catalog-presets";
+import StoreSetupWizardModal from "./store-setup-wizard-modal";
+import CounterQrModal from "./counter-qr-modal";
 
 interface StoreData {
     id: string;
@@ -90,39 +102,46 @@ interface Order {
     }[];
 }
 
+interface WhatsAppSessionItem {
+    id: string;
+    sessionId: string;
+    name: string;
+    status: string;
+}
+
 export default function StoreDashboardPage() {
     const [stores, setStores] = useState<StoreData[]>([]);
     const [activeStore, setActiveStore] = useState<StoreData | null>(null);
-    const [activeTab, setActiveTab] = useState<"settings" | "products" | "orders">("settings");
+    const [activeTab, setActiveTab] = useState<"overview" | "orders" | "products" | "delivery" | "settings">("overview");
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [copied, setCopied] = useState<boolean>(false);
+
+    // Modals
+    const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
+    const [showCounterQrModal, setShowCounterQrModal] = useState<boolean>(false);
+    const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
 
     // Products & Orders state
     const [products, setProducts] = useState<Product[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [selectedOrderStatus, setSelectedOrderStatus] = useState<string>("ALL");
+    const [productSearch, setProductSearch] = useState<string>("");
+    const [sessions, setSessions] = useState<WhatsAppSessionItem[]>([]);
 
-    // New Store Modal
-    const [showCreateStoreModal, setShowCreateStoreModal] = useState<boolean>(false);
-    const [newStoreName, setNewStoreName] = useState<string>("");
-    const [newStorePhone, setNewStorePhone] = useState<string>("");
-    const [newStoreSlug, setNewStoreSlug] = useState<string>("");
-    const [newStoreDeliveryTime, setNewStoreDeliveryTime] = useState<string>("30-45 mins");
-    const [newStoreOpeningHours, setNewStoreOpeningHours] = useState<string>("9:00 AM - 11:00 PM");
-
-    // New Product Modal
-    const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
+    // New Product Form
     const [productName, setProductName] = useState<string>("");
     const [productPrice, setProductPrice] = useState<string>("");
     const [productComparePrice, setProductComparePrice] = useState<string>("");
     const [productUnit, setProductUnit] = useState<string>("item");
     const [productImage, setProductImage] = useState<string>("");
 
-    // Custom Domain Input
+    // Settings Inputs
     const [customDomainInput, setCustomDomainInput] = useState<string>("");
     const [isSavingDomain, setIsSavingDomain] = useState<boolean>(false);
+    const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+    const [noticeMessageInput, setNoticeMessageInput] = useState<string>("");
 
-    // Delivery Charges & Times Input
+    // Delivery & Timings Inputs
     const [deliveryFeeInput, setDeliveryFeeInput] = useState<string>("0");
     const [freeDeliveryAboveInput, setFreeDeliveryAboveInput] = useState<string>("");
     const [deliveryTimeInput, setDeliveryTimeInput] = useState<string>("30-45 mins");
@@ -130,12 +149,13 @@ export default function StoreDashboardPage() {
     const [isSavingDelivery, setIsSavingDelivery] = useState<boolean>(false);
     const [isImportingPresets, setIsImportingPresets] = useState<boolean>(false);
 
-    // Load Stores on mount
+    // Load Stores & Sessions on mount
     useEffect(() => {
         fetchStores();
+        fetchSessions();
     }, []);
 
-    // Load store products/orders when store or tab changes
+    // Sync state when activeStore or tab changes
     useEffect(() => {
         if (activeStore) {
             setCustomDomainInput(activeStore.customDomain || "");
@@ -143,56 +163,23 @@ export default function StoreDashboardPage() {
             setFreeDeliveryAboveInput(activeStore.freeDeliveryAbove ? activeStore.freeDeliveryAbove.toString() : "");
             setDeliveryTimeInput(activeStore.estimatedDeliveryTime || "30-45 mins");
             setOpeningHoursInput(activeStore.openingHours || "9:00 AM - 11:00 PM");
-            if (activeTab === "products") {
-                fetchProducts(activeStore.id);
-            } else if (activeTab === "orders") {
-                fetchOrders(activeStore.id);
-            }
-        }
-    }, [activeStore, activeTab]);
+            setNoticeMessageInput(activeStore.noticeMessage || "");
+            setSelectedSessionId(activeStore.sessionId || "");
 
-    const handleSaveDelivery = async () => {
-        if (!activeStore) return;
-        setIsSavingDelivery(true);
-        try {
-            const res = await fetch(`/api/stores/${activeStore.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    deliveryFee: Number(deliveryFeeInput) || 0,
-                    freeDeliveryAbove: freeDeliveryAboveInput ? Number(freeDeliveryAboveInput) : null,
-                    estimatedDeliveryTime: deliveryTimeInput.trim(),
-                    openingHours: openingHoursInput.trim()
-                })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
-            toast.success("Delivery charges, timing aur auqaat kamiyabi se update ho gaye! 🛵");
-            setActiveStore(data.store);
-        } catch (err: any) {
-            toast.error(err.message || "Failed to update delivery settings");
-        } finally {
-            setIsSavingDelivery(false);
-        }
-    };
-
-    const handleImportPresets = async () => {
-        if (!activeStore) return;
-        setIsImportingPresets(true);
-        try {
-            const res = await fetch(`/api/stores/${activeStore.id}/presets`, {
-                method: "POST"
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
-            toast.success(data.message || "Pre-loaded products dukaan par add ho gaye! 📦");
             fetchProducts(activeStore.id);
-        } catch (err: any) {
-            toast.error(err.message || "Failed to import preset items");
-        } finally {
-            setIsImportingPresets(false);
+            fetchOrders(activeStore.id);
+        }
+    }, [activeStore]);
+
+    const fetchSessions = async () => {
+        try {
+            const res = await fetch("/api/sessions");
+            const data = await res.json();
+            if (res.ok && data.data && Array.isArray(data.data)) {
+                setSessions(data.data);
+            }
+        } catch (e) {
+            console.error("Error fetching sessions:", e);
         }
     };
 
@@ -204,7 +191,7 @@ export default function StoreDashboardPage() {
             if (res.ok && data.stores) {
                 setStores(data.stores);
                 if (data.stores.length > 0) {
-                    // Check if a specific storeId was requested via URL search param (e.g. from storefront "Management" button)
+                    // Check if a specific storeId was requested via URL query param
                     if (typeof window !== "undefined") {
                         const urlParams = new URLSearchParams(window.location.search);
                         const targetStoreId = urlParams.get("storeId");
@@ -251,54 +238,80 @@ export default function StoreDashboardPage() {
         }
     };
 
-    const handleCreateStore = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newStoreName.trim()) return;
+    // Recalculate orders when filter status changes
+    useEffect(() => {
+        if (activeStore) {
+            fetchOrders(activeStore.id);
+        }
+    }, [selectedOrderStatus]);
 
+    const handleSaveDelivery = async () => {
+        if (!activeStore) return;
+        setIsSavingDelivery(true);
         try {
-            const res = await fetch("/api/stores", {
-                method: "POST",
+            const res = await fetch(`/api/stores/${activeStore.id}`, {
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    name: newStoreName,
-                    phone: newStorePhone,
-                    slug: newStoreSlug,
-                    estimatedDeliveryTime: newStoreDeliveryTime.trim(),
-                    openingHours: newStoreOpeningHours.trim()
+                    deliveryFee: Number(deliveryFeeInput) || 0,
+                    freeDeliveryAbove: freeDeliveryAboveInput ? Number(freeDeliveryAboveInput) : null,
+                    estimatedDeliveryTime: deliveryTimeInput.trim(),
+                    openingHours: openingHoursInput.trim(),
+                    noticeMessage: noticeMessageInput.trim() || null
                 })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            toast.success("Dukaan kamiyabi se create ho gayi hai! 🎉");
-            setShowCreateStoreModal(false);
-            setNewStoreName("");
-            setNewStorePhone("");
-            setNewStoreSlug("");
-            setNewStoreDeliveryTime("30-45 mins");
-            setNewStoreOpeningHours("9:00 AM - 11:00 PM");
+            toast.success("Delivery charges, timing aur auqaat kamiyabi se update ho gaye! 🛵");
+            setActiveStore(data.store);
             fetchStores();
         } catch (err: any) {
-            toast.error(err.message || "Failed to create store");
+            toast.error(err.message || "Failed to update delivery settings");
+        } finally {
+            setIsSavingDelivery(false);
         }
     };
 
-    const handleSaveDomain = async () => {
+    const handleImportPresets = async () => {
+        if (!activeStore) return;
+        setIsImportingPresets(true);
+        try {
+            const res = await fetch(`/api/stores/${activeStore.id}/presets`, {
+                method: "POST"
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            toast.success(data.message || "Pre-loaded products dukaan par add ho gaye! 📦");
+            fetchProducts(activeStore.id);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to import preset items");
+        } finally {
+            setIsImportingPresets(false);
+        }
+    };
+
+    const handleSaveDomainAndSession = async () => {
         if (!activeStore) return;
         setIsSavingDomain(true);
         try {
             const res = await fetch(`/api/stores/${activeStore.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ customDomain: customDomainInput })
+                body: JSON.stringify({
+                    customDomain: customDomainInput.trim() || null,
+                    sessionId: selectedSessionId || null
+                })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            toast.success("Domain settings update ho gayi hain!");
+            toast.success("Domain aur WhatsApp session settings update ho gayi hain! ✅");
             setActiveStore(data.store);
+            fetchStores();
         } catch (err: any) {
-            toast.error(err.message || "Failed to update domain");
+            toast.error(err.message || "Failed to update domain/session");
         } finally {
             setIsSavingDomain(false);
         }
@@ -316,10 +329,11 @@ export default function StoreDashboardPage() {
             const data = await res.json();
             if (res.ok) {
                 setActiveStore(data.store);
-                toast.success(newStatus ? "Dukaan Online ho gayi hai! (Accepting orders)" : "Dukaan Closed mark kar di gayi hai.");
+                toast.success(newStatus ? "Dukaan Online ho gayi hai! (Accepting orders) 🟢" : "Dukaan Closed mark kar di gayi hai. 🔴");
+                fetchStores();
             }
         } catch (e) {
-            toast.error("Failed to update status");
+            toast.error("Failed to update store status");
         }
     };
 
@@ -342,15 +356,51 @@ export default function StoreDashboardPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            toast.success("Product dukaan par add ho gaya! 📦");
+            toast.success(`"${productName}" dukaan par add ho gaya! 🎉`);
             setShowAddProductModal(false);
             setProductName("");
             setProductPrice("");
             setProductComparePrice("");
+            setProductUnit("item");
             setProductImage("");
             fetchProducts(activeStore.id);
         } catch (err: any) {
             toast.error(err.message || "Failed to add product");
+        }
+    };
+
+    const handleToggleProductStock = async (product: Product) => {
+        if (!activeStore) return;
+        try {
+            const newStock = !product.inStock;
+            const res = await fetch(`/api/stores/${activeStore.id}/products/${product.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ inStock: newStock })
+            });
+            if (res.ok) {
+                toast.success(`"${product.name}" ab ${newStock ? "In Stock 🟢" : "Out of Stock 🔴"} hai`);
+                fetchProducts(activeStore.id);
+            }
+        } catch (e) {
+            toast.error("Stock status update nahi ho saka");
+        }
+    };
+
+    const handleDeleteProduct = async (product: Product) => {
+        if (!activeStore) return;
+        if (!confirm(`Kya aap waqai "${product.name}" ko dukaan se delete karna chahte hain?`)) return;
+
+        try {
+            const res = await fetch(`/api/stores/${activeStore.id}/products/${product.id}`, {
+                method: "DELETE"
+            });
+            if (res.ok) {
+                toast.success(`"${product.name}" delete ho gaya!`);
+                fetchProducts(activeStore.id);
+            }
+        } catch (e) {
+            toast.error("Product delete nahi ho saka");
         }
     };
 
@@ -368,7 +418,7 @@ export default function StoreDashboardPage() {
             });
             const data = await res.json();
             if (res.ok) {
-                toast.success(`Order #${data.order.orderNumber} status updated to ${newStatus}. WhatsApp notification sent!`);
+                toast.success(`Order #${data.order.orderNumber} status -> ${newStatus}. WhatsApp alert sent! 📲`);
                 fetchOrders(activeStore.id);
             }
         } catch (e) {
@@ -379,161 +429,931 @@ export default function StoreDashboardPage() {
     const copyStoreLink = () => {
         if (!activeStore) return;
         const origin = window.location.origin;
-        const url = `${origin}/s/${activeStore.slug}`;
+        const url = activeStore.customDomain ? `https://${activeStore.customDomain}` : `${origin}/s/${activeStore.slug}`;
         navigator.clipboard.writeText(url);
         setCopied(true);
-        toast.success("Store link copied!");
+        toast.success("Store link copy ho gaya hai!");
         setTimeout(() => setCopied(false), 2000);
     };
 
+    // Executive Metrics Computations
+    const totalRevenue = useMemo(() => {
+        return orders
+            .filter(o => o.status !== "CANCELLED")
+            .reduce((sum, o) => sum + (o.total || 0), 0);
+    }, [orders]);
+
+    const pendingOrdersCount = useMemo(() => {
+        return orders.filter(o => o.status === "PENDING").length;
+    }, [orders]);
+
+    const filteredProducts = useMemo(() => {
+        if (!productSearch.trim()) return products;
+        const q = productSearch.toLowerCase().trim();
+        return products.filter(p => p.name.toLowerCase().includes(q));
+    }, [products, productSearch]);
+
+    // Store Readiness Checklist score (0 to 100%)
+    const checklistScore = useMemo(() => {
+        if (!activeStore) return 0;
+        let score = 20; // store created
+        if (activeStore.estimatedDeliveryTime) score += 20;
+        if (products.length > 0) score += 25;
+        if (activeStore.sessionId || activeStore.phone) score += 20;
+        if (activeStore.noticeMessage || activeStore.freeDeliveryAbove) score += 15;
+        return score;
+    }, [activeStore, products]);
+
     if (isLoading) {
         return (
-            <div className="p-8 flex items-center justify-center min-h-[60vh]">
-                <RefreshCw className="w-8 h-8 animate-spin text-emerald-600" />
+            <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] space-y-3">
+                <RefreshCw className="w-9 h-9 animate-spin text-emerald-600" />
+                <p className="text-sm font-semibold text-slate-600">Digital Dukaan Hub Load Ho Raha Hai...</p>
             </div>
         );
     }
 
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const currentLiveStoreUrl = activeStore
+        ? activeStore.customDomain
+            ? `https://${activeStore.customDomain}`
+            : `${origin}/s/${activeStore.slug}`
+        : "";
+
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                        <Store className="w-6 h-6" />
+        <div className="p-3 sm:p-6 max-w-7xl mx-auto space-y-6">
+            {/* TOP EXECUTIVE BAR & STORE SWITCHER */}
+            <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center font-bold text-xl shadow-md shrink-0">
+                        {activeStore ? activeStore.name.charAt(0) : "D"}
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                            <span>Digital Dukaan / WhatsApp Commerce</span>
-                            <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">
-                                New
-                            </span>
-                        </h1>
-                        <p className="text-xs text-slate-500">
-                            Bina Shopify aur hosting ke apna online store chalayein aur orders seedha WhatsApp par lein.
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Store Switcher Dropdown */}
+                            {stores.length > 1 ? (
+                                <div className="relative inline-block">
+                                    <select
+                                        value={activeStore?.id}
+                                        onChange={(e) => {
+                                            const s = stores.find(x => x.id === e.target.value);
+                                            if (s) setActiveStore(s);
+                                        }}
+                                        className="appearance-none bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl px-3 py-1 text-sm sm:text-base font-extrabold text-slate-900 pr-8 focus:outline-none cursor-pointer"
+                                    >
+                                        {stores.map(st => (
+                                            <option key={st.id} value={st.id}>
+                                                🏪 {st.name} ({st.city || "Pakistan"})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                </div>
+                            ) : (
+                                <h1 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                                    {activeStore?.name || "Digital Dukaan"}
+                                </h1>
+                            )}
+
+                            {/* Store Open/Closed Live Toggle */}
+                            {activeStore && (
+                                <button
+                                    onClick={handleToggleStoreOpen}
+                                    title="Dukaan ka status badlein (Online / Closed)"
+                                    className={`px-3 py-0.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                        activeStore.isOpen
+                                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200"
+                                            : "bg-rose-100 text-rose-800 border border-rose-200 hover:bg-rose-200"
+                                    }`}
+                                >
+                                    <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
+                                    <span>{activeStore.isOpen ? "Online (Orders Khule Hain)" : "Closed (Abhi Band Hai)"}</span>
+                                </button>
+                            )}
+                        </div>
+
+                        {activeStore && (
+                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                                <span>📱 {activeStore.phone}</span>
+                                <span>•</span>
+                                <span>⏱️ {activeStore.estimatedDeliveryTime || "30-45 mins"}</span>
+                                <span>•</span>
+                                <span>📍 {activeStore.city || "Pakistan"}</span>
+                            </p>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                {/* Primary Actions: Setup Wizard, QR Poster, Live Store */}
+                <div className="flex items-center gap-2 flex-wrap">
                     <button
-                        onClick={() => setShowCreateStoreModal(true)}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        onClick={() => setShowWizardModal(true)}
+                        className="px-3.5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
                     >
-                        <Plus className="w-4 h-4" />
-                        <span>Nayi Dukaan Banayein</span>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Nayi Dukaan Setup Wizard</span>
                     </button>
+
+                    {activeStore && (
+                        <>
+                            <button
+                                onClick={() => setShowCounterQrModal(true)}
+                                className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            >
+                                <Printer className="w-4 h-4 text-indigo-600" />
+                                <span>Counter QR Stand</span>
+                            </button>
+
+                            <a
+                                href={currentLiveStoreUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                                <span>Live Dukaan ↗</span>
+                            </a>
+                        </>
+                    )}
                 </div>
             </div>
 
-            {/* No Store Empty State */}
+            {/* EMPTY STATE: NO STORES */}
             {stores.length === 0 ? (
-                <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-12 text-center max-w-md mx-auto my-12 space-y-4">
-                    <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-                        <Store className="w-8 h-8" />
+                <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-10 sm:p-14 text-center max-w-xl mx-auto my-8 space-y-5 shadow-xs">
+                    <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
+                        <Store className="w-10 h-10" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-slate-900">Aapki koi dukaan register nahi hai</h2>
-                        <p className="text-xs text-slate-500 mt-1">
-                            Apni pehli dukaan banayein, products add karein aur WhatsApp par instant orders lena shuru karein.
+                        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+                            Aapki Koi Online Dukaan Mojood Nahi Hai
+                        </h2>
+                        <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+                            Bina kisi Shopify subscription ya technical hosting ke apni dukaan banayein. Har mohallay ke karkun direct WhatsApp par orders receive kar sakte hain.
                         </p>
                     </div>
-                    <button
-                        onClick={() => setShowCreateStoreModal(true)}
-                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
-                    >
-                        Pehli Dukaan Banayein (1 Minute)
-                    </button>
+
+                    <div className="pt-2">
+                        <button
+                            onClick={() => setShowWizardModal(true)}
+                            className="px-7 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-lg transition flex items-center gap-2 mx-auto cursor-pointer"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            <span>Pehli Dukaan Banayein (1-Minute Setup)</span>
+                        </button>
+                    </div>
                 </div>
             ) : (
                 activeStore && (
                     <div className="space-y-6">
-                        {/* Store Selector & Status Bar */}
-                        <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 text-white p-4 sm:p-5 rounded-2xl shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-lg font-bold truncate">{activeStore.name}</h2>
-                                        <button
-                                            onClick={handleToggleStoreOpen}
-                                            className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full cursor-pointer transition ${
-                                                activeStore.isOpen
-                                                    ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                                                    : "bg-rose-500 text-white hover:bg-rose-600"
-                                            }`}
-                                        >
-                                            {activeStore.isOpen ? "● Store Open" : "● Store Closed"}
-                                        </button>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                                        <span>Link: /s/{activeStore.slug}</span>
-                                        {activeStore.customDomain && (
-                                            <span className="text-emerald-400 font-medium">
-                                                • {activeStore.customDomain}
-                                            </span>
-                                        )}
+                        {/* EXECUTIVE KPI METRIC CARDS */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                            {/* Card 1: Total Orders */}
+                            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                                    <span>Total Orders</span>
+                                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                                        <ShoppingBag className="w-4 h-4" />
                                     </div>
                                 </div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                                        {orders.length}
+                                    </span>
+                                    {pendingOrdersCount > 0 && (
+                                        <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 animate-pulse">
+                                            {pendingOrdersCount} naye
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-slate-400">WhatsApp par receive hue tamam orders</p>
                             </div>
 
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <button
-                                    onClick={copyStoreLink}
-                                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition text-slate-200"
-                                >
-                                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                                    <span>{copied ? "Copied!" : "Copy Link"}</span>
-                                </button>
-                                <a
-                                    href={`/s/${activeStore.slug}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold flex items-center gap-1.5 transition text-white shadow-xs"
-                                >
-                                    <span>Store Kholain</span>
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
+                            {/* Card 2: Total Sales (PKR) */}
+                            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                                    <span>Total Sales</span>
+                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                                        <TrendingUp className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 truncate">
+                                    Rs. {totalRevenue.toLocaleString("en-PK")}
+                                </div>
+                                <p className="text-[11px] text-slate-400">Ghar tak delivery ka mukammal revenue</p>
+                            </div>
+
+                            {/* Card 3: Products in Catalog */}
+                            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                                    <span>Products</span>
+                                    <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                                        <Package className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                                        {products.length}
+                                    </span>
+                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                        {products.filter(p => p.inStock).length} in-stock
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400">Dukaan ki inventory mein available items</p>
+                            </div>
+
+                            {/* Card 4: WhatsApp Automation */}
+                            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2">
+                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                                    <span>WhatsApp Alerts</span>
+                                    <div className="p-2 bg-green-50 text-green-600 rounded-xl">
+                                        <MessageCircle className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                        <span>Active & Connected</span>
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400">Customer aur dukaan dar ko foran auto bill</p>
                             </div>
                         </div>
 
-                        {/* Navigation Tabs */}
-                        <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+                        {/* STORE READINESS CHECKLIST (PROGRESS BAR) */}
+                        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span className="text-xs sm:text-sm font-bold text-slate-900">
+                                        Store Readiness & Launch Checklist:
+                                    </span>
+                                    <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                        {checklistScore}% Complete
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={copyStoreLink}
+                                    className="text-xs text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                    <span>{copied ? "Link Copied!" : "Copy Share Link"}</span>
+                                </button>
+                            </div>
+
+                            {/* Visual Progress Bar */}
+                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div
+                                    className="bg-emerald-600 h-full transition-all duration-500"
+                                    style={{ width: `${checklistScore}%` }}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 text-[11px]">
+                                <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                                    ✓ Dukaan Info Ready
+                                </span>
+                                <span className={`flex items-center gap-1 ${activeStore.estimatedDeliveryTime ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
+                                    {activeStore.estimatedDeliveryTime ? "✓ Delivery Set" : "○ Delivery Pending"}
+                                </span>
+                                <span className={`flex items-center gap-1 ${products.length > 0 ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
+                                    {products.length > 0 ? `✓ Products (${products.length})` : "○ Products Khali"}
+                                </span>
+                                <span className={`flex items-center gap-1 ${activeStore.phone ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
+                                    {activeStore.phone ? "✓ WhatsApp Alert" : "○ WhatsApp Missing"}
+                                </span>
+                                <button
+                                    onClick={() => setShowCounterQrModal(true)}
+                                    className="text-indigo-600 hover:text-indigo-700 font-bold text-left cursor-pointer flex items-center gap-1"
+                                >
+                                    <span>🖨️ Print Counter QR ➔</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* TAB NAVIGATION BAR */}
+                        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
                             <button
-                                onClick={() => setActiveTab("settings")}
-                                className={`px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                                    activeTab === "settings"
-                                        ? "bg-emerald-600 text-white shadow-sm"
+                                onClick={() => setActiveTab("overview")}
+                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    activeTab === "overview"
+                                        ? "bg-slate-900 text-white shadow-xs"
                                         : "text-slate-600 hover:bg-slate-100"
                                 }`}
                             >
-                                <Store className="w-4 h-4" />
-                                <span>Dukaan & Domain Settings</span>
+                                <Layers className="w-4 h-4" />
+                                <span>Overview</span>
                             </button>
+
+                            <button
+                                onClick={() => setActiveTab("orders")}
+                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    activeTab === "orders"
+                                        ? "bg-emerald-600 text-white shadow-xs"
+                                        : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                            >
+                                <ShoppingBag className="w-4 h-4" />
+                                <span>Orders ({orders.length})</span>
+                                {pendingOrdersCount > 0 && (
+                                    <span className="bg-amber-400 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                                        {pendingOrdersCount}
+                                    </span>
+                                )}
+                            </button>
+
                             <button
                                 onClick={() => setActiveTab("products")}
-                                className={`px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
+                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                                     activeTab === "products"
-                                        ? "bg-emerald-600 text-white shadow-sm"
+                                        ? "bg-emerald-600 text-white shadow-xs"
                                         : "text-slate-600 hover:bg-slate-100"
                                 }`}
                             >
                                 <Package className="w-4 h-4" />
                                 <span>Products ({products.length})</span>
                             </button>
+
                             <button
-                                onClick={() => setActiveTab("orders")}
-                                className={`px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 ${
-                                    activeTab === "orders"
-                                        ? "bg-emerald-600 text-white shadow-sm"
+                                onClick={() => setActiveTab("delivery")}
+                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    activeTab === "delivery"
+                                        ? "bg-emerald-600 text-white shadow-xs"
                                         : "text-slate-600 hover:bg-slate-100"
                                 }`}
                             >
-                                <ShoppingBag className="w-4 h-4" />
-                                <span>Orders ({orders.length})</span>
+                                <Truck className="w-4 h-4" />
+                                <span>Delivery & Auqaat</span>
+                            </button>
+
+                            <button
+                                onClick={() => setActiveTab("settings")}
+                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                                    activeTab === "settings"
+                                        ? "bg-emerald-600 text-white shadow-xs"
+                                        : "text-slate-600 hover:bg-slate-100"
+                                }`}
+                            >
+                                <Globe className="w-4 h-4" />
+                                <span>Domain & Automation</span>
                             </button>
                         </div>
 
-                        {/* TAB 1: SETTINGS & CUSTOM DOMAIN */}
+                        {/* TAB 1: OVERVIEW & RECENT ACTIVITY */}
+                        {activeTab === "overview" && (
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left 2 columns: Recent Orders Feed */}
+                                <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="font-extrabold text-base text-slate-900">Recent Orders Stream</h3>
+                                            <p className="text-xs text-slate-500">Taza tareen WhatsApp orders aur unka live status</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setActiveTab("orders")}
+                                            className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                                        >
+                                            Tamam Orders Dekhein ➔
+                                        </button>
+                                    </div>
+
+                                    {orders.length === 0 ? (
+                                        <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl space-y-2">
+                                            <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
+                                            <p className="text-xs font-semibold text-slate-600">Abhi tak koi order receive nahi hua</p>
+                                            <p className="text-[11px] text-slate-400">Store ka link WhatsApp status ya Facebook group par share karein</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {orders.slice(0, 5).map(order => (
+                                                <div
+                                                    key={order.id}
+                                                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                                                >
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <strong className="text-slate-900 font-mono">#{order.orderNumber}</strong>
+                                                            <span className="font-semibold text-slate-800">{order.customerName}</span>
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                order.status === "DELIVERED"
+                                                                    ? "bg-emerald-100 text-emerald-800"
+                                                                    : order.status === "PENDING"
+                                                                    ? "bg-amber-100 text-amber-800"
+                                                                    : "bg-blue-100 text-blue-800"
+                                                            }`}>
+                                                                {order.status}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-slate-500 text-[11px]">
+                                                            {order.items.length} items • Total: <strong>Rs. {order.total.toLocaleString("en-PK")}</strong> ({order.paymentMethod})
+                                                        </p>
+                                                        <p className="text-slate-400 text-[10px] truncate max-w-sm">
+                                                            📍 {order.customerAddress}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <a
+                                                            href={`https://wa.me/${order.customerPhone.replace(/[^\d]/g, "")}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="p-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 font-bold transition flex items-center gap-1 text-[11px]"
+                                                        >
+                                                            <MessageCircle className="w-3.5 h-3.5" />
+                                                            <span>Chat</span>
+                                                        </a>
+                                                        {order.status === "PENDING" && (
+                                                            <button
+                                                                onClick={() => handleUpdateOrderStatus(order.id, "CONFIRMED")}
+                                                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] transition"
+                                                            >
+                                                                Confirm
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right column: Quick Controls & Share */}
+                                <div className="space-y-4">
+                                    {/* Storefront Link Card */}
+                                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3 text-xs">
+                                        <h4 className="font-extrabold text-slate-900 flex items-center gap-2">
+                                            <Globe className="w-4 h-4 text-emerald-600" />
+                                            <span>Aapka Live Storefront Link</span>
+                                        </h4>
+                                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono text-[11px] text-emerald-800 font-bold truncate">
+                                            {currentLiveStoreUrl}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                            <button
+                                                onClick={copyStoreLink}
+                                                className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                                            >
+                                                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                                <span>{copied ? "Copied" : "Copy Link"}</span>
+                                            </button>
+                                            <a
+                                                href={currentLiveStoreUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                <span>Open Store</span>
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    {/* Physical Shop Counter Stand Card */}
+                                    <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Printer className="w-5 h-5 text-indigo-400" />
+                                            <h4 className="font-extrabold text-sm text-white">Dukaan Counter Stand</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-300 leading-relaxed">
+                                            Apni dukaan ke counter ke liye QR Stand print karein taake mohallay ke log scan karke ghar se order kar sakein!
+                                        </p>
+                                        <button
+                                            onClick={() => setShowCounterQrModal(true)}
+                                            className="w-full py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                                        >
+                                            <Printer className="w-4 h-4" />
+                                            <span>Poster / Standee Print Karein</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 2: ORDERS MANAGER */}
+                        {activeTab === "orders" && (
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-extrabold text-base text-slate-900">Orders Management</h3>
+                                        <p className="text-xs text-slate-500">Tamam orders ko track karein aur status update karke auto WhatsApp alert bhejein</p>
+                                    </div>
+
+                                    {/* Filter Status Chips */}
+                                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                                        {["ALL", "PENDING", "CONFIRMED", "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"].map(st => (
+                                            <button
+                                                key={st}
+                                                onClick={() => setSelectedOrderStatus(st)}
+                                                className={`text-[11px] px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer whitespace-nowrap ${
+                                                    selectedOrderStatus === st
+                                                        ? "bg-slate-900 text-white border-slate-900"
+                                                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                                                }`}
+                                            >
+                                                {st === "ALL" ? "All Orders" : st}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {orders.length === 0 ? (
+                                    <div className="p-12 text-center border border-dashed border-slate-200 rounded-2xl my-4 space-y-2">
+                                        <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
+                                        <p className="text-sm font-semibold text-slate-700">Koi order mojood nahi hai</p>
+                                        <p className="text-xs text-slate-400">Selected filter status ke mutabiq orders khali hain.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3.5">
+                                        {orders.map(order => (
+                                            <div
+                                                key={order.id}
+                                                className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition space-y-3 shadow-2xs"
+                                            >
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-mono font-bold text-sm text-slate-900">
+                                                                #{order.orderNumber}
+                                                            </span>
+                                                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide ${
+                                                                order.status === "DELIVERED"
+                                                                    ? "bg-emerald-100 text-emerald-800"
+                                                                    : order.status === "PENDING"
+                                                                    ? "bg-amber-100 text-amber-800"
+                                                                    : order.status === "CANCELLED"
+                                                                    ? "bg-rose-100 text-rose-800"
+                                                                    : "bg-blue-100 text-blue-800"
+                                                            }`}>
+                                                                {order.status}
+                                                            </span>
+                                                            <span className="text-xs text-slate-400 font-mono">
+                                                                {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs font-semibold text-slate-700 mt-1">
+                                                            Customer: <strong>{order.customerName}</strong> ({order.customerPhone})
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <a
+                                                            href={`https://wa.me/${order.customerPhone.replace(/[^\d]/g, "")}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-3 py-1.5 rounded-xl bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                                                        >
+                                                            <MessageCircle className="w-3.5 h-3.5" />
+                                                            <span>WhatsApp Chat</span>
+                                                        </a>
+                                                    </div>
+                                                </div>
+
+                                                {/* Items summary */}
+                                                <div className="bg-slate-50 p-3 rounded-xl space-y-1.5 text-xs text-slate-700">
+                                                    <div className="font-bold text-slate-900 text-[11px] mb-1">Items Ordered:</div>
+                                                    {order.items.map((it, idx) => (
+                                                        <div key={idx} className="flex justify-between">
+                                                            <span>{it.quantity}x {it.productName}</span>
+                                                            <span className="font-mono font-semibold">Rs. {it.totalPrice}</span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900 text-sm">
+                                                        <span>Total Bill ({order.paymentMethod}):</span>
+                                                        <span className="text-emerald-700">Rs. {order.total.toLocaleString("en-PK")}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Customer Delivery Address */}
+                                                <div className="text-xs text-slate-600 flex items-start gap-1.5">
+                                                    <Truck className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                                    <span><strong>Address:</strong> {order.customerAddress}</span>
+                                                    {order.customerNotes && (
+                                                        <span className="text-amber-700 ml-2">({order.customerNotes})</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Status Action Buttons */}
+                                                <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100 text-xs">
+                                                    <span className="text-[11px] font-bold text-slate-500">Status Update:</span>
+                                                    {order.status === "PENDING" && (
+                                                        <button
+                                                            onClick={() => handleUpdateOrderStatus(order.id, "CONFIRMED")}
+                                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer"
+                                                        >
+                                                            ✓ Confirm Order
+                                                        </button>
+                                                    )}
+                                                    {order.status === "CONFIRMED" && (
+                                                        <button
+                                                            onClick={() => handleUpdateOrderStatus(order.id, "PREPARING")}
+                                                            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg cursor-pointer"
+                                                        >
+                                                            🍲 Packing / Preparing
+                                                        </button>
+                                                    )}
+                                                    {order.status === "PREPARING" && (
+                                                        <button
+                                                            onClick={() => handleUpdateOrderStatus(order.id, "OUT_FOR_DELIVERY")}
+                                                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg cursor-pointer"
+                                                        >
+                                                            🛵 Rider Dispatched
+                                                        </button>
+                                                    )}
+                                                    {order.status === "OUT_FOR_DELIVERY" && (
+                                                        <button
+                                                            onClick={() => handleUpdateOrderStatus(order.id, "DELIVERED")}
+                                                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer"
+                                                        >
+                                                            🎉 Mark Delivered
+                                                        </button>
+                                                    )}
+                                                    {order.status !== "CANCELLED" && order.status !== "DELIVERED" && (
+                                                        <button
+                                                            onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
+                                                            className="px-3 py-1 bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-semibold rounded-lg cursor-pointer ml-auto"
+                                                        >
+                                                            Cancel Order
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* TAB 3: PRODUCTS & INVENTORY */}
+                        {activeTab === "products" && (
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-extrabold text-base text-slate-900">Products Catalog ({products.length})</h3>
+                                        <p className="text-xs text-slate-500">Apne store ke items, prices, packing units aur stock availability control karein</p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <button
+                                            onClick={handleImportPresets}
+                                            disabled={isImportingPresets}
+                                            className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-indigo-200 cursor-pointer disabled:opacity-50 shadow-2xs"
+                                        >
+                                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                                            <span>{isImportingPresets ? "Import Ho Raha Hai..." : "Pakistani Grocery Items (1-Click Import)"}</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => setShowAddProductModal(true)}
+                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            <span>Add Product</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Search Bar */}
+                                <div className="relative">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Product ka naam search karein (e.g. Olper's, Shan, Ghee, Bread)..."
+                                        value={productSearch}
+                                        onChange={(e) => setProductSearch(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                    />
+                                </div>
+
+                                {filteredProducts.length === 0 ? (
+                                    <div className="p-10 text-center border border-dashed border-slate-200 rounded-2xl my-4 space-y-3">
+                                        <Package className="w-10 h-10 text-slate-300 mx-auto" />
+                                        <p className="text-sm font-semibold text-slate-700">Koi product nahi mila</p>
+                                        <p className="text-xs text-slate-400">1-click import button dabayein taake foran 14 grocery items load ho jayen.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                                        {filteredProducts.map(p => (
+                                            <div
+                                                key={p.id}
+                                                className={`p-3.5 rounded-2xl border transition flex items-center justify-between gap-3 ${
+                                                    p.inStock ? "bg-white border-slate-200/90 shadow-2xs" : "bg-slate-50 border-slate-200 opacity-60"
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    {p.image ? (
+                                                        <img
+                                                            src={p.image}
+                                                            alt={p.name}
+                                                            className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                                                            <Package className="w-6 h-6" />
+                                                        </div>
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                                                            {p.name}
+                                                        </h4>
+                                                        <p className="text-[11px] text-slate-500">
+                                                            Rs. {p.price} {p.unit && `• ${p.unit}`}
+                                                            {p.compareAtPrice && (
+                                                                <span className="line-through text-slate-400 ml-1.5 text-[10px]">
+                                                                    Rs. {p.compareAtPrice}
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <button
+                                                        onClick={() => handleToggleProductStock(p)}
+                                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border cursor-pointer transition ${
+                                                            p.inStock
+                                                                ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                                                                : "bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100"
+                                                        }`}
+                                                    >
+                                                        {p.inStock ? "In Stock" : "Out of Stock"}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteProduct(p)}
+                                                        title="Delete Product"
+                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* TAB 4: DELIVERY CHARGES & AUQAAT */}
+                        {activeTab === "delivery" && (
+                            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                                        <Truck className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-extrabold text-base text-slate-900">
+                                            Delivery Charges, Timings & Dukaan Ke Auqaat
+                                        </h3>
+                                        <p className="text-xs text-slate-500">
+                                            Apne mohallay ya shehar ke hisaab se delivery charges, delivery waqt aur dukaan khulnay ke auqaat set karein
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">
+                                            Base Delivery Charges ({activeStore.currencySymbol}) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            placeholder="50"
+                                            value={deliveryFeeInput}
+                                            onChange={e => setDeliveryFeeInput(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Muft delivery ke liye 0 likhein.</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">
+                                            Free Delivery Ka Hadaf ({activeStore.currencySymbol})
+                                        </label>
+                                        <input
+                                            type="number"
+                                            placeholder="1000"
+                                            value={freeDeliveryAboveInput}
+                                            onChange={e => setFreeDeliveryAboveInput(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Is amount se zyada par delivery FREE hogi.</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">
+                                            Estimated Delivery Time *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 15-20 mins"
+                                            value={deliveryTimeInput}
+                                            onChange={e => setDeliveryTimeInput(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Customer ko storefront aur bill par show hoga.</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">
+                                            Store Opening Timings *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 9:00 AM - 11:00 PM"
+                                            value={openingHoursInput}
+                                            onChange={e => setOpeningHoursInput(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                        />
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Dukaan kab khuli aur kab band hoti hai.</p>
+                                    </div>
+                                </div>
+
+                                {/* 1-Click Quick Preset Chips */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                                    <div className="space-y-1.5">
+                                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                            <span>Delivery Time Quick Presets:</span>
+                                        </span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                "⚡ 15-20 Mins",
+                                                "🛵 30-45 Mins",
+                                                "⏱️ 1-2 Hours",
+                                                "📦 Same Day Delivery",
+                                                "🌙 Next Day Delivery"
+                                            ].map((preset) => (
+                                                <button
+                                                    key={preset}
+                                                    type="button"
+                                                    onClick={() => setDeliveryTimeInput(preset)}
+                                                    className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold cursor-pointer transition ${
+                                                        deliveryTimeInput === preset
+                                                            ? "bg-amber-100 border-amber-400 text-amber-900 font-bold"
+                                                            : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                                                    }`}
+                                                >
+                                                    {preset}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                                            <Store className="w-3.5 h-3.5 text-indigo-600" />
+                                            <span>Dukaan Ke Auqaat Quick Presets:</span>
+                                        </span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                "☀️ 9:00 AM - 11:00 PM",
+                                                "🏪 24/7 Khuli Hai",
+                                                "🌙 12:00 PM - 12:00 AM",
+                                                "🌅 8:00 AM - 10:00 PM"
+                                            ].map((preset) => (
+                                                <button
+                                                    key={preset}
+                                                    type="button"
+                                                    onClick={() => setOpeningHoursInput(preset)}
+                                                    className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold cursor-pointer transition ${
+                                                        openingHoursInput === preset
+                                                            ? "bg-indigo-100 border-indigo-400 text-indigo-900 font-bold"
+                                                            : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                                                    }`}
+                                                >
+                                                    {preset}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Announcement Banner Input */}
+                                <div className="pt-2 border-t border-slate-100">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                                        Notice / Announcement Banner (Storefront Ke Top Par Show Hoga)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 🎉 Rs. 1000 se zyada ke order par muft delivery! Taza phal aur sabziyan dastyab hain."
+                                        value={noticeMessageInput}
+                                        onChange={e => setNoticeMessageInput(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                    />
+                                </div>
+
+                                <div className="flex justify-end pt-2">
+                                    <button
+                                        onClick={handleSaveDelivery}
+                                        disabled={isSavingDelivery}
+                                        className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Truck className="w-4 h-4" />
+                                        <span>{isSavingDelivery ? "Saving..." : "Save Delivery & Timing Settings"}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 5: DOMAIN & WHATSAPP AUTOMATION */}
                         {activeTab === "settings" && (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 {/* Custom Domain Card */}
@@ -543,32 +1363,23 @@ export default function StoreDashboardPage() {
                                             <Globe className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-sm text-slate-900">Custom Domain Integration</h3>
+                                            <h3 className="font-extrabold text-sm sm:text-base text-slate-900">Custom Domain Integration</h3>
                                             <p className="text-xs text-slate-500">Apni khud ki domain connect karein (e.g. shop.mybrand.pk)</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-3 pt-2">
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">
                                                 Domain Name
                                             </label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. shop.bismillahstore.com"
-                                                    value={customDomainInput}
-                                                    onChange={e => setCustomDomainInput(e.target.value)}
-                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
-                                                />
-                                                <button
-                                                    onClick={handleSaveDomain}
-                                                    disabled={isSavingDomain}
-                                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
-                                                >
-                                                    {isSavingDomain ? "Saving..." : "Save Domain"}
-                                                </button>
-                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. shop.bismillahstore.pk"
+                                                value={customDomainInput}
+                                                onChange={e => setCustomDomainInput(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                            />
                                         </div>
 
                                         {/* DNS instructions banner */}
@@ -586,8 +1397,8 @@ export default function StoreDashboardPage() {
                                                     <strong>CNAME</strong>
                                                 </div>
                                                 <div>
-                                                    <span className="block text-[10px] text-slate-400">NAME / HOST</span>
-                                                    <strong>shop</strong> ya <strong>@</strong>
+                                                    <span className="block text-[10px] text-slate-400">HOST</span>
+                                                    <strong>shop</strong>
                                                 </div>
                                                 <div>
                                                     <span className="block text-[10px] text-slate-400">TARGET</span>
@@ -598,515 +1409,93 @@ export default function StoreDashboardPage() {
                                     </div>
                                 </div>
 
-                                {/* WhatsApp Notifications & Policies Card */}
+                                {/* WhatsApp Session Connection Card */}
                                 <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
                                     <div className="flex items-center gap-2.5">
                                         <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
                                             <Phone className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-sm text-slate-900">WhatsApp Order Alerts</h3>
-                                            <p className="text-xs text-slate-500">Order aate hi dukaan wale aur customer ko auto message</p>
+                                            <h3 className="font-extrabold text-sm sm:text-base text-slate-900">WhatsApp Session Connection</h3>
+                                            <p className="text-xs text-slate-500">Order aate hi dukaan aur customer ko auto message dispatch karne ke liye</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-3 pt-2 text-xs">
-                                        <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                                            <div>
-                                                <p className="font-bold text-slate-800">Dukaan Ke Phone Par Alert</p>
-                                                <p className="text-[11px] text-slate-500">Naye order ka mukammal bill aur address foran receive ho</p>
-                                            </div>
-                                            <span className="font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full text-[10px]">
-                                                {activeStore.autoNotifyOwner ? "Active" : "Disabled"}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                                            <div>
-                                                <p className="font-bold text-slate-800">Customer Ko Receipt Confirmation</p>
-                                                <p className="text-[11px] text-slate-500">Customer ke number par order # aur bill bhej diya jaye</p>
-                                            </div>
-                                            <span className="font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full text-[10px]">
-                                                {activeStore.autoNotifyCustomer ? "Active" : "Disabled"}
-                                            </span>
-                                        </div>
-
-                                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-                                            <p className="font-bold text-slate-800">Current Delivery & Timing Summary:</p>
-                                            <div className="grid grid-cols-2 gap-2 text-slate-600">
-                                                <div>Delivery Fee: <strong>{activeStore.currencySymbol} {activeStore.deliveryFee}</strong></div>
-                                                <div>Est. Delivery: <strong>{activeStore.estimatedDeliveryTime || "30-45 mins"}</strong></div>
-                                                <div className="col-span-2">Dukaan Timings: <strong>{activeStore.openingHours || "9:00 AM - 11:00 PM"}</strong></div>
-                                                {activeStore.freeDeliveryAbove && (
-                                                    <div className="col-span-2 text-emerald-700 font-semibold">
-                                                        Free delivery above {activeStore.currencySymbol} {activeStore.freeDeliveryAbove}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Dedicated Delivery Charges & Schedule Card */}
-                                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 col-span-1 lg:col-span-2">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
-                                            <Truck className="w-5 h-5" />
-                                        </div>
                                         <div>
-                                            <h3 className="font-bold text-sm text-slate-900">Delivery Charges, Timings & Dukaan Ke Auqaat</h3>
-                                            <p className="text-xs text-slate-500">Apne mohallay ya shehar ke hisaab se delivery charges, delivery waqt aur dukaan khulnay ke auqaat set karein</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                Base Delivery Charges ({activeStore.currencySymbol}) *
+                                            <label className="block font-bold text-slate-700 mb-1">
+                                                Connected Baileys WhatsApp Session
                                             </label>
-                                            <input
-                                                type="number"
-                                                placeholder="e.g. 50"
-                                                value={deliveryFeeInput}
-                                                onChange={e => setDeliveryFeeInput(e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Muft delivery ke liye 0 likhein.</p>
+                                            {sessions.length > 0 ? (
+                                                <select
+                                                    value={selectedSessionId}
+                                                    onChange={e => setSelectedSessionId(e.target.value)}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                                >
+                                                    <option value="">-- Direct WhatsApp Chat Mode (No Bot) --</option>
+                                                    {sessions.map(s => (
+                                                        <option key={s.id} value={s.id}>
+                                                            🟢 {s.name} ({s.sessionId})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <p className="text-slate-500 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                                    Koi Baileys WhatsApp session connected nahi hai. Customer orders direct WhatsApp link se aapke number <strong>({activeStore.phone})</strong> par receive honge.
+                                                </p>
+                                            )}
                                         </div>
 
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                Free Delivery Threshold ({activeStore.currencySymbol})
-                                            </label>
-                                            <input
-                                                type="number"
-                                                placeholder="e.g. 1000"
-                                                value={freeDeliveryAboveInput}
-                                                onChange={e => setFreeDeliveryAboveInput(e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Is amount se zyada par delivery FREE hogi.</p>
+                                        <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-100 text-[11px] text-slate-700 space-y-1.5">
+                                            <p className="font-bold text-emerald-900">Auto-Alert System Summary:</p>
+                                            <p>✓ Order place hote hi Dukaan ke WhatsApp par mukammal receipt.</p>
+                                            <p>✓ Status change hote hi customer ke WhatsApp par notification.</p>
                                         </div>
 
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                Estimated Delivery Time *
-                                            </label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. 30-45 mins ya Same Day"
-                                                value={deliveryTimeInput}
-                                                onChange={e => setDeliveryTimeInput(e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Customer ko storefront aur bill par show hoga.</p>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                Store Opening Timings *
-                                            </label>
-                                            <input
-                                                type="text"
-                                                placeholder="e.g. 9:00 AM - 11:00 PM"
-                                                value={openingHoursInput}
-                                                onChange={e => setOpeningHoursInput(e.target.value)}
-                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                                            />
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Dukaan kab khuli aur kab band hoti hai.</p>
-                                        </div>
-                                    </div>
-
-                                    {/* 1-Click Quick Preset Chips */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-                                        <div className="space-y-1.5">
-                                            <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                                                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                                <span>Delivery Time Quick Presets:</span>
-                                            </span>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {[
-                                                    "⚡ 15-20 Mins",
-                                                    "🛵 30-45 Mins",
-                                                    "⏱️ 1-2 Hours",
-                                                    "📦 Same Day Delivery",
-                                                    "🌙 Next Day Delivery"
-                                                ].map((preset) => (
-                                                    <button
-                                                        key={preset}
-                                                        type="button"
-                                                        onClick={() => setDeliveryTimeInput(preset)}
-                                                        className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium cursor-pointer transition ${
-                                                            deliveryTimeInput === preset
-                                                                ? "bg-amber-100 border-amber-400 text-amber-900 font-bold"
-                                                                : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                                                        }`}
-                                                    >
-                                                        {preset}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-1.5">
-                                            <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                                                <Store className="w-3.5 h-3.5 text-indigo-600" />
-                                                <span>Dukaan Ke Auqaat Quick Presets:</span>
-                                            </span>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {[
-                                                    "☀️ 9:00 AM - 11:00 PM",
-                                                    "🏪 24/7 Khuli Hai",
-                                                    "🌙 12:00 PM - 12:00 AM",
-                                                    "🌅 8:00 AM - 10:00 PM"
-                                                ].map((preset) => (
-                                                    <button
-                                                        key={preset}
-                                                        type="button"
-                                                        onClick={() => setOpeningHoursInput(preset)}
-                                                        className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium cursor-pointer transition ${
-                                                            openingHoursInput === preset
-                                                                ? "bg-indigo-100 border-indigo-400 text-indigo-900 font-bold"
-                                                                : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                                                        }`}
-                                                    >
-                                                        {preset}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end pt-2">
-                                        <button
-                                            onClick={handleSaveDelivery}
-                                            disabled={isSavingDelivery}
-                                            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-                                        >
-                                            <Truck className="w-4 h-4" />
-                                            <span>{isSavingDelivery ? "Saving..." : "Save Delivery & Timing Settings"}</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* TAB 2: PRODUCTS */}
-                        {activeTab === "products" && (
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                    <div>
-                                        <h3 className="font-bold text-base text-slate-900">Products Inventory</h3>
-                                        <p className="text-xs text-slate-500">Apni dukaan ke saman ki list aur qeematain manage karein</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <button
-                                            onClick={handleImportPresets}
-                                            disabled={isImportingPresets}
-                                            className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition border border-indigo-200 cursor-pointer disabled:opacity-50"
-                                        >
-                                            <Sparkles className="w-4 h-4 text-indigo-600" />
-                                            <span>{isImportingPresets ? "Importing..." : "Pre-loaded Items Import Karein (1-Click)"}</span>
-                                        </button>
-                                        <button
-                                            onClick={() => setShowAddProductModal(true)}
-                                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                            <span>Add Product</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {products.length === 0 ? (
-                                    <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl my-4 space-y-2">
-                                        <Package className="w-10 h-10 text-slate-300 mx-auto" />
-                                        <p className="text-sm font-semibold text-slate-700">Koi product add nahi hua</p>
-                                        <p className="text-xs text-slate-400">Pehla product add karein taake customer store se buy kar sakein.</p>
-                                    </div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-xs">
-                                            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                                                <tr>
-                                                    <th className="py-3 px-4">Product</th>
-                                                    <th className="py-3 px-4">Price</th>
-                                                    <th className="py-3 px-4">Unit</th>
-                                                    <th className="py-3 px-4">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {products.map(p => (
-                                                    <tr key={p.id} className="hover:bg-slate-50/50">
-                                                        <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2.5">
-                                                            {p.image ? (
-                                                                <img src={p.image} alt={p.name} className="w-8 h-8 rounded-lg object-cover" />
-                                                            ) : (
-                                                                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                                                                    <Package className="w-4 h-4" />
-                                                                </div>
-                                                            )}
-                                                            <span>{p.name}</span>
-                                                        </td>
-                                                        <td className="py-3 px-4 font-bold text-slate-800">
-                                                            {activeStore.currencySymbol} {Number(p.price).toLocaleString("en-PK")}
-                                                        </td>
-                                                        <td className="py-3 px-4 text-slate-500">{p.unit || "item"}</td>
-                                                        <td className="py-3 px-4">
-                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
-                                                                In Stock
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* TAB 3: ORDERS */}
-                        {activeTab === "orders" && (
-                            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <h3 className="font-bold text-base text-slate-900">Live Customer Orders</h3>
-                                        <p className="text-xs text-slate-500">Aaye huway orders dekhein aur status update karke customer ko notify karein</p>
-                                    </div>
-
-                                    {/* Status Filter */}
-                                    <div className="flex items-center gap-2">
-                                        <Filter className="w-4 h-4 text-slate-400" />
-                                        <select
-                                            value={selectedOrderStatus}
-                                            onChange={e => setSelectedOrderStatus(e.target.value)}
-                                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none"
-                                        >
-                                            <option value="ALL">All Statuses</option>
-                                            <option value="PENDING">Pending</option>
-                                            <option value="CONFIRMED">Confirmed</option>
-                                            <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
-                                            <option value="DELIVERED">Delivered</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {orders.length === 0 ? (
-                                    <div className="p-8 text-center border border-dashed border-slate-200 rounded-2xl my-4 space-y-2">
-                                        <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
-                                        <p className="text-sm font-semibold text-slate-700">Koi order receive nahi hua</p>
-                                        <p className="text-xs text-slate-400">Jab customer aapke store link se order karega, wo yahan show hoga.</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {orders.map(order => (
-                                            <div
-                                                key={order.id}
-                                                className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition bg-slate-50/50 space-y-3"
+                                        <div className="pt-2 flex justify-end">
+                                            <button
+                                                onClick={handleSaveDomainAndSession}
+                                                disabled={isSavingDomain}
+                                                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
                                             >
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-sm text-slate-900">#{order.orderNumber}</span>
-                                                        <span className="text-xs text-slate-500">
-                                                            {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                            order.status === "DELIVERED"
-                                                                ? "bg-emerald-100 text-emerald-800"
-                                                                : order.status === "OUT_FOR_DELIVERY"
-                                                                ? "bg-amber-100 text-amber-800"
-                                                                : order.status === "CONFIRMED"
-                                                                ? "bg-blue-100 text-blue-800"
-                                                                : "bg-slate-200 text-slate-800"
-                                                        }`}>
-                                                            {order.status}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="text-sm font-bold text-emerald-700">
-                                                        Total: {activeStore.currencySymbol} {Number(order.total).toLocaleString("en-PK")} ({order.paymentMethod})
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-xs text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white p-3 rounded-lg border border-slate-100">
-                                                    <div>
-                                                        <p>👤 <strong>{order.customerName}</strong> (+{order.customerPhone})</p>
-                                                        <p className="text-slate-500 text-[11px] mt-0.5">📍 {order.customerAddress}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-semibold text-slate-800">Items:</p>
-                                                        <p className="text-[11px] text-slate-600">
-                                                            {order.items.map(i => `${i.quantity}x ${i.productName}`).join(", ")}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Action Buttons to update status */}
-                                                <div className="flex items-center gap-2 pt-1 flex-wrap">
-                                                    <span className="text-xs font-semibold text-slate-500">Update Status:</span>
-                                                    {order.status !== "CONFIRMED" && order.status !== "DELIVERED" && (
-                                                        <button
-                                                            onClick={() => handleUpdateOrderStatus(order.id, "CONFIRMED")}
-                                                            className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-xs transition cursor-pointer"
-                                                        >
-                                                            Confirm Order
-                                                        </button>
-                                                    )}
-                                                    {order.status !== "OUT_FOR_DELIVERY" && order.status !== "DELIVERED" && (
-                                                        <button
-                                                            onClick={() => handleUpdateOrderStatus(order.id, "OUT_FOR_DELIVERY")}
-                                                            className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 font-semibold text-xs transition cursor-pointer"
-                                                        >
-                                                            Out for Delivery 🛵
-                                                        </button>
-                                                    )}
-                                                    {order.status !== "DELIVERED" && (
-                                                        <button
-                                                            onClick={() => handleUpdateOrderStatus(order.id, "DELIVERED")}
-                                                            className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs transition cursor-pointer"
-                                                        >
-                                                            Delivered 🎉
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
+                                                {isSavingDomain ? "Saving..." : "Save Settings"}
+                                            </button>
+                                        </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
                         )}
                     </div>
                 )
             )}
 
-            {/* CREATE STORE MODAL */}
-            {showCreateStoreModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-                    <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                                <Store className="w-5 h-5 text-emerald-600" />
-                                <span>Nayi Digital Dukaan Banayein</span>
-                            </h3>
-                            <button
-                                onClick={() => setShowCreateStoreModal(false)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
+            {/* MODAL 1: STEP-BY-STEP STORE SETUP WIZARD */}
+            <StoreSetupWizardModal
+                isOpen={showWizardModal}
+                onClose={() => setShowWizardModal(false)}
+                onStoreCreated={(newStore) => {
+                    fetchStores();
+                    setActiveStore(newStore);
+                }}
+                onOpenCounterQr={(store) => {
+                    setActiveStore(store);
+                    setShowCounterQrModal(true);
+                }}
+            />
 
-                        <form onSubmit={handleCreateStore} className="space-y-3 text-xs">
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Dukaan Ka Naam *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. Bismillah Kiryana Store"
-                                    value={newStoreName}
-                                    onChange={e => setNewStoreName(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Store URL Slug (Optional)</label>
-                                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-500">
-                                    <span>/s/</span>
-                                    <input
-                                        type="text"
-                                        placeholder="bismillah-store"
-                                        value={newStoreSlug}
-                                        onChange={e => setNewStoreSlug(e.target.value)}
-                                        className="bg-transparent text-slate-900 font-semibold focus:outline-none flex-1 ml-1"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">WhatsApp Contact Number *</label>
-                                <input
-                                    type="tel"
-                                    required
-                                    placeholder="e.g. 0300 1234567"
-                                    value={newStorePhone}
-                                    onChange={e => setNewStorePhone(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Delivery Time</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. 30-45 mins"
-                                        value={newStoreDeliveryTime}
-                                        onChange={e => setNewStoreDeliveryTime(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                                    />
-                                    <div className="flex flex-wrap gap-1 mt-1.5">
-                                        {["⚡ 15-20 mins", "🛵 30-45 mins", "📦 Same Day"].map((p) => (
-                                            <button
-                                                key={p}
-                                                type="button"
-                                                onClick={() => setNewStoreDeliveryTime(p)}
-                                                className={`text-[10px] px-2 py-0.5 rounded-md border cursor-pointer ${
-                                                    newStoreDeliveryTime === p
-                                                        ? "bg-emerald-100 border-emerald-400 text-emerald-900 font-bold"
-                                                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                                                }`}
-                                            >
-                                                {p}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Dukaan Ke Auqaat</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. 9:00 AM - 11:00 PM"
-                                        value={newStoreOpeningHours}
-                                        onChange={e => setNewStoreOpeningHours(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                                    />
-                                    <div className="flex flex-wrap gap-1 mt-1.5">
-                                        {["☀️ 9 AM - 11 PM", "🏪 24/7 Khuli Hai"].map((p) => (
-                                            <button
-                                                key={p}
-                                                type="button"
-                                                onClick={() => setNewStoreOpeningHours(p.includes("24/7") ? "24/7 Khuli Hai" : "9:00 AM - 11:00 PM")}
-                                                className={`text-[10px] px-2 py-0.5 rounded-md border cursor-pointer ${
-                                                    newStoreOpeningHours.includes(p.includes("24/7") ? "24/7" : "9:00")
-                                                        ? "bg-indigo-100 border-indigo-400 text-indigo-900 font-bold"
-                                                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                                                }`}
-                                            >
-                                                {p}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit"
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-md cursor-pointer mt-2"
-                            >
-                                Dukaan Create Karein
-                            </button>
-                        </form>
-                    </div>
-                </div>
+            {/* MODAL 2: SHOP COUNTER QR STAND & POSTER */}
+            {activeStore && (
+                <CounterQrModal
+                    isOpen={showCounterQrModal}
+                    onClose={() => setShowCounterQrModal(false)}
+                    store={activeStore}
+                />
             )}
 
-            {/* ADD PRODUCT MODAL */}
+            {/* MODAL 3: ADD NEW PRODUCT MODAL */}
             {showAddProductModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-                    <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+                    <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 my-6">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                                 <Package className="w-5 h-5 text-emerald-600" />
@@ -1157,7 +1546,7 @@ export default function StoreDashboardPage() {
                                 <input
                                     type="text"
                                     required
-                                    placeholder="e.g. Shan Biryani Masala"
+                                    placeholder="e.g. Olper's Milk 1 Litre"
                                     value={productName}
                                     onChange={e => setProductName(e.target.value)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
@@ -1166,11 +1555,11 @@ export default function StoreDashboardPage() {
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Qeemat (Price in PKR) *</label>
+                                    <label className="block font-semibold text-slate-700 mb-1">Qeemat (PKR) *</label>
                                     <input
                                         type="number"
                                         required
-                                        placeholder="120"
+                                        placeholder="280"
                                         value={productPrice}
                                         onChange={e => setProductPrice(e.target.value)}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none"
@@ -1180,7 +1569,7 @@ export default function StoreDashboardPage() {
                                     <label className="block font-semibold text-slate-700 mb-1">Original Price (Discount)</label>
                                     <input
                                         type="number"
-                                        placeholder="150"
+                                        placeholder="300"
                                         value={productComparePrice}
                                         onChange={e => setProductComparePrice(e.target.value)}
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none"
@@ -1192,7 +1581,7 @@ export default function StoreDashboardPage() {
                                 <label className="block font-semibold text-slate-700 mb-1">Unit / Packing</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. 50g pack, 1 kg, 1 liter, piece"
+                                    placeholder="e.g. 1 Litre, 1 kg, 50g pack, piece"
                                     value={productUnit}
                                     onChange={e => setProductUnit(e.target.value)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none"
@@ -1200,13 +1589,13 @@ export default function StoreDashboardPage() {
                             </div>
 
                             <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Photo URL (Optional)</label>
+                                <label className="block font-semibold text-slate-700 mb-1">Image URL (Optional)</label>
                                 <input
                                     type="url"
-                                    placeholder="https://... image link"
+                                    placeholder="https://..."
                                     value={productImage}
                                     onChange={e => setProductImage(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none"
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
                                 />
                             </div>
 
@@ -1214,7 +1603,7 @@ export default function StoreDashboardPage() {
                                 type="submit"
                                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-md cursor-pointer mt-2"
                             >
-                                Product Save Karein
+                                Product Add Karein
                             </button>
                         </form>
                     </div>
