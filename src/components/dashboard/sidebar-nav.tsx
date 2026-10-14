@@ -32,7 +32,8 @@ import {
     BarChart2,
     Sparkles,
     Repeat,
-    Globe
+    Globe,
+    Store
 } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import {
@@ -62,6 +63,7 @@ const navGroups: NavGroup[] = [
         items: [
             { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
             { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode },
+            { href: "/dashboard/store", label: "Digital Dukaan (Store)", icon: Store },
         ],
     },
     {

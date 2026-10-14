@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -49,6 +49,7 @@ model User {
   webhooks  Webhook[]
   notifications Notification[]
   sessionAccesses SessionAccess[]
+  stores        Store[]
 }
 
 model Session {
@@ -74,6 +75,7 @@ model Session {
   aiConfig    AiConfig?
   dripCampaigns DripCampaign[]
   sessionAccesses SessionAccess[]
+  stores      Store[]
 }
 
 model Contact {
@@ -465,5 +467,172 @@ model DripSubscriber {
   @@index([campaignId])
   @@index([jid])
   @@index([status, nextRunAt])
+}
+
+// ==============================================================================
+// 🛍️ DIGITAL DUKAAN & COMMERCE (STORE, PRODUCTS, ORDERS, CUSTOM DOMAIN)
+// ==============================================================================
+
+model Store {
+  id                    String        @id @default(cuid())
+  userId                String
+  sessionId             String?       // WhatsApp session used for order alerts & customer chat
+  name                  String        // Store Name e.g. "Bismillah Super Store"
+  slug                  String        @unique // Default URL: solewhat.com/s/bismillah-store
+  tagline               String?       // "Apke Mohallay Ki Apni Dukaan"
+  description           String?       @db.Text
+  logoUrl               String?       @db.Text
+  bannerUrl             String?       @db.Text
+  phone                 String        // WhatsApp number for order alerts e.g. "923001234567"
+  email                 String?
+  address               String?       @db.Text
+  city                  String?       @default("Lahore")
+
+  // Custom Domain Integration
+  customDomain          String?       @unique // e.g. "shop.mybrand.pk" or "mybrand.com"
+  domainVerified        Boolean       @default(false)
+  domainVerificationTxt String?       // TXT verification token
+  domainStatus          String        @default("INACTIVE") // PENDING, ACTIVE, INACTIVE, FAILED
+
+  // Store Settings & Policies
+  currency              String        @default("PKR")
+  currencySymbol        String        @default("Rs.")
+  deliveryFee           Float         @default(0)
+  minOrderAmount        Float         @default(0)
+  freeDeliveryAbove     Float?
+  estimatedDeliveryTime String?       @default("30-45 mins")
+  noticeMessage         String?       @db.Text // Banner announcement e.g. "Free delivery on orders above Rs. 1500"
+
+  // Status Controls
+  isActive              Boolean       @default(true)
+  isOpen                Boolean       @default(true) // Open / Closed toggle
+
+  // WhatsApp Notification Settings
+  autoNotifyOwner       Boolean       @default(true) // Send WA alert to store owner on new order
+  autoNotifyCustomer    Boolean       @default(true) // Send WA confirmation to customer
+  orderPrefix           String        @default("ORD-")
+
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session               Session?      @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  categories            Category[]
+  products              Product[]
+  orders                Order[]
+
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([customDomain])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  storeId     String
+  name        String    // e.g. "Beverages", "Dairy & Eggs", "Snacks"
+  slug        String
+  icon        String?   // emoji or icon name
+  image       String?   @db.Text
+  order       Int       @default(0)
+  isActive    Boolean   @default(true)
+
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products    Product[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model Product {
+  id              String      @id @default(cuid())
+  storeId         String
+  categoryId      String?
+  name            String      // e.g. "Olper's Milk 1L"
+  slug            String
+  description     String?     @db.Text
+  price           Float       // Sale price in PKR
+  compareAtPrice  Float?      // Original strike-through price
+  unit            String?     @default("item") // "pack", "kg", "liter", "piece", "tola"
+  image           String?     @db.Text // Main product photo
+  images          Json?       // Additional gallery images
+
+  inStock         Boolean     @default(true)
+  stockQuantity   Int?        // Optional stock count
+  isFeatured      Boolean     @default(false)
+  isActive        Boolean     @default(true)
+  order           Int         @default(0)
+
+  store           Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category        Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderItems      OrderItem[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([categoryId])
+}
+
+model Order {
+  id                  String      @id @default(cuid())
+  orderNumber         String      // e.g. "ORD-1001"
+  storeId             String
+
+  // Customer Details
+  customerName        String
+  customerPhone       String      // WhatsApp phone number
+  customerAddress     String      @db.Text
+  customerCity        String?
+  customerNotes       String?     @db.Text // Special delivery instructions
+
+  // Order Pricing
+  itemsSnapshot       Json        // Complete snapshot of items at time of purchase
+  subtotal            Float
+  deliveryFee         Float       @default(0)
+  discount            Float       @default(0)
+  total               Float
+  currency            String      @default("PKR")
+
+  // Payment & Fulfillment
+  paymentMethod       String      @default("COD") // COD, JAZZCASH, EASYPAISA, BANK
+  paymentStatus       String      @default("UNPAID") // UNPAID, PAID, REFUNDED
+  status              String      @default("PENDING") // PENDING, CONFIRMED, PREPARING, OUT_FOR_DELIVERY, DELIVERED, CANCELLED
+
+  // WhatsApp Notification Tracking
+  ownerNotified       Boolean     @default(false)
+  customerNotified    Boolean     @default(false)
+
+  store               Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items               OrderItem[]
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@unique([storeId, orderNumber])
+  @@index([storeId])
+  @@index([customerPhone])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  productId    String?
+  productName  String
+  unitPrice    Float
+  quantity     Int      @default(1)
+  totalPrice   Float
+  productImage String?  @db.Text
+
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
 }
 

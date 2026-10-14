@@ -6,7 +6,16 @@ export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Public routes that don't require authentication
-    const publicRoutes = ["/auth/login", "/auth/register", "/api/auth", "/api/test", "/terms", "/privacy"];
+    const publicRoutes = [
+        "/auth/login",
+        "/auth/register",
+        "/api/auth",
+        "/api/test",
+        "/terms",
+        "/privacy",
+        "/s",
+        "/api/store"
+    ];
 
     // Check if it's a public route
     const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
@@ -25,10 +34,30 @@ export async function proxy(request: NextRequest) {
         return NextResponse.next();
     }
 
+    // Custom Domain Routing:
+    // If request Host is not the main platform host, rewrite transparently to /s/[customDomain]
+    const forwardedHost = request.headers.get("x-forwarded-host");
+    const rawHost = (forwardedHost || request.headers.get("host") || "").toLowerCase().split(":")[0];
+    const baseHost = (process.env.BASE_URL ? new URL(process.env.BASE_URL).hostname : "localhost").toLowerCase();
+    const railwayHost = (process.env.RAILWAY_PUBLIC_DOMAIN || "").toLowerCase();
+
+    const isSystemHost =
+        !rawHost ||
+        rawHost === "localhost" ||
+        rawHost === "127.0.0.1" ||
+        rawHost === baseHost ||
+        (railwayHost && rawHost === railwayHost);
+
+    if (!isSystemHost && !pathname.startsWith("/api") && !pathname.startsWith("/_next") && !pathname.startsWith("/s/")) {
+        const url = request.nextUrl.clone();
+        url.pathname = `/s/${rawHost}${pathname === "/" ? "" : pathname}`;
+        return NextResponse.rewrite(url);
+    }
+
     // API routes: Check for API key or session
     if (pathname.startsWith("/api/")) {
-        // Skip auth endpoints
-        if (pathname.startsWith("/api/auth") || pathname.startsWith("/api/test")) {
+        // Skip public auth, test, and store checkout endpoints
+        if (pathname.startsWith("/api/auth") || pathname.startsWith("/api/test") || pathname.startsWith("/api/store")) {
             return NextResponse.next();
         }
 
