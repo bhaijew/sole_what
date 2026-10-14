@@ -11,7 +11,7 @@ RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # Source & build
 COPY . .
-RUN npx prisma generate && npm run build
+RUN node scripts/sync-db-provider.js && npx prisma generate && npm run build
 
 # Strip devDeps from node_modules after build
 # tsx needed at runtime, kept explicitly
@@ -38,4 +38,4 @@ ENV NEXTAUTH_URL="https://solewhat-production.up.railway.app"
 ENV AUTH_URL="https://solewhat-production.up.railway.app"
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma db push && node scripts/setup-admin.js && node node_modules/tsx/dist/cli.mjs src/server/index.ts"]
+CMD ["sh", "-c", "node scripts/sync-db-provider.js && npx prisma generate && npx prisma db push && node scripts/setup-admin.js && node node_modules/tsx/dist/cli.mjs src/server/index.ts"]

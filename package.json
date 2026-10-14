@@ -5,10 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "npx tsx src/server/index.ts",
+    "prebuild": "node scripts/sync-db-provider.js",
     "build": "next build",
     "start": "NODE_ENV=production npx tsx src/server/index.ts",
     "lint": "eslint",
-    "db:push": "prisma db push && prisma generate",
+    "db:push": "node scripts/sync-db-provider.js && prisma db push && prisma generate",
     "db:studio": "prisma studio",
     "make-admin": "node scripts/setup-admin.js",
     "postinstall": "patch-package"
