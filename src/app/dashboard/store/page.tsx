@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
     Store,
     ShoppingBag,
@@ -125,7 +126,6 @@ export default function StoreDashboardPage() {
     // Modals
     const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
     const [showCounterQrModal, setShowCounterQrModal] = useState<boolean>(false);
-    const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
 
     // Products & Orders state
     const [products, setProducts] = useState<Product[]>([]);
@@ -139,13 +139,6 @@ export default function StoreDashboardPage() {
     const [customBanners, setCustomBanners] = useState<PresetBanner[]>(PRESET_HERO_BANNERS);
     const [isSavingBanners, setIsSavingBanners] = useState<boolean>(false);
     const [previewSlideIndex, setPreviewSlideIndex] = useState<number>(0);
-
-    // New Product Form
-    const [productName, setProductName] = useState<string>("");
-    const [productPrice, setProductPrice] = useState<string>("");
-    const [productComparePrice, setProductComparePrice] = useState<string>("");
-    const [productUnit, setProductUnit] = useState<string>("item");
-    const [productImage, setProductImage] = useState<string>("");
 
     // Settings Inputs
     const [customDomainInput, setCustomDomainInput] = useState<string>("");
@@ -397,38 +390,6 @@ export default function StoreDashboardPage() {
             }
         } catch (e) {
             toast.error("Failed to update store status");
-        }
-    };
-
-    const handleAddProduct = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!activeStore || !productName.trim() || !productPrice) return;
-
-        try {
-            const res = await fetch(`/api/stores/${activeStore.id}/products`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: productName,
-                    price: Number(productPrice),
-                    compareAtPrice: productComparePrice ? Number(productComparePrice) : null,
-                    unit: productUnit,
-                    image: productImage
-                })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-
-            toast.success(`"${productName}" dukaan par add ho gaya! 🎉`);
-            setShowAddProductModal(false);
-            setProductName("");
-            setProductPrice("");
-            setProductComparePrice("");
-            setProductUnit("item");
-            setProductImage("");
-            fetchProducts(activeStore.id);
-        } catch (err: any) {
-            toast.error(err.message || "Failed to add product");
         }
     };
 
@@ -1188,13 +1149,13 @@ export default function StoreDashboardPage() {
                                             <span>{isImportingPresets ? "Import Ho Raha Hai..." : "Pakistani Grocery Items (1-Click Import)"}</span>
                                         </button>
 
-                                        <button
-                                            onClick={() => setShowAddProductModal(true)}
+                                        <Link
+                                            href={`/dashboard/store/products/new${activeStore ? `?storeId=${activeStore.id}` : ""}`}
                                             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                                         >
                                             <Plus className="w-4 h-4" />
                                             <span>Add Product</span>
-                                        </button>
+                                        </Link>
                                     </div>
                                 </div>
 
@@ -1211,10 +1172,21 @@ export default function StoreDashboardPage() {
                                 </div>
 
                                 {filteredProducts.length === 0 ? (
-                                    <div className="p-10 text-center border border-dashed border-slate-200 rounded-2xl my-4 space-y-3">
+                                    <div className="p-10 text-center border border-dashed border-slate-200 rounded-2xl my-4 space-y-4">
                                         <Package className="w-10 h-10 text-slate-300 mx-auto" />
-                                        <p className="text-sm font-semibold text-slate-700">Koi product nahi mila</p>
-                                        <p className="text-xs text-slate-400">1-click import button dabayein taake foran 14 grocery items load ho jayen.</p>
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-700">Koi product nahi mila</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">1-click import button dabayein ya naya product add karein.</p>
+                                        </div>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <Link
+                                                href={`/dashboard/store/products/new${activeStore ? `?storeId=${activeStore.id}` : ""}`}
+                                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl inline-flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                                <span>Naya Product Add Karein</span>
+                                            </Link>
+                                        </div>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -1832,123 +1804,6 @@ export default function StoreDashboardPage() {
                 />
             )}
 
-            {/* MODAL 3: ADD NEW PRODUCT MODAL */}
-            {showAddProductModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-                    <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 my-6">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                                <Package className="w-5 h-5 text-emerald-600" />
-                                <span>Naya Product Add Karein</span>
-                            </h3>
-                            <button
-                                onClick={() => setShowAddProductModal(false)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleAddProduct} className="space-y-3 text-xs">
-                            {/* 1-Click Pre-loaded Items Quick Picker */}
-                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                                <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Pre-loaded Products Se Auto-Fill Karein:</span>
-                                </span>
-                                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                                    {PRESET_CATALOG_PRODUCTS.map((preset, i) => (
-                                        <button
-                                            key={i}
-                                            type="button"
-                                            onClick={() => {
-                                                setProductName(preset.name);
-                                                setProductPrice(preset.price.toString());
-                                                setProductComparePrice(preset.compareAtPrice ? preset.compareAtPrice.toString() : "");
-                                                setProductUnit(preset.unit);
-                                                setProductImage(preset.image);
-                                                toast.info(`"${preset.name}" auto-filled!`);
-                                            }}
-                                            className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-emerald-500 shrink-0 text-left cursor-pointer transition active:scale-95 shadow-2xs"
-                                        >
-                                            <img src={preset.image} alt={preset.name} className="w-7 h-7 rounded-md object-cover" />
-                                            <div className="text-[10px]">
-                                                <p className="font-semibold text-slate-800 truncate max-w-[100px]">{preset.name}</p>
-                                                <p className="text-emerald-700 font-bold">Rs. {preset.price}</p>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Product Ka Naam *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. Olper's Milk 1 Litre"
-                                    value={productName}
-                                    onChange={e => setProductName(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Qeemat (PKR) *</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        placeholder="280"
-                                        value={productPrice}
-                                        onChange={e => setProductPrice(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Original Price (Discount)</label>
-                                    <input
-                                        type="number"
-                                        placeholder="300"
-                                        value={productComparePrice}
-                                        onChange={e => setProductComparePrice(e.target.value)}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Unit / Packing</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. 1 Litre, 1 kg, 50g pack, piece"
-                                    value={productUnit}
-                                    onChange={e => setProductUnit(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Image URL (Optional)</label>
-                                <input
-                                    type="url"
-                                    placeholder="https://..."
-                                    value={productImage}
-                                    onChange={e => setProductImage(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none"
-                                />
-                            </div>
-
-                            <button
-                                type="submit"
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-md cursor-pointer mt-2"
-                            >
-                                Product Add Karein
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
