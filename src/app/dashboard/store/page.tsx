@@ -28,10 +28,15 @@ import {
     Layers,
     MessageCircle,
     Share2,
-    Trash2
+    Trash2,
+    Eye,
+    EyeOff,
+    Image as ImageIcon,
+    ChevronLeft,
+    ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
-import { PRESET_CATALOG_PRODUCTS } from "@/lib/catalog-presets";
+import { PRESET_CATALOG_PRODUCTS, PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
 import StoreSetupWizardModal from "./store-setup-wizard-modal";
 import CounterQrModal from "./counter-qr-modal";
 
@@ -41,6 +46,7 @@ interface StoreData {
     slug: string;
     tagline?: string | null;
     description?: string | null;
+    bannerUrl?: string | null;
     phone: string;
     address?: string | null;
     city?: string | null;
@@ -112,7 +118,7 @@ interface WhatsAppSessionItem {
 export default function StoreDashboardPage() {
     const [stores, setStores] = useState<StoreData[]>([]);
     const [activeStore, setActiveStore] = useState<StoreData | null>(null);
-    const [activeTab, setActiveTab] = useState<"overview" | "orders" | "products" | "delivery" | "settings">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "orders" | "products" | "slider" | "delivery" | "settings">("overview");
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [copied, setCopied] = useState<boolean>(false);
 
@@ -127,6 +133,12 @@ export default function StoreDashboardPage() {
     const [selectedOrderStatus, setSelectedOrderStatus] = useState<string>("ALL");
     const [productSearch, setProductSearch] = useState<string>("");
     const [sessions, setSessions] = useState<WhatsAppSessionItem[]>([]);
+
+    // Slider / Banners State
+    const [isSliderEnabled, setIsSliderEnabled] = useState<boolean>(true);
+    const [customBanners, setCustomBanners] = useState<PresetBanner[]>(PRESET_HERO_BANNERS);
+    const [isSavingBanners, setIsSavingBanners] = useState<boolean>(false);
+    const [previewSlideIndex, setPreviewSlideIndex] = useState<number>(0);
 
     // New Product Form
     const [productName, setProductName] = useState<string>("");
@@ -166,10 +178,61 @@ export default function StoreDashboardPage() {
             setNoticeMessageInput(activeStore.noticeMessage || "");
             setSelectedSessionId(activeStore.sessionId || "");
 
+            // Parse banner slider configuration
+            if (activeStore.bannerUrl === "OFF" || activeStore.bannerUrl === "DISABLED") {
+                setIsSliderEnabled(false);
+            } else if (activeStore.bannerUrl) {
+                try {
+                    const parsed = JSON.parse(activeStore.bannerUrl);
+                    if (parsed && typeof parsed === "object") {
+                        setIsSliderEnabled(parsed.enabled !== false);
+                        if (Array.isArray(parsed.banners) && parsed.banners.length > 0) {
+                            setCustomBanners(parsed.banners);
+                        } else {
+                            setCustomBanners(PRESET_HERO_BANNERS);
+                        }
+                    }
+                } catch {
+                    setIsSliderEnabled(true);
+                    setCustomBanners(PRESET_HERO_BANNERS);
+                }
+            } else {
+                setIsSliderEnabled(true);
+                setCustomBanners(PRESET_HERO_BANNERS);
+            }
+
             fetchProducts(activeStore.id);
             fetchOrders(activeStore.id);
         }
     }, [activeStore]);
+
+    const handleSaveBanners = async () => {
+        if (!activeStore) return;
+        setIsSavingBanners(true);
+        try {
+            const payloadValue = !isSliderEnabled
+                ? "DISABLED"
+                : JSON.stringify({ enabled: true, banners: customBanners });
+
+            const res = await fetch(`/api/stores/${activeStore.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ bannerUrl: payloadValue })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            toast.success(isSliderEnabled
+                ? "Slider aur banners kamiyabi se update ho gaye! 🖼️"
+                : "Slider band kar diya gaya hai (Storefront par old banners nahi show honge)! 🚫");
+            setActiveStore(data.store);
+            fetchStores();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to save banners");
+        } finally {
+            setIsSavingBanners(false);
+        }
+    };
 
     const fetchSessions = async () => {
         try {
@@ -730,72 +793,96 @@ export default function StoreDashboardPage() {
                             </div>
                         </div>
 
-                        {/* TAB NAVIGATION BAR */}
-                        <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
-                            <button
-                                onClick={() => setActiveTab("overview")}
-                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                    activeTab === "overview"
-                                        ? "bg-slate-900 text-white shadow-xs"
-                                        : "text-slate-600 hover:bg-slate-100"
-                                }`}
+                        {/* TAB SLIDER NAVIGATION (Modern Horizontal Pill Slider) */}
+                        <div className="relative flex items-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                            <div
+                                id="store-tab-slider"
+                                className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth w-full px-1"
                             >
-                                <Layers className="w-4 h-4" />
-                                <span>Overview</span>
-                            </button>
+                                <button
+                                    onClick={() => setActiveTab("overview")}
+                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "overview"
+                                            ? "bg-slate-900 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                                    }`}
+                                >
+                                    <Layers className="w-4 h-4" />
+                                    <span>Overview</span>
+                                </button>
 
-                            <button
-                                onClick={() => setActiveTab("orders")}
-                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                    activeTab === "orders"
-                                        ? "bg-emerald-600 text-white shadow-xs"
-                                        : "text-slate-600 hover:bg-slate-100"
-                                }`}
-                            >
-                                <ShoppingBag className="w-4 h-4" />
-                                <span>Orders ({orders.length})</span>
-                                {pendingOrdersCount > 0 && (
-                                    <span className="bg-amber-400 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full">
-                                        {pendingOrdersCount}
-                                    </span>
-                                )}
-                            </button>
+                                <button
+                                    onClick={() => setActiveTab("orders")}
+                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "orders"
+                                            ? "bg-emerald-600 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                                    }`}
+                                >
+                                    <ShoppingBag className="w-4 h-4" />
+                                    <span>Orders ({orders.length})</span>
+                                    {pendingOrdersCount > 0 && (
+                                        <span className="bg-amber-400 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                                            {pendingOrdersCount}
+                                        </span>
+                                    )}
+                                </button>
 
-                            <button
-                                onClick={() => setActiveTab("products")}
-                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                    activeTab === "products"
-                                        ? "bg-emerald-600 text-white shadow-xs"
-                                        : "text-slate-600 hover:bg-slate-100"
-                                }`}
-                            >
-                                <Package className="w-4 h-4" />
-                                <span>Products ({products.length})</span>
-                            </button>
+                                <button
+                                    onClick={() => setActiveTab("products")}
+                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "products"
+                                            ? "bg-emerald-600 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                                    }`}
+                                >
+                                    <Package className="w-4 h-4" />
+                                    <span>Products ({products.length})</span>
+                                </button>
 
-                            <button
-                                onClick={() => setActiveTab("delivery")}
-                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                    activeTab === "delivery"
-                                        ? "bg-emerald-600 text-white shadow-xs"
-                                        : "text-slate-600 hover:bg-slate-100"
-                                }`}
-                            >
-                                <Truck className="w-4 h-4" />
-                                <span>Delivery & Auqaat</span>
-                            </button>
+                                <button
+                                    onClick={() => setActiveTab("slider")}
+                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "slider"
+                                            ? "bg-emerald-600 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                                    }`}
+                                >
+                                    <ImageIcon className="w-4 h-4" />
+                                    <span>Slider / Banners</span>
+                                    {!isSliderEnabled ? (
+                                        <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-rose-200">
+                                            Off
+                                        </span>
+                                    ) : (
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    )}
+                                </button>
 
-                            <button
-                                onClick={() => setActiveTab("settings")}
-                                className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                                    activeTab === "settings"
-                                        ? "bg-emerald-600 text-white shadow-xs"
-                                        : "text-slate-600 hover:bg-slate-100"
-                                }`}
-                            >
-                                <Globe className="w-4 h-4" />
-                                <span>Domain & Automation</span>
-                            </button>
+                                <button
+                                    onClick={() => setActiveTab("delivery")}
+                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "delivery"
+                                            ? "bg-emerald-600 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                                    }`}
+                                >
+                                    <Truck className="w-4 h-4" />
+                                    <span>Delivery & Auqaat</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab("settings")}
+                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "settings"
+                                            ? "bg-emerald-600 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                                    }`}
+                                >
+                                    <Globe className="w-4 h-4" />
+                                    <span>Domain & Automation</span>
+                                </button>
+                            </div>
                         </div>
 
                         {/* TAB 1: OVERVIEW & RECENT ACTIVITY */}
@@ -1188,6 +1275,259 @@ export default function StoreDashboardPage() {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* TAB: SLIDER / HERO BANNERS MANAGER */}
+                        {activeTab === "slider" && (
+                            <div className="space-y-6">
+                                {/* Header & Master Toggle */}
+                                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
+                                                <ImageIcon className="w-5 h-5" />
+                                            </div>
+                                            <h3 className="font-extrabold text-base sm:text-lg text-slate-900">
+                                                Storefront Hero Slider & Banners
+                                            </h3>
+                                        </div>
+                                        <p className="text-xs text-slate-500">
+                                            Apni dukaan ke promotional banner slides manage karein ya default slider ko mukammal band karein
+                                        </p>
+                                    </div>
+
+                                    {/* Master Enable/Disable Toggle Button */}
+                                    <button
+                                        onClick={() => setIsSliderEnabled(!isSliderEnabled)}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs ${
+                                            isSliderEnabled
+                                                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                : "bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300"
+                                        }`}
+                                    >
+                                        {isSliderEnabled ? (
+                                            <>
+                                                <Eye className="w-4 h-4" />
+                                                <span>Slider Active Hai (Storefront Par Show Hoga)</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <EyeOff className="w-4 h-4" />
+                                                <span>Slider Band Hai (Old Default Banners Na Show Ho!)</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Banner Notice Alert if Disabled */}
+                                {!isSliderEnabled && (
+                                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-start gap-3">
+                                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                                        <div className="space-y-1">
+                                            <strong className="block text-sm">Storefront Slider Mukammal Chhupa Diya Gaya Hai (Hidden)</strong>
+                                            <p className="text-[11px] text-rose-700">
+                                                Customer ko store page par koi bhi purana ya default promotional slider nazar nahi aayega. Seedha Search bar aur Products show honge.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Interactive Live Preview (If Enabled) */}
+                                {isSliderEnabled && (
+                                    <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3">
+                                        <div className="flex items-center justify-between text-xs">
+                                            <span className="font-bold flex items-center gap-1.5 text-emerald-400">
+                                                <Sparkles className="w-4 h-4" />
+                                                <span>Live Storefront Slider Preview ({customBanners.length} Slides):</span>
+                                            </span>
+                                            <span className="text-[11px] text-slate-400">
+                                                Slide {previewSlideIndex + 1} of {Math.max(1, customBanners.length)}
+                                            </span>
+                                        </div>
+
+                                        {customBanners.length > 0 ? (
+                                            <div className="relative aspect-[21/9] sm:aspect-[24/8] min-h-[160px] w-full rounded-2xl overflow-hidden shadow-lg border border-white/10 select-none">
+                                                {customBanners.map((b, idx) => (
+                                                    <div
+                                                        key={b.id || idx}
+                                                        className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${
+                                                            idx === previewSlideIndex ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+                                                        }`}
+                                                    >
+                                                        <img src={b.imageUrl} alt={b.title} className="w-full h-full object-cover" />
+                                                        <div className={`absolute inset-0 bg-gradient-to-r ${b.bgGradient || "from-emerald-900/90 to-slate-900/80"} opacity-85`} />
+                                                        <div className="absolute inset-0 p-4 sm:p-6 flex flex-col justify-between z-20">
+                                                            <div>
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 backdrop-blur-md text-white mb-1 border border-white/20">
+                                                                    {b.badge}
+                                                                </span>
+                                                                <h4 className="text-base sm:text-2xl font-extrabold line-clamp-1">{b.title}</h4>
+                                                                <p className="text-[11px] sm:text-xs text-slate-200 line-clamp-1 mt-0.5">{b.subtitle}</p>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-[10px] text-emerald-300">
+                                                                <span className="bg-black/40 px-2 py-0.5 rounded-lg border border-white/10">
+                                                                    🛵 Tez Delivery ({activeStore.estimatedDeliveryTime || "30-45 mins"})
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {customBanners.length > 1 && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setPreviewSlideIndex(p => (p - 1 + customBanners.length) % customBanners.length)}
+                                                            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center cursor-pointer hover:bg-black/70"
+                                                        >
+                                                            <ChevronLeft className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setPreviewSlideIndex(p => (p + 1) % customBanners.length)}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center cursor-pointer hover:bg-black/70"
+                                                        >
+                                                            <ChevronRight className="w-4 h-4" />
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-slate-400 py-6 text-center">Koi slide add nahi hai.</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 1-Click Pakistani Banner Presets */}
+                                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="font-extrabold text-xs sm:text-sm text-slate-900 flex items-center gap-1.5">
+                                            <Sparkles className="w-4 h-4 text-emerald-600" />
+                                            <span>Pakistani Banner Themes (1-Click Add Karein):</span>
+                                        </h4>
+                                        <button
+                                            onClick={() => {
+                                                setCustomBanners(PRESET_HERO_BANNERS);
+                                                toast.info("Default presets restore ho gaye");
+                                            }}
+                                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer"
+                                        >
+                                            Reset to Default Presets
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                                        {[
+                                            {
+                                                title: "Ghar Ka Ration Mega Sale 🛒",
+                                                subtitle: "Olper's, Shan Masala, Dalda Ghee aur tamam zarooriyat foran mangwayein.",
+                                                badge: "Super Bachat",
+                                                bgGradient: "from-emerald-700 via-teal-800 to-slate-900",
+                                                imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80"
+                                            },
+                                            {
+                                                title: "Dhamaka Free Delivery Offer! 🛵",
+                                                subtitle: "Muft delivery hasil karein apne mohallay ki pasandeeda dukaan se.",
+                                                badge: "Free Delivery",
+                                                bgGradient: "from-amber-600 via-orange-700 to-slate-900",
+                                                imageUrl: "https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=1200&q=80"
+                                            },
+                                            {
+                                                title: "Taaza Phal & Sabziyan 🍎🥕",
+                                                subtitle: "Mandi se taza maal rozana aapke darwazay par.",
+                                                badge: "100% Fresh",
+                                                bgGradient: "from-green-700 via-emerald-800 to-slate-900",
+                                                imageUrl: "https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=1200&q=80"
+                                            },
+                                            {
+                                                title: "Dairy, Eggs & Bakery Fresh 🥛",
+                                                subtitle: "Subah ka nashta taaza doodh aur andon ke sath.",
+                                                badge: "Subah Sawere",
+                                                bgGradient: "from-blue-600 via-indigo-700 to-slate-900",
+                                                imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=1200&q=80"
+                                            },
+                                            {
+                                                title: "Fresh Meat & Chicken 🍗",
+                                                subtitle: "Saaf shafaf halal gosht aur chicken foran delivery ke sath.",
+                                                badge: "Halal & Clean",
+                                                bgGradient: "from-rose-700 via-red-800 to-slate-900",
+                                                imageUrl: "https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&w=1200&q=80"
+                                            }
+                                        ].map((preset, i) => (
+                                            <button
+                                                key={i}
+                                                type="button"
+                                                onClick={() => {
+                                                    const newSlide: PresetBanner = {
+                                                        id: `banner-${Date.now()}-${i}`,
+                                                        ...preset
+                                                    };
+                                                    setCustomBanners(prev => [...prev, newSlide]);
+                                                    toast.success(`"${preset.title}" slider mein add ho gaya!`);
+                                                }}
+                                                className="p-2.5 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/40 text-left transition cursor-pointer flex items-center gap-2.5 shadow-2xs group"
+                                            >
+                                                <img src={preset.imageUrl} alt={preset.title} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-slate-800 text-xs truncate group-hover:text-emerald-700">{preset.title}</p>
+                                                    <span className="text-[10px] text-slate-400 block truncate">{preset.badge}</span>
+                                                </div>
+                                                <Plus className="w-4 h-4 text-emerald-600 ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Manage Active Slides Table */}
+                                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                                    <h4 className="font-extrabold text-xs sm:text-sm text-slate-900">
+                                        Current Slider Slides ({customBanners.length})
+                                    </h4>
+
+                                    <div className="space-y-2.5">
+                                        {customBanners.map((slide, idx) => (
+                                            <div
+                                                key={slide.id || idx}
+                                                className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <span className="font-black text-slate-400 w-5 shrink-0">#{idx + 1}</span>
+                                                    <img src={slide.imageUrl} alt={slide.title} className="w-12 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-slate-900 truncate">{slide.title}</p>
+                                                        <p className="text-[11px] text-slate-500 truncate">{slide.subtitle}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
+                                                        {slide.badge}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setCustomBanners(prev => prev.filter((_, i) => i !== idx));
+                                                            toast.info("Slide delete ho gayi");
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Save Slider Changes */}
+                                <div className="flex justify-end pt-2">
+                                    <button
+                                        onClick={handleSaveBanners}
+                                        disabled={isSavingBanners}
+                                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Sparkles className="w-4 h-4" />
+                                        <span>{isSavingBanners ? "Saving..." : "Save Slider Changes"}</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
 

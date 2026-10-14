@@ -22,7 +22,7 @@ import {
     Truck,
     Settings
 } from "lucide-react";
-import { PRESET_HERO_BANNERS } from "@/lib/catalog-presets";
+import { PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
 
 interface Category {
     id: string;
@@ -76,13 +76,51 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
     const [currentSlide, setCurrentSlide] = useState<number>(0);
 
-    // Auto-advance hero banner slider every 4.5 seconds
+    // Dynamic banner configuration from store.bannerUrl (allows custom slides or hiding the slider completely)
+    const bannerConfig = useMemo(() => {
+        if (!store.bannerUrl) {
+            return { enabled: true, banners: PRESET_HERO_BANNERS };
+        }
+        if (store.bannerUrl === "OFF" || store.bannerUrl === "DISABLED") {
+            return { enabled: false, banners: [] };
+        }
+        try {
+            const parsed = JSON.parse(store.bannerUrl);
+            if (parsed && typeof parsed === "object") {
+                const enabled = parsed.enabled !== false;
+                const banners = Array.isArray(parsed.banners) && parsed.banners.length > 0
+                    ? parsed.banners
+                    : (enabled ? PRESET_HERO_BANNERS : []);
+                return { enabled, banners };
+            }
+        } catch {
+            if (store.bannerUrl.startsWith("http")) {
+                return {
+                    enabled: true,
+                    banners: [{
+                        id: "custom-1",
+                        title: store.name,
+                        subtitle: store.tagline || "Ghar bethay online order mangwayein",
+                        badge: "Special Offer",
+                        bgGradient: "from-emerald-700 via-teal-800 to-slate-900",
+                        imageUrl: store.bannerUrl
+                    }]
+                };
+            }
+        }
+        return { enabled: true, banners: PRESET_HERO_BANNERS };
+    }, [store.bannerUrl, store.name, store.tagline]);
+
+    const activeBanners: PresetBanner[] = bannerConfig.banners;
+
+    // Auto-advance hero banner slider every 4.5 seconds if enabled and more than 1 banner
     useEffect(() => {
+        if (!bannerConfig.enabled || activeBanners.length <= 1) return;
         const timer = setInterval(() => {
-            setCurrentSlide(prev => (prev + 1) % PRESET_HERO_BANNERS.length);
+            setCurrentSlide(prev => (prev + 1) % activeBanners.length);
         }, 4500);
         return () => clearInterval(timer);
-    }, []);
+    }, [bannerConfig.enabled, activeBanners.length]);
 
     // Checkout Form state
     const [customerName, setCustomerName] = useState<string>("");
@@ -380,85 +418,91 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
 
             {/* Main Content Area */}
             <main className="max-w-5xl mx-auto px-4 pt-3 sm:pt-6">
-                {/* Hero Promotional Banner Slider */}
-                <div className="relative mb-4 sm:mb-6 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm border border-slate-200/80 bg-slate-900 select-none">
-                    <div className="relative aspect-[21/10] sm:aspect-[24/8] min-h-[150px] w-full overflow-hidden">
-                        {PRESET_HERO_BANNERS.map((banner, idx) => (
-                            <div
-                                key={banner.id}
-                                className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                                    idx === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
-                                }`}
-                            >
-                                <img
-                                    src={banner.imageUrl}
-                                    alt={banner.title}
-                                    className="w-full h-full object-cover"
-                                />
-                                <div className={`absolute inset-0 bg-gradient-to-r ${banner.bgGradient} opacity-85`} />
+                {/* Hero Promotional Banner Slider (Hidden if store owner disabled or customized) */}
+                {bannerConfig.enabled && activeBanners.length > 0 && (
+                    <div className="relative mb-4 sm:mb-6 rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm border border-slate-200/80 bg-slate-900 select-none">
+                        <div className="relative aspect-[21/10] sm:aspect-[24/8] min-h-[150px] w-full overflow-hidden">
+                            {activeBanners.map((banner, idx) => (
+                                <div
+                                    key={banner.id || idx}
+                                    className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                                        idx === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+                                    }`}
+                                >
+                                    <img
+                                        src={banner.imageUrl}
+                                        alt={banner.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                    <div className={`absolute inset-0 bg-gradient-to-r ${banner.bgGradient} opacity-85`} />
 
-                                <div className="absolute inset-0 p-4 sm:p-7 flex flex-col justify-between text-white z-20">
-                                    <div>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 backdrop-blur-md text-white mb-1.5 border border-white/20">
-                                            {banner.badge}
-                                        </span>
-                                        <h2 className="text-sm sm:text-2xl md:text-3xl font-extrabold tracking-tight leading-tight line-clamp-1 drop-shadow-sm">
-                                            {banner.title}
-                                        </h2>
-                                        <p className="text-[11px] sm:text-xs md:text-sm text-slate-200 mt-0.5 line-clamp-2 max-w-md opacity-90 drop-shadow-sm">
-                                            {banner.subtitle}
-                                        </p>
-                                    </div>
+                                    <div className="absolute inset-0 p-4 sm:p-7 flex flex-col justify-between text-white z-20">
+                                        <div>
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 backdrop-blur-md text-white mb-1.5 border border-white/20">
+                                                {banner.badge}
+                                            </span>
+                                            <h2 className="text-sm sm:text-2xl md:text-3xl font-extrabold tracking-tight leading-tight line-clamp-1 drop-shadow-sm">
+                                                {banner.title}
+                                            </h2>
+                                            <p className="text-[11px] sm:text-xs md:text-sm text-slate-200 mt-0.5 line-clamp-2 max-w-md opacity-90 drop-shadow-sm">
+                                                {banner.subtitle}
+                                            </p>
+                                        </div>
 
-                                    {/* Delivery Badge on Slider */}
-                                    <div className="flex items-center gap-2 text-[10px] sm:text-xs font-medium text-emerald-300">
-                                        <span className="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10">
-                                            <Truck className="w-3 h-3 text-emerald-400" />
-                                            <span>
-                                                {Number(store.deliveryFee) === 0 ? "FREE Delivery" : `Delivery: ${store.currencySymbol} ${store.deliveryFee}`}
+                                        {/* Delivery Badge on Slider */}
+                                        <div className="flex items-center gap-2 text-[10px] sm:text-xs font-medium text-emerald-300">
+                                            <span className="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10">
+                                                <Truck className="w-3 h-3 text-emerald-400" />
+                                                <span>
+                                                    {Number(store.deliveryFee) === 0 ? "FREE Delivery" : `Delivery: ${store.currencySymbol} ${store.deliveryFee}`}
+                                                </span>
                                             </span>
-                                        </span>
-                                        {store.freeDeliveryAbove && store.freeDeliveryAbove > 0 && (
-                                            <span className="hidden sm:inline bg-white/15 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10 text-white">
-                                                Free over {store.currencySymbol} {store.freeDeliveryAbove}
-                                            </span>
-                                        )}
+                                            {store.freeDeliveryAbove && store.freeDeliveryAbove > 0 && (
+                                                <span className="hidden sm:inline bg-white/15 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10 text-white">
+                                                    Free over {store.currencySymbol} {store.freeDeliveryAbove}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
 
-                    {/* Arrow Navigation Controls */}
-                    <button
-                        onClick={() => setCurrentSlide(prev => (prev - 1 + PRESET_HERO_BANNERS.length) % PRESET_HERO_BANNERS.length)}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition border border-white/10 cursor-pointer active:scale-90"
-                        aria-label="Previous Slide"
-                    >
-                        <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={() => setCurrentSlide(prev => (prev + 1) % PRESET_HERO_BANNERS.length)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition border border-white/10 cursor-pointer active:scale-90"
-                        aria-label="Next Slide"
-                    >
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
+                        {/* Arrow Navigation Controls (only if more than 1 banner) */}
+                        {activeBanners.length > 1 && (
+                            <>
+                                <button
+                                    onClick={() => setCurrentSlide(prev => (prev - 1 + activeBanners.length) % activeBanners.length)}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition border border-white/10 cursor-pointer active:scale-90"
+                                    aria-label="Previous Slide"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setCurrentSlide(prev => (prev + 1) % activeBanners.length)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white flex items-center justify-center transition border border-white/10 cursor-pointer active:scale-90"
+                                    aria-label="Next Slide"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
 
-                    {/* Slider Indicator Dots */}
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
-                        {PRESET_HERO_BANNERS.map((_, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => setCurrentSlide(idx)}
-                                className={`h-1.5 rounded-full transition-all duration-300 ${
-                                    idx === currentSlide ? "w-5 bg-white" : "w-1.5 bg-white/40"
-                                }`}
-                                aria-label={`Slide ${idx + 1}`}
-                            />
-                        ))}
+                                {/* Slider Indicator Dots */}
+                                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1">
+                                    {activeBanners.map((_, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setCurrentSlide(idx)}
+                                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                                                idx === currentSlide ? "w-5 bg-white" : "w-1.5 bg-white/40"
+                                            }`}
+                                            aria-label={`Slide ${idx + 1}`}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
                     </div>
-                </div>
+                )}
 
                 {/* Search Bar */}
                 <div className="relative mb-4">
