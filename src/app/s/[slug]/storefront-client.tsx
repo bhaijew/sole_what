@@ -19,7 +19,8 @@ import {
     ArrowRight,
     ChevronLeft,
     ChevronRight,
-    Truck
+    Truck,
+    Settings
 } from "lucide-react";
 import { PRESET_HERO_BANNERS } from "@/lib/catalog-presets";
 
@@ -60,6 +61,7 @@ interface StoreData {
     minOrderAmount: number;
     freeDeliveryAbove?: number | null;
     estimatedDeliveryTime?: string | null;
+    openingHours?: string | null;
     noticeMessage?: string | null;
     isOpen: boolean;
     customDomain?: string | null;
@@ -311,6 +313,18 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                        {/* Dukaan Management Button (Opens in New Tab) */}
+                        <a
+                            href={`/dashboard/store?storeId=${store.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Dukaan Management Dashboard (Nayi Window Mein Kholain)"
+                            className="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 shadow-2xs"
+                        >
+                            <Settings className="w-4 h-4 text-emerald-600" />
+                            <span className="hidden sm:inline">Management</span>
+                        </a>
+
                         <button
                             onClick={handleShare}
                             title="Share Store"
@@ -335,22 +349,28 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                 {/* Meta details bar */}
                 <div className="bg-slate-50/70 border-t border-slate-100 px-4 py-2 text-xs text-slate-600">
                     <div className="max-w-5xl mx-auto flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
-                        <div className="flex items-center gap-4 shrink-0">
-                            {store.address && (
-                                <span className="flex items-center gap-1">
-                                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>{store.address}</span>
-                                </span>
-                            )}
+                        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
                             {store.estimatedDeliveryTime && (
-                                <span className="flex items-center gap-1">
+                                <span className="flex items-center gap-1.5 font-medium text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
                                     <Clock className="w-3.5 h-3.5 text-emerald-600" />
                                     <span>{store.estimatedDeliveryTime}</span>
                                 </span>
                             )}
+                            {store.openingHours && (
+                                <span className="flex items-center gap-1.5 font-medium text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                                    <Store className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>{store.openingHours}</span>
+                                </span>
+                            )}
+                            {store.address && (
+                                <span className="flex items-center gap-1 text-slate-500">
+                                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>{store.address}</span>
+                                </span>
+                            )}
                         </div>
                         {store.freeDeliveryAbove && store.freeDeliveryAbove > 0 && (
-                            <span className="shrink-0 font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            <span className="shrink-0 font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                                 Free delivery over {store.currencySymbol} {store.freeDeliveryAbove}
                             </span>
                         )}
@@ -598,6 +618,24 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                         })}
                     </div>
                 )}
+
+                {/* Store Footer & Management Link */}
+                <footer className="mt-14 pt-8 pb-4 border-t border-slate-200/80 text-center text-xs text-slate-500 space-y-3">
+                    <p className="font-medium text-slate-600">
+                        © {new Date().getFullYear()} {store.name} • WhatsApp Commerce Powered by Sole-What
+                    </p>
+                    <div>
+                        <a
+                            href={`/dashboard/store?storeId=${store.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 font-semibold bg-white hover:bg-emerald-50 px-3.5 py-2 rounded-xl border border-slate-200 hover:border-emerald-300 transition shadow-2xs cursor-pointer"
+                        >
+                            <Settings className="w-4 h-4 text-emerald-600" />
+                            <span>Dukaan Management Dashboard (New Tab) ➔</span>
+                        </a>
+                    </div>
+                </footer>
             </main>
 
             {/* Floating Mobile Cart Bar (When cart has items) */}
@@ -852,6 +890,15 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                         )}
                                     </span>
                                 </div>
+                                {store.estimatedDeliveryTime && (
+                                    <div className="flex justify-between items-center text-[11px] text-emerald-800 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
+                                        <span className="flex items-center gap-1">
+                                            <Clock className="w-3 h-3 text-emerald-600" />
+                                            <span>Est. Delivery:</span>
+                                        </span>
+                                        <span className="font-bold">{store.estimatedDeliveryTime}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-base font-bold text-slate-900 pt-1 border-t border-slate-200">
                                     <span>Total Bill:</span>
                                     <span className="text-emerald-700">

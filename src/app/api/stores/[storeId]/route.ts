@@ -74,6 +74,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         }
         if (body.noticeMessage !== undefined) updateData.noticeMessage = body.noticeMessage?.trim() || null;
         if (body.estimatedDeliveryTime !== undefined) updateData.estimatedDeliveryTime = body.estimatedDeliveryTime?.trim() || null;
+        if (body.openingHours !== undefined) updateData.openingHours = body.openingHours?.trim() || null;
         if (body.isOpen !== undefined) updateData.isOpen = Boolean(body.isOpen);
         if (body.autoNotifyOwner !== undefined) updateData.autoNotifyOwner = Boolean(body.autoNotifyOwner);
         if (body.autoNotifyCustomer !== undefined) updateData.autoNotifyCustomer = Boolean(body.autoNotifyCustomer);

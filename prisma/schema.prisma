@@ -501,6 +501,7 @@ model Store {
   minOrderAmount        Float         @default(0)
   freeDeliveryAbove     Float?
   estimatedDeliveryTime String?       @default("30-45 mins")
+  openingHours          String?       @default("9:00 AM - 11:00 PM")
   noticeMessage         String?       @db.Text // Banner announcement e.g. "Free delivery on orders above Rs. 1500"
 
   // Status Controls

@@ -38,6 +38,7 @@ interface StoreData {
     minOrderAmount: number;
     freeDeliveryAbove?: number | null;
     estimatedDeliveryTime?: string | null;
+    openingHours?: string | null;
     noticeMessage?: string | null;
     isOpen: boolean;
     autoNotifyOwner: boolean;
@@ -106,6 +107,8 @@ export default function StoreDashboardPage() {
     const [newStoreName, setNewStoreName] = useState<string>("");
     const [newStorePhone, setNewStorePhone] = useState<string>("");
     const [newStoreSlug, setNewStoreSlug] = useState<string>("");
+    const [newStoreDeliveryTime, setNewStoreDeliveryTime] = useState<string>("30-45 mins");
+    const [newStoreOpeningHours, setNewStoreOpeningHours] = useState<string>("9:00 AM - 11:00 PM");
 
     // New Product Modal
     const [showAddProductModal, setShowAddProductModal] = useState<boolean>(false);
@@ -123,6 +126,7 @@ export default function StoreDashboardPage() {
     const [deliveryFeeInput, setDeliveryFeeInput] = useState<string>("0");
     const [freeDeliveryAboveInput, setFreeDeliveryAboveInput] = useState<string>("");
     const [deliveryTimeInput, setDeliveryTimeInput] = useState<string>("30-45 mins");
+    const [openingHoursInput, setOpeningHoursInput] = useState<string>("9:00 AM - 11:00 PM");
     const [isSavingDelivery, setIsSavingDelivery] = useState<boolean>(false);
     const [isImportingPresets, setIsImportingPresets] = useState<boolean>(false);
 
@@ -138,6 +142,7 @@ export default function StoreDashboardPage() {
             setDeliveryFeeInput(activeStore.deliveryFee?.toString() || "0");
             setFreeDeliveryAboveInput(activeStore.freeDeliveryAbove ? activeStore.freeDeliveryAbove.toString() : "");
             setDeliveryTimeInput(activeStore.estimatedDeliveryTime || "30-45 mins");
+            setOpeningHoursInput(activeStore.openingHours || "9:00 AM - 11:00 PM");
             if (activeTab === "products") {
                 fetchProducts(activeStore.id);
             } else if (activeTab === "orders") {
@@ -156,13 +161,14 @@ export default function StoreDashboardPage() {
                 body: JSON.stringify({
                     deliveryFee: Number(deliveryFeeInput) || 0,
                     freeDeliveryAbove: freeDeliveryAboveInput ? Number(freeDeliveryAboveInput) : null,
-                    estimatedDeliveryTime: deliveryTimeInput.trim()
+                    estimatedDeliveryTime: deliveryTimeInput.trim(),
+                    openingHours: openingHoursInput.trim()
                 })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            toast.success("Delivery charges aur timings update ho gaye!");
+            toast.success("Delivery charges, timing aur auqaat kamiyabi se update ho gaye! 🛵");
             setActiveStore(data.store);
         } catch (err: any) {
             toast.error(err.message || "Failed to update delivery settings");
@@ -198,6 +204,16 @@ export default function StoreDashboardPage() {
             if (res.ok && data.stores) {
                 setStores(data.stores);
                 if (data.stores.length > 0) {
+                    // Check if a specific storeId was requested via URL search param (e.g. from storefront "Management" button)
+                    if (typeof window !== "undefined") {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const targetStoreId = urlParams.get("storeId");
+                        const matchedStore = data.stores.find((s: StoreData) => s.id === targetStoreId);
+                        if (matchedStore) {
+                            setActiveStore(matchedStore);
+                            return;
+                        }
+                    }
                     setActiveStore(data.stores[0]);
                 }
             }
@@ -246,7 +262,9 @@ export default function StoreDashboardPage() {
                 body: JSON.stringify({
                     name: newStoreName,
                     phone: newStorePhone,
-                    slug: newStoreSlug
+                    slug: newStoreSlug,
+                    estimatedDeliveryTime: newStoreDeliveryTime.trim(),
+                    openingHours: newStoreOpeningHours.trim()
                 })
             });
             const data = await res.json();
@@ -257,6 +275,8 @@ export default function StoreDashboardPage() {
             setNewStoreName("");
             setNewStorePhone("");
             setNewStoreSlug("");
+            setNewStoreDeliveryTime("30-45 mins");
+            setNewStoreOpeningHours("9:00 AM - 11:00 PM");
             fetchStores();
         } catch (err: any) {
             toast.error(err.message || "Failed to create store");
@@ -612,10 +632,11 @@ export default function StoreDashboardPage() {
                                         </div>
 
                                         <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-                                            <p className="font-bold text-slate-800">Current Delivery Summary:</p>
+                                            <p className="font-bold text-slate-800">Current Delivery & Timing Summary:</p>
                                             <div className="grid grid-cols-2 gap-2 text-slate-600">
                                                 <div>Delivery Fee: <strong>{activeStore.currencySymbol} {activeStore.deliveryFee}</strong></div>
-                                                <div>Est. Time: <strong>{activeStore.estimatedDeliveryTime || "30-45 mins"}</strong></div>
+                                                <div>Est. Delivery: <strong>{activeStore.estimatedDeliveryTime || "30-45 mins"}</strong></div>
+                                                <div className="col-span-2">Dukaan Timings: <strong>{activeStore.openingHours || "9:00 AM - 11:00 PM"}</strong></div>
                                                 {activeStore.freeDeliveryAbove && (
                                                     <div className="col-span-2 text-emerald-700 font-semibold">
                                                         Free delivery above {activeStore.currencySymbol} {activeStore.freeDeliveryAbove}
@@ -633,12 +654,12 @@ export default function StoreDashboardPage() {
                                             <Truck className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-sm text-slate-900">Delivery Charges & Schedule Manager</h3>
-                                            <p className="text-xs text-slate-500">Apne mohallay ya shehar ke hisaab se delivery charges aur waqt set karein</p>
+                                            <h3 className="font-bold text-sm text-slate-900">Delivery Charges, Timings & Dukaan Ke Auqaat</h3>
+                                            <p className="text-xs text-slate-500">Apne mohallay ya shehar ke hisaab se delivery charges, delivery waqt aur dukaan khulnay ke auqaat set karein</p>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-700 mb-1">
                                                 Base Delivery Charges ({activeStore.currencySymbol}) *
@@ -669,7 +690,7 @@ export default function StoreDashboardPage() {
 
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                                Estimated Delivery Time
+                                                Estimated Delivery Time *
                                             </label>
                                             <input
                                                 type="text"
@@ -678,7 +699,81 @@ export default function StoreDashboardPage() {
                                                 onChange={e => setDeliveryTimeInput(e.target.value)}
                                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                                             />
-                                            <p className="text-[10px] text-slate-400 mt-0.5">Customer ko store par show hoga.</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Customer ko storefront aur bill par show hoga.</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                Store Opening Timings *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. 9:00 AM - 11:00 PM"
+                                                value={openingHoursInput}
+                                                onChange={e => setOpeningHoursInput(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            />
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Dukaan kab khuli aur kab band hoti hai.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* 1-Click Quick Preset Chips */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                                        <div className="space-y-1.5">
+                                            <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                                <span>Delivery Time Quick Presets:</span>
+                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {[
+                                                    "⚡ 15-20 Mins",
+                                                    "🛵 30-45 Mins",
+                                                    "⏱️ 1-2 Hours",
+                                                    "📦 Same Day Delivery",
+                                                    "🌙 Next Day Delivery"
+                                                ].map((preset) => (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        onClick={() => setDeliveryTimeInput(preset)}
+                                                        className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium cursor-pointer transition ${
+                                                            deliveryTimeInput === preset
+                                                                ? "bg-amber-100 border-amber-400 text-amber-900 font-bold"
+                                                                : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                                                <Store className="w-3.5 h-3.5 text-indigo-600" />
+                                                <span>Dukaan Ke Auqaat Quick Presets:</span>
+                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {[
+                                                    "☀️ 9:00 AM - 11:00 PM",
+                                                    "🏪 24/7 Khuli Hai",
+                                                    "🌙 12:00 PM - 12:00 AM",
+                                                    "🌅 8:00 AM - 10:00 PM"
+                                                ].map((preset) => (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        onClick={() => setOpeningHoursInput(preset)}
+                                                        className={`text-[11px] px-2.5 py-1 rounded-lg border font-medium cursor-pointer transition ${
+                                                            openingHoursInput === preset
+                                                                ? "bg-indigo-100 border-indigo-400 text-indigo-900 font-bold"
+                                                                : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -689,7 +784,7 @@ export default function StoreDashboardPage() {
                                             className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                                         >
                                             <Truck className="w-4 h-4" />
-                                            <span>{isSavingDelivery ? "Saving..." : "Save Delivery Settings"}</span>
+                                            <span>{isSavingDelivery ? "Saving..." : "Save Delivery & Timing Settings"}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -939,6 +1034,62 @@ export default function StoreDashboardPage() {
                                     onChange={e => setNewStorePhone(e.target.value)}
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">Delivery Time</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 30-45 mins"
+                                        value={newStoreDeliveryTime}
+                                        onChange={e => setNewStoreDeliveryTime(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                    />
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {["⚡ 15-20 mins", "🛵 30-45 mins", "📦 Same Day"].map((p) => (
+                                            <button
+                                                key={p}
+                                                type="button"
+                                                onClick={() => setNewStoreDeliveryTime(p)}
+                                                className={`text-[10px] px-2 py-0.5 rounded-md border cursor-pointer ${
+                                                    newStoreDeliveryTime === p
+                                                        ? "bg-emerald-100 border-emerald-400 text-emerald-900 font-bold"
+                                                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                                                }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">Dukaan Ke Auqaat</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. 9:00 AM - 11:00 PM"
+                                        value={newStoreOpeningHours}
+                                        onChange={e => setNewStoreOpeningHours(e.target.value)}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                    />
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {["☀️ 9 AM - 11 PM", "🏪 24/7 Khuli Hai"].map((p) => (
+                                            <button
+                                                key={p}
+                                                type="button"
+                                                onClick={() => setNewStoreOpeningHours(p.includes("24/7") ? "24/7 Khuli Hai" : "9:00 AM - 11:00 PM")}
+                                                className={`text-[10px] px-2 py-0.5 rounded-md border cursor-pointer ${
+                                                    newStoreOpeningHours.includes(p.includes("24/7") ? "24/7" : "9:00")
+                                                        ? "bg-indigo-100 border-indigo-400 text-indigo-900 font-bold"
+                                                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                                                }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             <button

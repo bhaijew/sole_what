@@ -111,6 +111,8 @@ export async function POST(request: NextRequest) {
                 deliveryFee: Number(deliveryFee) || 0,
                 minOrderAmount: Number(minOrderAmount) || 0,
                 freeDeliveryAbove: freeDeliveryAbove ? Number(freeDeliveryAbove) : null,
+                estimatedDeliveryTime: body.estimatedDeliveryTime?.trim() || "30-45 mins",
+                openingHours: body.openingHours?.trim() || "9:00 AM - 11:00 PM",
                 noticeMessage: noticeMessage?.trim() || null,
                 sessionId: sessionId || null,
                 customDomain: cleanDomain

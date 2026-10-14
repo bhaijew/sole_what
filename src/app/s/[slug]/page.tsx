@@ -59,6 +59,7 @@ export default async function StorePage({ params }: Props) {
                 minOrderAmount: store.minOrderAmount,
                 freeDeliveryAbove: store.freeDeliveryAbove,
                 estimatedDeliveryTime: store.estimatedDeliveryTime,
+                openingHours: store.openingHours,
                 noticeMessage: store.noticeMessage,
                 isOpen: store.isOpen,
                 customDomain: store.customDomain,
