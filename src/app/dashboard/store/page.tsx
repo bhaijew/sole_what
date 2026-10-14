@@ -21,6 +21,7 @@ import {
     Filter
 } from "lucide-react";
 import { toast } from "sonner";
+import { PRESET_CATALOG_PRODUCTS } from "@/lib/catalog-presets";
 
 interface StoreData {
     id: string;
@@ -118,6 +119,13 @@ export default function StoreDashboardPage() {
     const [customDomainInput, setCustomDomainInput] = useState<string>("");
     const [isSavingDomain, setIsSavingDomain] = useState<boolean>(false);
 
+    // Delivery Charges & Times Input
+    const [deliveryFeeInput, setDeliveryFeeInput] = useState<string>("0");
+    const [freeDeliveryAboveInput, setFreeDeliveryAboveInput] = useState<string>("");
+    const [deliveryTimeInput, setDeliveryTimeInput] = useState<string>("30-45 mins");
+    const [isSavingDelivery, setIsSavingDelivery] = useState<boolean>(false);
+    const [isImportingPresets, setIsImportingPresets] = useState<boolean>(false);
+
     // Load Stores on mount
     useEffect(() => {
         fetchStores();
@@ -127,6 +135,9 @@ export default function StoreDashboardPage() {
     useEffect(() => {
         if (activeStore) {
             setCustomDomainInput(activeStore.customDomain || "");
+            setDeliveryFeeInput(activeStore.deliveryFee?.toString() || "0");
+            setFreeDeliveryAboveInput(activeStore.freeDeliveryAbove ? activeStore.freeDeliveryAbove.toString() : "");
+            setDeliveryTimeInput(activeStore.estimatedDeliveryTime || "30-45 mins");
             if (activeTab === "products") {
                 fetchProducts(activeStore.id);
             } else if (activeTab === "orders") {
@@ -134,6 +145,50 @@ export default function StoreDashboardPage() {
             }
         }
     }, [activeStore, activeTab]);
+
+    const handleSaveDelivery = async () => {
+        if (!activeStore) return;
+        setIsSavingDelivery(true);
+        try {
+            const res = await fetch(`/api/stores/${activeStore.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    deliveryFee: Number(deliveryFeeInput) || 0,
+                    freeDeliveryAbove: freeDeliveryAboveInput ? Number(freeDeliveryAboveInput) : null,
+                    estimatedDeliveryTime: deliveryTimeInput.trim()
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            toast.success("Delivery charges aur timings update ho gaye!");
+            setActiveStore(data.store);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to update delivery settings");
+        } finally {
+            setIsSavingDelivery(false);
+        }
+    };
+
+    const handleImportPresets = async () => {
+        if (!activeStore) return;
+        setIsImportingPresets(true);
+        try {
+            const res = await fetch(`/api/stores/${activeStore.id}/presets`, {
+                method: "POST"
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            toast.success(data.message || "Pre-loaded products dukaan par add ho gaye! 📦");
+            fetchProducts(activeStore.id);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to import preset items");
+        } finally {
+            setIsImportingPresets(false);
+        }
+    };
 
     const fetchStores = async () => {
         setIsLoading(true);
@@ -557,10 +612,10 @@ export default function StoreDashboardPage() {
                                         </div>
 
                                         <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
-                                            <p className="font-bold text-slate-800">Delivery Charges & Policy:</p>
+                                            <p className="font-bold text-slate-800">Current Delivery Summary:</p>
                                             <div className="grid grid-cols-2 gap-2 text-slate-600">
                                                 <div>Delivery Fee: <strong>{activeStore.currencySymbol} {activeStore.deliveryFee}</strong></div>
-                                                <div>Min Order: <strong>{activeStore.currencySymbol} {activeStore.minOrderAmount}</strong></div>
+                                                <div>Est. Time: <strong>{activeStore.estimatedDeliveryTime || "30-45 mins"}</strong></div>
                                                 {activeStore.freeDeliveryAbove && (
                                                     <div className="col-span-2 text-emerald-700 font-semibold">
                                                         Free delivery above {activeStore.currencySymbol} {activeStore.freeDeliveryAbove}
@@ -570,24 +625,102 @@ export default function StoreDashboardPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Dedicated Delivery Charges & Schedule Card */}
+                                <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4 col-span-1 lg:col-span-2">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                                            <Truck className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-sm text-slate-900">Delivery Charges & Schedule Manager</h3>
+                                            <p className="text-xs text-slate-500">Apne mohallay ya shehar ke hisaab se delivery charges aur waqt set karein</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                Base Delivery Charges ({activeStore.currencySymbol}) *
+                                            </label>
+                                            <input
+                                                type="number"
+                                                placeholder="e.g. 50"
+                                                value={deliveryFeeInput}
+                                                onChange={e => setDeliveryFeeInput(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            />
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Muft delivery ke liye 0 likhein.</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                Free Delivery Threshold ({activeStore.currencySymbol})
+                                            </label>
+                                            <input
+                                                type="number"
+                                                placeholder="e.g. 1000"
+                                                value={freeDeliveryAboveInput}
+                                                onChange={e => setFreeDeliveryAboveInput(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            />
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Is amount se zyada par delivery FREE hogi.</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                                Estimated Delivery Time
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. 30-45 mins ya Same Day"
+                                                value={deliveryTimeInput}
+                                                onChange={e => setDeliveryTimeInput(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            />
+                                            <p className="text-[10px] text-slate-400 mt-0.5">Customer ko store par show hoga.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end pt-2">
+                                        <button
+                                            onClick={handleSaveDelivery}
+                                            disabled={isSavingDelivery}
+                                            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                                        >
+                                            <Truck className="w-4 h-4" />
+                                            <span>{isSavingDelivery ? "Saving..." : "Save Delivery Settings"}</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
                         {/* TAB 2: PRODUCTS */}
                         {activeTab === "products" && (
                             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                                <div className="flex items-center justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div>
                                         <h3 className="font-bold text-base text-slate-900">Products Inventory</h3>
                                         <p className="text-xs text-slate-500">Apni dukaan ke saman ki list aur qeematain manage karein</p>
                                     </div>
-                                    <button
-                                        onClick={() => setShowAddProductModal(true)}
-                                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        <span>Add Product</span>
-                                    </button>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <button
+                                            onClick={handleImportPresets}
+                                            disabled={isImportingPresets}
+                                            className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition border border-indigo-200 cursor-pointer disabled:opacity-50"
+                                        >
+                                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                                            <span>{isImportingPresets ? "Importing..." : "Pre-loaded Items Import Karein (1-Click)"}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => setShowAddProductModal(true)}
+                                            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            <span>Add Product</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {products.length === 0 ? (
@@ -837,6 +970,37 @@ export default function StoreDashboardPage() {
                         </div>
 
                         <form onSubmit={handleAddProduct} className="space-y-3 text-xs">
+                            {/* 1-Click Pre-loaded Items Quick Picker */}
+                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                                <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Pre-loaded Products Se Auto-Fill Karein:</span>
+                                </span>
+                                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                                    {PRESET_CATALOG_PRODUCTS.map((preset, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => {
+                                                setProductName(preset.name);
+                                                setProductPrice(preset.price.toString());
+                                                setProductComparePrice(preset.compareAtPrice ? preset.compareAtPrice.toString() : "");
+                                                setProductUnit(preset.unit);
+                                                setProductImage(preset.image);
+                                                toast.info(`"${preset.name}" auto-filled!`);
+                                            }}
+                                            className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-emerald-500 shrink-0 text-left cursor-pointer transition active:scale-95 shadow-2xs"
+                                        >
+                                            <img src={preset.image} alt={preset.name} className="w-7 h-7 rounded-md object-cover" />
+                                            <div className="text-[10px]">
+                                                <p className="font-semibold text-slate-800 truncate max-w-[100px]">{preset.name}</p>
+                                                <p className="text-emerald-700 font-bold">Rs. {preset.price}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block font-semibold text-slate-700 mb-1">Product Ka Naam *</label>
                                 <input
