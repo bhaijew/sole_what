@@ -578,17 +578,6 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                        {/* Dukaan Management Button (Opens in New Tab) */}
-                        <a
-                            href={`/dashboard/store?storeId=${store.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Dukaan Management Dashboard (Nayi Window Mein Kholain)"
-                            className="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700 font-semibold text-xs transition flex items-center gap-1.5 shadow-2xs"
-                        >
-                            <Settings className="w-4 h-4 text-emerald-600" />
-                            <span className="hidden sm:inline">Management</span>
-                        </a>
 
                         <button
                             onClick={handleShare}
@@ -920,22 +909,11 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                     </div>
                 )}
 
-                {/* Store Footer & Management Link */}
-                <footer className="mt-14 pt-8 pb-4 border-t border-slate-200/80 text-center text-xs text-slate-500 space-y-3">
+                {/* Store Footer */}
+                <footer className="mt-14 pt-8 pb-4 border-t border-slate-200/80 text-center text-xs text-slate-500">
                     <p className="font-medium text-slate-600">
                         © {new Date().getFullYear()} {store.name} • WhatsApp Commerce Powered by Sole-What
                     </p>
-                    <div>
-                        <a
-                            href={`/dashboard/store?storeId=${store.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 font-semibold bg-white hover:bg-emerald-50 px-3.5 py-2 rounded-xl border border-slate-200 hover:border-emerald-300 transition shadow-2xs cursor-pointer"
-                        >
-                            <Settings className="w-4 h-4 text-emerald-600" />
-                            <span>Dukaan Management Dashboard (New Tab) ➔</span>
-                        </a>
-                    </div>
                 </footer>
             </main>
 
