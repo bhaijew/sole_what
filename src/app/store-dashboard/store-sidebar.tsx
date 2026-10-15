@@ -274,6 +274,74 @@ export default function StoreSidebar({
                     </div>
                 </div>
             </aside>
+
+            {/* Mobile Bottom Navigation Bar for quick thumb access */}
+            <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
+                <Link
+                    href={getTabHref("overview")}
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+                        currentTab === "overview"
+                            ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
+                            : "text-slate-500 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                >
+                    <LayoutDashboard className="w-5 h-5" />
+                    <span className="text-[10px] mt-0.5">Overview</span>
+                </Link>
+
+                <Link
+                    href={getTabHref("pos")}
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+                        currentTab === "pos"
+                            ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
+                            : "text-slate-500 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                >
+                    <Calculator className="w-5 h-5" />
+                    <span className="text-[10px] mt-0.5">POS</span>
+                </Link>
+
+                <Link
+                    href={getTabHref("orders")}
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+                        currentTab === "orders"
+                            ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
+                            : "text-slate-500 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                >
+                    <ShoppingBag className="w-5 h-5" />
+                    <span className="text-[10px] mt-0.5">Orders</span>
+                </Link>
+
+                <Link
+                    href={getTabHref("products")}
+                    onClick={() => setIsMobileOpen(false)}
+                    className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+                        currentTab === "products"
+                            ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
+                            : "text-slate-500 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                >
+                    <Package className="w-5 h-5" />
+                    <span className="text-[10px] mt-0.5">Products</span>
+                </Link>
+
+                <button
+                    type="button"
+                    onClick={() => setIsMobileOpen(!isMobileOpen)}
+                    className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+                        isMobileOpen
+                            ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
+                            : "text-slate-500 dark:text-slate-400 font-medium hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                >
+                    <Menu className="w-5 h-5" />
+                    <span className="text-[10px] mt-0.5">Menu</span>
+                </button>
+            </div>
         </>
     );
 }

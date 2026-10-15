@@ -597,10 +597,11 @@ function StoreDashboardContent() {
         : "";
 
     return (
-        <div className="max-w-7xl mx-auto space-y-6 pt-12 md:pt-0">
+        <div className="max-w-7xl mx-auto space-y-5">
             
-            {/* TOP EXECUTIVE BAR & STORE SWITCHER */}
-            <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            {/* TOP EXECUTIVE BAR & STORE SWITCHER (OVERVIEW ONLY) */}
+            {currentTab === "overview" && (
+                <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center font-bold text-xl shadow-md shrink-0">
                         {activeStore ? activeStore.name.charAt(0) : "D"}
@@ -661,23 +662,23 @@ function StoreDashboardContent() {
                     </div>
                 </div>
 
-                {/* Primary Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
+                {/* Primary Actions (Mobile Horizontal Scrollable Pills) */}
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 w-full lg:w-auto shrink-0">
                     <button
                         onClick={() => setShowPosModal(true)}
-                        className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
                         title="Dukaan Counter POS Cashier Register Kholein"
                     >
-                        <Calculator className="w-4 h-4" />
+                        <Calculator className="w-3.5 h-3.5" />
                         <span>⚡ Counter POS</span>
                     </button>
 
                     <button
                         onClick={() => setShowBulkImportModal(true)}
-                        className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
                         title="CSV ya Excel se products bulk import karein"
                     >
-                        <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Bulk Import</span>
                     </button>
 
@@ -685,33 +686,35 @@ function StoreDashboardContent() {
                         href={`/s/${activeStore?.slug}/track`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3.5 py-2.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        className="px-3.5 py-2 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
                     >
-                        <Truck className="w-4 h-4 text-blue-600" />
-                        <span>Tracking Portal ↗</span>
+                        <Truck className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Track ↗</span>
                     </a>
 
                     <button
                         onClick={() => setShowCounterQrModal(true)}
-                        className="px-3.5 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
                     >
-                        <Printer className="w-4 h-4 text-indigo-600" />
-                        <span>Counter Stand</span>
+                        <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Counter QR</span>
                     </button>
 
                     <a
                         href={currentLiveStoreUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
                     >
-                        <span>Live Storefront ↗</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Storefront ↗</span>
                     </a>
                 </div>
             </div>
+            )}
 
-            {/* DEDICATED STORE CAROUSEL / SLIDER (Requirement 3) */}
-            {activeStore && (
+            {/* DEDICATED STORE CAROUSEL / SLIDER (OVERVIEW ONLY) */}
+            {currentTab === "overview" && activeStore && (
                 <StoreSlider
                     storeName={activeStore.name}
                     liveStoreUrl={currentLiveStoreUrl}
@@ -721,6 +724,87 @@ function StoreDashboardContent() {
                     pendingOrdersCount={pendingOrdersCount}
                     abandonedCount={abandonedCarts.filter(c => !c.recovered).length}
                 />
+            )}
+
+            {/* DEDICATED SUBPAGE HEADER (ONLY ON NON-OVERVIEW TABS - NO DASHBOARD CLUTTER) */}
+            {currentTab !== "overview" && activeStore && (
+                <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-150">
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                        <button
+                            onClick={() => handleSwitchTab("overview")}
+                            className="p-2 sm:p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition flex items-center justify-center cursor-pointer shadow-2xs group shrink-0"
+                            title="Wapis Dashboard Overview"
+                        >
+                            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition" />
+                        </button>
+
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <button
+                                    onClick={() => handleSwitchTab("overview")}
+                                    className="text-[11px] font-bold text-slate-500 hover:text-emerald-600 transition"
+                                >
+                                    Dashboard
+                                </button>
+                                <span className="text-slate-300 dark:text-slate-700">/</span>
+                                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                    {currentTab === "pos" ? "Walk-In POS" :
+                                     currentTab === "orders" ? "Orders" :
+                                     currentTab === "products" ? "Catalog" :
+                                     currentTab === "abandoned" ? "Cart Recovery" :
+                                     currentTab === "slider" ? "Banners" :
+                                     currentTab === "delivery" ? "Delivery" : "Settings"}
+                                </span>
+                            </div>
+
+                            <h1 className="text-sm sm:text-lg font-black text-slate-900 dark:text-white truncate">
+                                {currentTab === "pos" && "Walk-In Counter POS (Tez Bill)"}
+                                {currentTab === "orders" && `Orders & Shipping (${orders.length})`}
+                                {currentTab === "products" && `Products Catalog (${products.length})`}
+                                {currentTab === "abandoned" && `Abandoned Carts WhatsApp Recovery (${abandonedCarts.filter(c => !c.recovered).length})`}
+                                {currentTab === "slider" && "Storefront Banners & Promotions"}
+                                {currentTab === "delivery" && "Delivery Charges & Timings"}
+                                {currentTab === "settings" && "Store Settings & Domain"}
+                            </h1>
+                        </div>
+                    </div>
+
+                    {/* Store Switcher & Live Store Quick Links */}
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                        {stores.length > 1 && (
+                            <div className="relative inline-block">
+                                <select
+                                    value={activeStore?.id}
+                                    onChange={(e) => {
+                                        const s = stores.find(x => x.id === e.target.value);
+                                        if (s) setActiveStore(s);
+                                    }}
+                                    className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-2.5 pr-7 py-1.5 text-xs font-bold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                                >
+                                    {stores.map(st => (
+                                        <option key={st.id} value={st.id}>
+                                            🏪 {st.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                        )}
+
+                        {activeStore && (
+                            <a
+                                href={currentLiveStoreUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 dark:text-slate-300 text-xs font-bold border border-slate-200 dark:border-slate-800 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="Live Storefront Kholein"
+                            >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span>Storefront ↗</span>
+                            </a>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* EMPTY STATE IF NO STORES EXIST */}
@@ -751,9 +835,11 @@ function StoreDashboardContent() {
             ) : (
                 activeStore && (
                     <div className="space-y-6">
-                        
-                        {/* EXECUTIVE KPI METRIC CARDS */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                        {/* TAB 1: OVERVIEW (EXECUTIVE KPI CARDS, CHECKLIST, RECENT ORDERS) */}
+                        {currentTab === "overview" && (
+                            <div className="space-y-6 animate-in fade-in duration-150">
+                                {/* EXECUTIVE KPI METRIC CARDS */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                             {/* Card 1: Total Orders */}
                             <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-2">
                                 <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
@@ -876,9 +962,8 @@ function StoreDashboardContent() {
                             </div>
                         </div>
 
-                        {/* TAB 1: OVERVIEW */}
-                        {currentTab === "overview" && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* RECENT ORDERS STREAM & COUNTER STAND */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div>
@@ -1005,6 +1090,7 @@ function StoreDashboardContent() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
                         )}
 
                         {/* TAB 2: POS COUNTER */}
@@ -1250,7 +1336,7 @@ function StoreDashboardContent() {
                                         <p className="text-xs text-slate-500">Apne store ke items, prices, packing units aur stock availability control karein</p>
                                     </div>
 
-                                    <div className="flex items-center gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 w-full sm:w-auto shrink-0">
                                         <button
                                             onClick={() => setShowBulkImportModal(true)}
                                             className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"

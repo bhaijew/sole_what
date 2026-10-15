@@ -37,7 +37,7 @@ export default async function StoreDashboardLayout({
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col overflow-hidden min-w-0 relative z-10">
-                    <main className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-7 styled-scrollbar">
+                    <main className="flex-1 overflow-y-auto pt-16 pb-24 md:pt-6 md:pb-6 px-3 sm:px-5 lg:px-7 styled-scrollbar">
                         {children}
                     </main>
                 </div>
