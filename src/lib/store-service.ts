@@ -27,11 +27,15 @@ export interface CreateOrderInput {
  * Clean phone number to WhatsApp international format (e.g. 03001234567 -> 923001234567)
  */
 export function formatPhoneNumberToWA(phone: string): string {
+    if (!phone) return "";
     let clean = phone.replace(/[^\d]/g, "");
+    if (clean.startsWith("00")) {
+        clean = clean.substring(2);
+    }
     if (clean.startsWith("0")) {
         clean = "92" + clean.substring(1);
-    } else if (clean.startsWith("+")) {
-        clean = clean.substring(1);
+    } else if (clean.length === 10 && clean.startsWith("3")) {
+        clean = "92" + clean;
     }
     return clean;
 }
@@ -277,29 +281,74 @@ export async function createStoreOrder(input: CreateOrderInput) {
     const ownerReceipt = formatOrderWhatsAppReceipt(order, store, "owner");
     const customerReceipt = formatOrderWhatsAppReceipt(order, store, "customer");
 
+    // Resolve active WhatsApp Session for sending notifications
+    let activeBaileysSessionId: string | null = null;
+
+    if (store.session?.sessionId) {
+        activeBaileysSessionId = store.session.sessionId;
+    } else if (store.sessionId) {
+        const found = await prisma.session.findFirst({
+            where: {
+                OR: [
+                    { id: store.sessionId },
+                    { sessionId: store.sessionId }
+                ]
+            },
+            select: { id: true, sessionId: true }
+        });
+        if (found) {
+            activeBaileysSessionId = found.sessionId;
+        }
+    }
+
+    // Fallback: If no session is linked to store, find the store owner's active WhatsApp session
+    if (!activeBaileysSessionId) {
+        const userSession = await prisma.session.findFirst({
+            where: {
+                userId: store.userId,
+                status: "CONNECTED"
+            },
+            orderBy: { updatedAt: "desc" }
+        }) || await prisma.session.findFirst({
+            where: { userId: store.userId },
+            orderBy: { updatedAt: "desc" }
+        });
+
+        if (userSession) {
+            activeBaileysSessionId = userSession.sessionId;
+            // Auto-link store with this session so future lookups are immediate
+            await prisma.store.update({
+                where: { id: store.id },
+                data: { sessionId: userSession.id }
+            }).catch(() => {});
+        }
+    }
+
     // Automatically send WhatsApp notification via connected Baileys Session
-    if (store.sessionId) {
+    if (activeBaileysSessionId) {
         // Notify Store Owner
-        if (store.autoNotifyOwner && store.phone) {
+        if (store.autoNotifyOwner !== false && store.phone) {
             const cleanOwnerPhone = formatPhoneNumberToWA(store.phone);
-            const ownerJid = normalizeJid(`${cleanOwnerPhone}@s.whatsapp.net`);
-            try {
-                await ChatService.sendTextMessage(store.sessionId, ownerJid, ownerReceipt);
-                await prisma.order.update({
-                    where: { id: order.id },
-                    data: { ownerNotified: true }
-                });
-                logger.info("StoreService", `WhatsApp order alert sent to Store Owner (+${cleanOwnerPhone})`);
-            } catch (err: any) {
-                logger.error("StoreService", `Failed to send WhatsApp alert to owner: ${err.message}`);
+            if (cleanOwnerPhone) {
+                const ownerJid = normalizeJid(`${cleanOwnerPhone}@s.whatsapp.net`);
+                try {
+                    await ChatService.sendTextMessage(activeBaileysSessionId, ownerJid, ownerReceipt);
+                    await prisma.order.update({
+                        where: { id: order.id },
+                        data: { ownerNotified: true }
+                    });
+                    logger.info("StoreService", `WhatsApp order alert sent to Store Owner (+${cleanOwnerPhone})`);
+                } catch (err: any) {
+                    logger.error("StoreService", `Failed to send WhatsApp alert to owner: ${err.message}`);
+                }
             }
         }
 
         // Notify Customer
-        if (store.autoNotifyCustomer && cleanCustomerPhone) {
+        if (store.autoNotifyCustomer !== false && cleanCustomerPhone) {
             const customerJid = normalizeJid(`${cleanCustomerPhone}@s.whatsapp.net`);
             try {
-                await ChatService.sendTextMessage(store.sessionId, customerJid, customerReceipt);
+                await ChatService.sendTextMessage(activeBaileysSessionId, customerJid, customerReceipt);
                 await prisma.order.update({
                     where: { id: order.id },
                     data: { customerNotified: true }
@@ -309,6 +358,8 @@ export async function createStoreOrder(input: CreateOrderInput) {
                 logger.error("StoreService", `Failed to send WhatsApp confirmation to customer: ${err.message}`);
             }
         }
+    } else {
+        logger.warn("StoreService", `No WhatsApp session available to send order notifications for store "${store.name}".`);
     }
 
     // Direct WhatsApp Web click URL as fallback

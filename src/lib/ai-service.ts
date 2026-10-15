@@ -136,15 +136,15 @@ export async function generateAiResponse(
 
         const provider = aiConfig?.provider || "openrouter";
         // Check session apiKey first, then fall back to environment variables
-        const envApiKey = 
+        const envApiKey =
             provider === "gemini" ? (process.env.GEMINI_API_KEY || "") :
-            provider === "openai" ? (process.env.OPENAI_API_KEY || "") :
-            (process.env.OPENROUTER_API_KEY || "");
+                provider === "openai" ? (process.env.OPENAI_API_KEY || "") :
+                    (process.env.OPENROUTER_API_KEY || "");
         const apiKey = aiConfig?.apiKey?.trim() || envApiKey;
         const modelName = aiConfig?.modelName || (
             provider === "gemini" ? "gemini-1.5-flash" :
-            provider === "openai" ? "gpt-4o-mini" :
-            "openrouter/free"
+                provider === "openai" ? "gpt-4o-mini" :
+                    "openrouter/free"
         );
         const systemPrompt = aiConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
         const knowledgeBase = aiConfig?.knowledgeBase || "";

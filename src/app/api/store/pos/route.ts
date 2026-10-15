@@ -109,7 +109,8 @@ export async function POST(req: NextRequest) {
         });
 
         // Send WhatsApp Digital Receipt if valid phone was given
-        if (store.sessionId && cleanPhone && cleanPhone !== "923000000000" && cleanPhone.length >= 10) {
+        const activeSessionId = store.session?.sessionId || store.sessionId;
+        if (activeSessionId && cleanPhone && cleanPhone !== "923000000000" && cleanPhone.length >= 10) {
             const customerJid = normalizeJid(`${cleanPhone}@s.whatsapp.net`);
             const itemsList = order.items.map((x, idx) => `${idx + 1}. *${x.productName}* (${x.quantity}x) = Rs. ${x.totalPrice.toLocaleString("en-PK")}`).join("\n");
             const posReceipt = `🧾 *DIGITAL CASH MEMO / RECEIPT* 🛍️
@@ -132,7 +133,7 @@ ${discountAmount > 0 ? `🎟️ *Discount:* -${store.currencySymbol} ${discountA
 Shukriya hamari dukaan par aane ka! Wapis zaroor aayiye ga! 😊`;
 
             try {
-                await ChatService.sendTextMessage(store.sessionId, customerJid, posReceipt);
+                await ChatService.sendTextMessage(activeSessionId, customerJid, posReceipt);
                 await prisma.order.update({
                     where: { id: order.id },
                     data: { customerNotified: true }

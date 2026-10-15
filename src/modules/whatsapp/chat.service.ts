@@ -209,20 +209,92 @@ export class ChatService {
         };
     }
 
+    /**
+     * Resiliently resolve a WhatsApp session instance.
+     * Supports both Baileys auth sessionId string AND database cuid (Session.id).
+     * If instance is in database but not in memory, attempts to boot it.
+     */
+    public static async resolveSessionInstance(sessionIdOrDbId: string) {
+        if (!sessionIdOrDbId) {
+            return { instance: null, resolvedSessionId: "", dbSessionId: null };
+        }
+
+        // 1. Direct memory lookup
+        let instance = waManager.getInstance(sessionIdOrDbId);
+        let resolvedSessionId = sessionIdOrDbId;
+        let dbSessionId: string | null = null;
+
+        if (instance && instance.socket) {
+            try {
+                const dbSession = await prisma.session.findFirst({
+                    where: { OR: [{ sessionId: sessionIdOrDbId }, { id: sessionIdOrDbId }] },
+                    select: { id: true, sessionId: true }
+                });
+                if (dbSession) {
+                    dbSessionId = dbSession.id;
+                    resolvedSessionId = dbSession.sessionId;
+                }
+            } catch (e) {}
+            return { instance, resolvedSessionId, dbSessionId };
+        }
+
+        // 2. Look up in DB by id (CUID) or sessionId
+        const dbSession = await prisma.session.findFirst({
+            where: {
+                OR: [
+                    { id: sessionIdOrDbId },
+                    { sessionId: sessionIdOrDbId }
+                ]
+            },
+            select: { id: true, sessionId: true, status: true, userId: true }
+        });
+
+        if (dbSession) {
+            resolvedSessionId = dbSession.sessionId;
+            dbSessionId = dbSession.id;
+            instance = waManager.getInstance(resolvedSessionId);
+
+            // 3. If still not running in memory, check if session has credentials in authState
+            if (!instance || !instance.socket) {
+                try {
+                    const authCount = await prisma.authState.count({
+                        where: { sessionId: resolvedSessionId }
+                    });
+                    if (authCount > 0) {
+                        await waManager.startSession(resolvedSessionId);
+                        for (let i = 0; i < 5; i++) {
+                            instance = waManager.getInstance(resolvedSessionId);
+                            if (instance && instance.socket) break;
+                            await new Promise(r => setTimeout(r, 300));
+                        }
+                    }
+                } catch (startErr: any) {
+                    console.warn(`[ChatService] Failed to auto-start session ${resolvedSessionId}:`, startErr.message);
+                }
+            }
+        }
+
+        return { instance, resolvedSessionId, dbSessionId };
+    }
+
     static async sendTextMessage(sessionId: string, jid: string, messagePayload: any, mentions?: string[], quotedMessageId?: string) {
-        const instance = waManager.getInstance(sessionId);
+        const { instance, resolvedSessionId, dbSessionId } = await ChatService.resolveSessionInstance(sessionId);
         if (!instance || !instance.socket) {
-            throw new Error("WhatsApp session is disconnected or not found");
+            throw new Error(`WhatsApp session is disconnected or not found (id: ${sessionId})`);
         }
 
         // Handle quoted/reply message
         let quotedOption: any = undefined;
         if (quotedMessageId) {
             try {
-                const dbSession = await prisma.session.findUnique({ where: { sessionId }, select: { id: true } });
-                if (dbSession) {
+                const targetDbSessionId = dbSessionId || (await prisma.session.findFirst({
+                    where: { OR: [{ id: sessionId }, { sessionId: resolvedSessionId }] },
+                    select: { id: true }
+                }))?.id;
+
+                if (targetDbSessionId) {
                     const quotedMsg = await prisma.message.findFirst({
-                        where: { sessionId: dbSession.id, keyId: quotedMessageId },
+                        where: { sessionId: targetDbSessionId, keyId: quotedMessageId },
                         select: { keyId: true, remoteJid: true, fromMe: true, content: true, senderJid: true }
                     });
                     if (quotedMsg) {
@@ -391,7 +463,7 @@ export class ChatService {
                 };
             }
 
-            onMessageSent(sessionId, webhookMsg).catch(e => console.error("Webhook error:", e));
+            onMessageSent(resolvedSessionId, webhookMsg).catch(e => console.error("Webhook error:", e));
         } catch (e) {
             // Non-blocking — webhook failure shouldn't break message send
         }
@@ -411,9 +483,9 @@ export class ChatService {
         fileName: string,
         caption: string
     ) {
-        const instance = waManager.getInstance(sessionId);
+        const { instance, resolvedSessionId } = await ChatService.resolveSessionInstance(sessionId);
         if (!instance || !instance.socket) {
-            throw new Error("WhatsApp session is disconnected or not found");
+            throw new Error(`WhatsApp session is disconnected or not found (id: ${sessionId})`);
         }
 
         const messageOptions: any = {};
@@ -469,7 +541,7 @@ export class ChatService {
                 webhookMsg.message = { stickerMessage: {} };
             }
 
-            onMessageSent(sessionId, webhookMsg).catch(e => console.error("Webhook error:", e));
+            onMessageSent(resolvedSessionId, webhookMsg).catch(e => console.error("Webhook error:", e));
         } catch (e) {
             // Non-blocking
         }

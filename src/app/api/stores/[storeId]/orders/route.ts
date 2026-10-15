@@ -90,38 +90,51 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         });
 
         // Trigger WhatsApp Notification to Customer if requested
-        if (notifyCustomer && store.sessionId && existingOrder.customerPhone) {
-            let statusMessage = "";
-            const cleanPhone = formatPhoneNumberToWA(existingOrder.customerPhone);
-            const customerJid = normalizeJid(`${cleanPhone}@s.whatsapp.net`);
+        if (notifyCustomer && existingOrder.customerPhone) {
+            let activeSessionId = store.session?.sessionId || store.sessionId;
+            if (!activeSessionId) {
+                const userSession = await prisma.session.findFirst({
+                    where: { userId: store.userId, status: "CONNECTED" },
+                    orderBy: { updatedAt: "desc" }
+                });
+                if (userSession) {
+                    activeSessionId = userSession.sessionId;
+                }
+            }
 
-            if (status === "CONFIRMED") {
-                statusMessage = `✅ *Order Confirmed!*
+            if (activeSessionId) {
+                let statusMessage = "";
+                const cleanPhone = formatPhoneNumberToWA(existingOrder.customerPhone);
+                const customerJid = normalizeJid(`${cleanPhone}@s.whatsapp.net`);
+
+                if (status === "CONFIRMED") {
+                    statusMessage = `✅ *Order Confirmed!*
 Assalam o Alaikum *${existingOrder.customerName}*!
 Aapka order #${existingOrder.orderNumber} confirm ho gaya hai aur tayari shuru ho chuki hai.
 🏪 *${store.name}*`;
-            } else if (status === "OUT_FOR_DELIVERY") {
-                statusMessage = `🛵 *Order Raste Mein Hai (Out for Delivery)!*
+                } else if (status === "OUT_FOR_DELIVERY") {
+                    statusMessage = `🛵 *Order Raste Mein Hai (Out for Delivery)!*
 Assalam o Alaikum *${existingOrder.customerName}*!
 Aapka order #${existingOrder.orderNumber} dukaan se nikal chuka hai aur rider jald aapke address par pohanch raha hai.
 📍 Address: ${existingOrder.customerAddress}
 💵 Baraye meherbani *${store.currencySymbol || "Rs."} ${existingOrder.total}* tayar rakhein.
 🏪 *${store.name}*`;
-            } else if (status === "DELIVERED") {
-                statusMessage = `🎉 *Order Delivered!*
+                } else if (status === "DELIVERED") {
+                    statusMessage = `🎉 *Order Delivered!*
 Aapka order #${existingOrder.orderNumber} kamiyabi se deliver ho chuka hai.
 *${store.name}* se shopping karne ka bohot shukriya! Apka din acha guzray! ⭐`;
-            } else if (status === "CANCELLED") {
-                statusMessage = `❌ *Order Cancelled*
+                } else if (status === "CANCELLED") {
+                    statusMessage = `❌ *Order Cancelled*
 Aapka order #${existingOrder.orderNumber} cancel kar diya gaya hai. Agar koi sawal ho to humse rabta karein.
 🏪 *${store.name}*`;
-            }
+                }
 
-            if (statusMessage) {
-                try {
-                    await ChatService.sendTextMessage(store.sessionId, customerJid, statusMessage);
-                } catch (waErr: any) {
-                    console.error("Failed to send WhatsApp status update to customer:", waErr.message);
+                if (statusMessage) {
+                    try {
+                        await ChatService.sendTextMessage(activeSessionId, customerJid, statusMessage);
+                    } catch (waErr: any) {
+                        console.error("Failed to send WhatsApp status update to customer:", waErr.message);
+                    }
                 }
             }
         }

@@ -123,10 +123,11 @@ ${storeUrl}
 
 Shukriya! Agar koi madad chahiye ho toh isi chat par reply karein.`;
 
-            if (store.sessionId && target.customerPhone) {
+            const activeSessionId = store.session?.sessionId || store.sessionId;
+            if (activeSessionId && target.customerPhone) {
                 const customerJid = normalizeJid(`${target.customerPhone}@s.whatsapp.net`);
                 try {
-                    await ChatService.sendTextMessage(store.sessionId, customerJid, recoveryMessage);
+                    await ChatService.sendTextMessage(activeSessionId, customerJid, recoveryMessage);
                     target.recoverySentAt = new Date().toISOString();
                     await saveAbandonedCarts(storeId, carts);
                 } catch (err: any) {
