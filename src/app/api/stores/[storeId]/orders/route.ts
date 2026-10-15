@@ -78,6 +78,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
         }
 
+        // Prevent duplicate notifications if order is already in this status
+        if (existingOrder.status === status && (!paymentStatus || existingOrder.paymentStatus === paymentStatus)) {
+            return NextResponse.json({ order: existingOrder, alreadyUpdated: true });
+        }
+
         const updateData: any = { status };
         if (paymentStatus) {
             updateData.paymentStatus = paymentStatus;

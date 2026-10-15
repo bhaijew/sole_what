@@ -235,6 +235,31 @@ export async function createStoreOrder(input: CreateOrderInput) {
 
     const cleanCustomerPhone = formatPhoneNumberToWA(input.customerPhone);
 
+    // Prevent rapid duplicate order submission within 5 seconds
+    const recentDuplicate = await prisma.order.findFirst({
+        where: {
+            storeId: store.id,
+            customerPhone: cleanCustomerPhone,
+            total: total,
+            createdAt: {
+                gte: new Date(Date.now() - 5000)
+            }
+        },
+        orderBy: { createdAt: "desc" }
+    });
+
+    if (recentDuplicate) {
+        logger.info("StoreService", `Duplicate checkout request suppressed for phone ${cleanCustomerPhone} (Order #${recentDuplicate.orderNumber})`);
+        const targetPhone = store.phone ? formatPhoneNumberToWA(store.phone) : cleanCustomerPhone;
+        return {
+            success: true,
+            orderId: recentDuplicate.id,
+            orderNumber: recentDuplicate.orderNumber,
+            total: recentDuplicate.total,
+            whatsappRedirectUrl: `https://wa.me/${targetPhone}`
+        };
+    }
+
     const notesParts: string[] = [];
     if (input.customerNotes?.trim()) notesParts.push(input.customerNotes.trim());
     if (input.transactionId?.trim()) notesParts.push(`[TID: ${input.transactionId.trim()}]`);
@@ -326,11 +351,28 @@ export async function createStoreOrder(input: CreateOrderInput) {
 
     // Automatically send WhatsApp notification via connected Baileys Session
     if (activeBaileysSessionId) {
-        // Notify Store Owner
-        if (store.autoNotifyOwner !== false && store.phone) {
-            const cleanOwnerPhone = formatPhoneNumberToWA(store.phone);
-            if (cleanOwnerPhone) {
-                const ownerJid = normalizeJid(`${cleanOwnerPhone}@s.whatsapp.net`);
+        const cleanOwnerPhone = store.phone ? formatPhoneNumberToWA(store.phone) : "";
+        const ownerJid = cleanOwnerPhone ? normalizeJid(`${cleanOwnerPhone}@s.whatsapp.net`) : "";
+        const customerJid = cleanCustomerPhone ? normalizeJid(`${cleanCustomerPhone}@s.whatsapp.net`) : "";
+
+        // Check if store phone and customer phone are identical (e.g. store owner testing orders)
+        const isSameRecipient = !!(ownerJid && customerJid && ownerJid === customerJid);
+
+        if (isSameRecipient) {
+            // Send only ONE message to avoid sending 2 duplicate receipts to the same chat
+            try {
+                await ChatService.sendTextMessage(activeBaileysSessionId, ownerJid, ownerReceipt);
+                await prisma.order.update({
+                    where: { id: order.id },
+                    data: { ownerNotified: true, customerNotified: true }
+                });
+                logger.info("StoreService", `Single WhatsApp order alert sent to Owner/Customer (+${cleanOwnerPhone})`);
+            } catch (err: any) {
+                logger.error("StoreService", `Failed to send WhatsApp alert: ${err.message}`);
+            }
+        } else {
+            // Notify Store Owner
+            if (store.autoNotifyOwner !== false && ownerJid) {
                 try {
                     await ChatService.sendTextMessage(activeBaileysSessionId, ownerJid, ownerReceipt);
                     await prisma.order.update({
@@ -342,20 +384,19 @@ export async function createStoreOrder(input: CreateOrderInput) {
                     logger.error("StoreService", `Failed to send WhatsApp alert to owner: ${err.message}`);
                 }
             }
-        }
 
-        // Notify Customer
-        if (store.autoNotifyCustomer !== false && cleanCustomerPhone) {
-            const customerJid = normalizeJid(`${cleanCustomerPhone}@s.whatsapp.net`);
-            try {
-                await ChatService.sendTextMessage(activeBaileysSessionId, customerJid, customerReceipt);
-                await prisma.order.update({
-                    where: { id: order.id },
-                    data: { customerNotified: true }
-                });
-                logger.info("StoreService", `WhatsApp order confirmation sent to Customer (+${cleanCustomerPhone})`);
-            } catch (err: any) {
-                logger.error("StoreService", `Failed to send WhatsApp confirmation to customer: ${err.message}`);
+            // Notify Customer
+            if (store.autoNotifyCustomer !== false && customerJid) {
+                try {
+                    await ChatService.sendTextMessage(activeBaileysSessionId, customerJid, customerReceipt);
+                    await prisma.order.update({
+                        where: { id: order.id },
+                        data: { customerNotified: true }
+                    });
+                    logger.info("StoreService", `WhatsApp order confirmation sent to Customer (+${cleanCustomerPhone})`);
+                } catch (err: any) {
+                    logger.error("StoreService", `Failed to send WhatsApp confirmation to customer: ${err.message}`);
+                }
             }
         }
     } else {

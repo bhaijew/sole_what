@@ -164,6 +164,7 @@ function StoreDashboardContent() {
     // Products & Orders state
     const [products, setProducts] = useState<Product[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
+    const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
     const [selectedOrderStatus, setSelectedOrderStatus] = useState<string>("ALL");
     const [productSearch, setProductSearch] = useState<string>("");
     const [sessions, setSessions] = useState<WhatsAppSessionItem[]>([]);
@@ -420,7 +421,8 @@ function StoreDashboardContent() {
     };
 
     const handleUpdateOrderStatus = async (orderId: string, newStatus: string) => {
-        if (!activeStore) return;
+        if (!activeStore || updatingOrderId) return;
+        setUpdatingOrderId(orderId);
         try {
             const res = await fetch(`/api/stores/${activeStore.id}/orders`, {
                 method: "PATCH",
@@ -433,11 +435,19 @@ function StoreDashboardContent() {
             });
             const data = await res.json();
             if (res.ok) {
-                toast.success(`Order #${data.order.orderNumber} status -> ${newStatus}. WhatsApp alert sent! 📲`);
+                if (data.alreadyUpdated) {
+                    toast.info(`Order #${data.order.orderNumber} pehle se hi ${newStatus} hai.`);
+                } else {
+                    toast.success(`Order #${data.order.orderNumber} status -> ${newStatus}. WhatsApp alert sent! 📲`);
+                }
                 fetchOrders(activeStore.id);
+            } else {
+                toast.error(data.error || "Failed to update order status");
             }
         } catch {
             toast.error("Failed to update order status");
+        } finally {
+            setUpdatingOrderId(null);
         }
     };
 
@@ -1281,40 +1291,45 @@ function StoreDashboardContent() {
                                                     <span className="text-[11px] font-bold text-slate-500">Status Update:</span>
                                                     {order.status === "PENDING" && (
                                                         <button
+                                                            disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "CONFIRMED")}
-                                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer"
+                                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
                                                         >
-                                                            ✓ Confirm Order
+                                                            {updatingOrderId === order.id ? "Updating..." : "✓ Confirm Order"}
                                                         </button>
                                                     )}
                                                     {order.status === "CONFIRMED" && (
                                                         <button
+                                                            disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "PREPARING")}
-                                                            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg cursor-pointer"
+                                                            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
                                                         >
-                                                            🍲 Packing / Preparing
+                                                            {updatingOrderId === order.id ? "Updating..." : "🍲 Packing / Preparing"}
                                                         </button>
                                                     )}
                                                     {order.status === "PREPARING" && (
                                                         <button
+                                                            disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "OUT_FOR_DELIVERY")}
-                                                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg cursor-pointer"
+                                                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
                                                         >
-                                                            🛵 Rider Dispatched
+                                                            {updatingOrderId === order.id ? "Updating..." : "🛵 Rider Dispatched"}
                                                         </button>
                                                     )}
                                                     {order.status === "OUT_FOR_DELIVERY" && (
                                                         <button
+                                                            disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "DELIVERED")}
-                                                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer"
+                                                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
                                                         >
-                                                            🎉 Mark Delivered
+                                                            {updatingOrderId === order.id ? "Updating..." : "🎉 Mark Delivered"}
                                                         </button>
                                                     )}
                                                     {order.status !== "CANCELLED" && order.status !== "DELIVERED" && (
                                                         <button
+                                                            disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
-                                                            className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 text-slate-600 hover:text-rose-700 font-semibold rounded-lg cursor-pointer ml-auto"
+                                                            className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed text-slate-600 hover:text-rose-700 font-semibold rounded-lg cursor-pointer ml-auto transition"
                                                         >
                                                             Cancel Order
                                                         </button>

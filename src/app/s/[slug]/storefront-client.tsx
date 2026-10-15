@@ -149,6 +149,7 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
     const [customerNotes, setCustomerNotes] = useState<string>("");
     const [paymentMethod, setPaymentMethod] = useState<string>("COD");
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const isSubmittingRef = useRef<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string>("");
 
     // Feature 6: Coupons & Flash Deals State
@@ -429,6 +430,8 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
     // Submit Checkout
     const handleCheckout = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmittingRef.current || isSubmitting) return;
+
         setErrorMessage("");
 
         if (!customerName.trim()) {
@@ -448,6 +451,7 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
             return;
         }
 
+        isSubmittingRef.current = true;
         setIsSubmitting(true);
         try {
             const itemsPayload = cartItems.map(item => ({
@@ -493,6 +497,7 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
         } catch (err: any) {
             setErrorMessage(err.message || "Failed to submit order. Please try again.");
         } finally {
+            isSubmittingRef.current = false;
             setIsSubmitting(false);
         }
     };
