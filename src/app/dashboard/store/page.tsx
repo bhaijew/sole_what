@@ -156,6 +156,7 @@ export default function StoreDashboardPage() {
 
     // Load Stores & Sessions on mount
     useEffect(() => {
+        fetchStores();
         fetchSessions();
 
         // Check if tab is specified in URL query
