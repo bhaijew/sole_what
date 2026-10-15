@@ -8,5 +8,5 @@ export default async function AddProductRedirectPage({
     const params = await searchParams;
     const storeId = params?.storeId;
     const query = storeId ? `?storeId=${storeId}` : "";
-    redirect(`/dashboard/store/products/new${query}`);
+    redirect(`/store-dashboard/products/new${query}`);
 }

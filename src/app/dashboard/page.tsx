@@ -92,7 +92,7 @@ export default async function DashboardPage() {
     const canAccessAi = isSuperAdmin || isOwner;
 
     const quickActions = [
-        { href: "/dashboard/store", label: "Digital Dukaan (Store)", icon: Store, description: "WhatsApp online store, orders & items" },
+        { href: "/store-dashboard", label: "Store (Digital Dukaan)", icon: Store, description: "WhatsApp online store, orders & items" },
         ...(isSuperAdmin ? [{ href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, description: "WooCommerce, Shopify & APIs" }] : []),
         { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode, description: "Manage WhatsApp devices" },
         { href: "/dashboard/chat", label: "Send Message", icon: Send, description: "Open chat interface" },
@@ -109,9 +109,9 @@ export default async function DashboardPage() {
                     <p className="text-sm text-slate-500 mt-1">Overview of your WhatsApp gateway &amp; website integrations</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Link href="/dashboard/store">
+                    <Link href="/store-dashboard">
                         <Button size="sm" variant="outline" className="gap-2 border-emerald-500/30 text-emerald-700 hover:bg-emerald-600 hover:text-white">
-                            <Store className="h-4 w-4" /> Digital Dukaan
+                            <Store className="h-4 w-4" /> Store Dashboard
                         </Button>
                     </Link>
                     {isSuperAdmin && (

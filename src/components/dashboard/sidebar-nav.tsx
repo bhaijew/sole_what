@@ -63,7 +63,7 @@ const navGroups: NavGroup[] = [
         items: [
             { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
             { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode },
-            { href: "/dashboard/store", label: "Digital Dukaan (Store)", icon: Store },
+            { href: "/store-dashboard", label: "Store (Digital Dukaan)", icon: Store },
         ],
     },
     {

@@ -149,9 +149,9 @@ export function Navbar({ appName }: NavbarProps) {
             <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                 <span className="hidden sm:inline"><RealtimeClock /></span>
                 <Link
-                    href="/dashboard/store"
+                    href="/store-dashboard"
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition border border-emerald-200/80 shadow-2xs cursor-pointer shrink-0"
-                    title="Digital Dukaan (Store Hub)"
+                    title="Digital Dukaan (Store Dashboard)"
                 >
                     <Store className="w-4 h-4 text-emerald-600" />
                     <span className="hidden sm:inline">Store Hub</span>
