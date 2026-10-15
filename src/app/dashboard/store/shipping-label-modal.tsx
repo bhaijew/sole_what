@@ -13,8 +13,10 @@ import {
     Phone,
     Calendar,
     DollarSign,
-    Package
+    Package,
+    MessageCircle
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface OrderItem {
     id: string;
@@ -42,6 +44,7 @@ interface OrderData {
 }
 
 interface StoreData {
+    id?: string;
     name: string;
     phone: string;
     address?: string | null;
@@ -60,12 +63,46 @@ export default function ShippingLabelModal({
     isOpen: boolean;
     onClose: () => void;
 }) {
-    const [format, setFormat] = useState<"courier" | "thermal">("courier");
+    const [format, setFormat] = useState<"courier" | "thermal">("thermal");
+    const [isSendingWa, setIsSendingWa] = useState<boolean>(false);
 
     if (!isOpen || !order || !store) return null;
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleSendWhatsAppReceipt = async () => {
+        if (!order || !store) return;
+        setIsSendingWa(true);
+        try {
+            if (store.id) {
+                const res = await fetch(`/api/stores/${store.id}/orders/receipt`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ orderId: order.id })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    toast.success(data.message || "Customer ko WhatsApp receipt bhej di gayi hai! 📲");
+                    return;
+                }
+                if (data.waLink) {
+                    window.open(data.waLink, "_blank");
+                    toast.info("WhatsApp direct link khol diya gaya hai.");
+                    return;
+                }
+                throw new Error(data.error || "Receipt send nahi ho saki");
+            } else {
+                const cleanPhone = order.customerPhone.replace(/[^\d]/g, "");
+                const waClean = cleanPhone.startsWith("0") ? "92" + cleanPhone.slice(1) : cleanPhone;
+                window.open(`https://wa.me/${waClean}`, "_blank");
+            }
+        } catch (e: any) {
+            toast.error(e.message || "Receipt send error");
+        } finally {
+            setIsSendingWa(false);
+        }
     };
 
     const dateFormatted = new Date(order.createdAt).toLocaleDateString("en-PK", {
@@ -154,13 +191,26 @@ export default function ShippingLabelModal({
                         </button>
                     </div>
 
-                    <button
-                        onClick={handlePrint}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                    >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>Print Karein</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={isSendingWa}
+                            onClick={handleSendWhatsAppReceipt}
+                            className="px-3.5 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap"
+                            title="Customer ke WhatsApp par exact digital thermal receipt bhejein"
+                        >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>{isSendingWa ? "Bhej raha hai..." : "WhatsApp Receipt"}</span>
+                        </button>
+
+                        <button
+                            onClick={handlePrint}
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap"
+                        >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Print Karein</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Printable Label Viewport */}

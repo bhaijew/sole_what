@@ -2029,6 +2029,7 @@ function StoreDashboardContent() {
                     onClose={() => setShowLabelModal(false)}
                     order={selectedLabelOrder as any}
                     store={{
+                        id: activeStore.id,
                         name: activeStore.name,
                         phone: activeStore.phone,
                         address: activeStore.address,

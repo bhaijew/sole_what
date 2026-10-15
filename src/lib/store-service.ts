@@ -72,6 +72,93 @@ export async function getStoreBySlugOrDomain(identifier: string) {
 }
 
 /**
+ * Generate 80mm Digital Thermal Cash Memo / Slip for WhatsApp
+ * Formatted with fixed width (32 chars) so inside monospace code block (```)
+ * it looks identical to the printed receipt slip.
+ */
+export function buildThermalReceiptText(order: any, store: any): string {
+    const W = 32;
+    const center = (text: string) => {
+        const s = (text || "").trim();
+        if (s.length >= W) return s.slice(0, W);
+        const pad = Math.floor((W - s.length) / 2);
+        return " ".repeat(pad) + s;
+    };
+
+    const row = (left: string, right: string) => {
+        const l = (left || "").trim();
+        const r = (right || "").trim();
+        const spaceCount = Math.max(1, W - l.length - r.length);
+        return l + " ".repeat(spaceCount) + r;
+    };
+
+    const dateFormatted = new Date(order.createdAt).toLocaleDateString("en-PK", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+    });
+
+    const lines: string[] = [];
+
+    // Header matching 80mm slip
+    lines.push(center((store.name || "DUKAAN").toUpperCase()));
+    const address = store.city || store.address || "Pakistan";
+    if (address) {
+        lines.push(center(address));
+    }
+    if (store.phone) {
+        lines.push(center(`Ph: ${store.phone}`));
+    }
+    lines.push(center(`Invoice #${order.orderNumber}`));
+    lines.push(center(`Date: ${dateFormatted}`));
+    lines.push("-".repeat(W));
+
+    // Customer section
+    lines.push(`Customer: ${order.customerName || "Customer"}`);
+    lines.push(`Phone: ${order.customerPhone || ""}`);
+    lines.push("-".repeat(W));
+
+    // Items table header
+    lines.push(row("Item", "Total"));
+    if (Array.isArray(order.items)) {
+        order.items.forEach((it: any) => {
+            const itemLabel = `${it.quantity}x ${it.productName}`;
+            const itemPrice = `${store.currencySymbol || "Rs."} ${Number(it.totalPrice).toLocaleString("en-PK")}`;
+            if (itemLabel.length + itemPrice.length + 1 <= W) {
+                lines.push(row(itemLabel, itemPrice));
+            } else {
+                lines.push(itemLabel);
+                lines.push(row("", itemPrice));
+            }
+        });
+    }
+    lines.push("-".repeat(W));
+
+    // Financial totals
+    const subtotal = Number(order.subtotal || order.total);
+    lines.push(row("Subtotal:", `${store.currencySymbol || "Rs."} ${subtotal.toLocaleString("en-PK")}`));
+
+    if (Number(order.discount) > 0) {
+        lines.push(row("Discount:", `-${store.currencySymbol || "Rs."} ${Number(order.discount).toLocaleString("en-PK")}`));
+    }
+
+    const deliveryFee = Number(order.deliveryFee || 0);
+    lines.push(row("Delivery:", deliveryFee === 0 ? "FREE" : `${store.currencySymbol || "Rs."} ${deliveryFee.toLocaleString("en-PK")}`));
+
+    lines.push("-".repeat(W));
+    const total = Number(order.total);
+    lines.push(row("NET PAYABLE:", `${store.currencySymbol || "Rs."} ${total.toLocaleString("en-PK")}`));
+    lines.push(row("Mode:", String(order.paymentMethod || "COD")));
+    lines.push("-".repeat(W));
+
+    // Footer
+    lines.push(center("*** SHUKRIYA VISIT KARNE KA ***"));
+    lines.push(center("Powered by Sole-What Digital Dukaan"));
+
+    return lines.join("\n");
+}
+
+/**
  * Format WhatsApp Receipt in natural, polite Roman Urdu
  */
 export function formatOrderWhatsAppReceipt(order: any, store: any, recipientType: "owner" | "customer"): string {
@@ -113,8 +200,7 @@ export function formatOrderWhatsAppReceipt(order: any, store: any, recipientType
 • *Naam:* ${order.customerName}
 • *Phone:* +${order.customerPhone}
 • *Pata (Address):* ${order.customerAddress}${order.customerCity ? `, ${order.customerCity}` : ""}
-${order.customerNotes ? `• *Hidayat:* _"${order.customerNotes}"_\n` : ""}
-🛒 *Items Ordered:*
+${order.customerNotes ? `• *Hidayat:* _"${order.customerNotes}"_\n` : ""}🛒 *Items Ordered:*
 ━━━━━━━━━━━━━━━━━━━━
 ${itemsText}
 
@@ -127,23 +213,17 @@ ${Number(order.discount) > 0 ? `• Discount: -${store.currencySymbol || "Rs."} 
 ━━━━━━━━━━━━━━━━━━━━
 Dashboard se order ko confirm ya dispatch karein!`;
     } else {
-        return `🎉 *Shukriya ${order.customerName}!*
-Aapka order kamiyabi se receive ho gaya hai.
+        const slipText = buildThermalReceiptText(order, store);
+        const origin = process.env.NEXTAUTH_URL || "";
+        const trackingLink = store.slug ? `${origin ? origin : ""}/s/${store.slug}/track?q=${order.orderNumber}` : "";
 
-🏪 *${store.name}*
-🔖 *Order ID:* #${order.orderNumber}
-🕒 *Tareekh:* ${dateFormatted}
+        return `\`\`\`
+${slipText}
+\`\`\`
 
-🛒 *Aapka Saman:*
-━━━━━━━━━━━━━━━━━━━━
-${itemsText}
-
-━━━━━━━━━━━━━━━━━━━━
-${Number(order.discount) > 0 ? `💵 *Discount:* -${store.currencySymbol || "Rs."} ${discount}\n` : ""}💵 *Total Bill:* *${store.currencySymbol || "Rs."} ${total}*
-📍 *Delivery Address:* ${order.customerAddress}
-💳 *Tareeqa:* ${order.paymentMethod || "Cash on Delivery (COD)"}${transactionId ? ` (TID: ${transactionId})` : ""}
-━━━━━━━━━━━━━━━━━━━━
-Hamari team jald aapka order pack karke dispatch karegi. Agar koi sawal ho to isi chat par message karein!`;
+📍 *Delivery Address:* ${order.customerAddress}${order.customerCity ? `, ${order.customerCity}` : ""}
+${order.customerNotes ? `📝 *Special Instructions:* _${order.customerNotes}_\n` : ""}🛵 *Estimated Delivery:* ${store.estimatedDeliveryTime || "30-45 mins"}
+${trackingLink ? `📲 *Track Order Live:* ${trackingLink}` : ""}`;
     }
 }
 
@@ -359,14 +439,15 @@ export async function createStoreOrder(input: CreateOrderInput) {
         const isSameRecipient = !!(ownerJid && customerJid && ownerJid === customerJid);
 
         if (isSameRecipient) {
-            // Send only ONE message to avoid sending 2 duplicate receipts to the same chat
+            // When store owner is testing their own store, send the customer thermal receipt slip
+            // so they immediately see the exact receipt invoice!
             try {
-                await ChatService.sendTextMessage(activeBaileysSessionId, ownerJid, ownerReceipt);
+                await ChatService.sendTextMessage(activeBaileysSessionId, ownerJid, customerReceipt);
                 await prisma.order.update({
                     where: { id: order.id },
                     data: { ownerNotified: true, customerNotified: true }
                 });
-                logger.info("StoreService", `Single WhatsApp order alert sent to Owner/Customer (+${cleanOwnerPhone})`);
+                logger.info("StoreService", `Single WhatsApp order receipt sent to Owner/Customer (+${cleanOwnerPhone})`);
             } catch (err: any) {
                 logger.error("StoreService", `Failed to send WhatsApp alert: ${err.message}`);
             }
