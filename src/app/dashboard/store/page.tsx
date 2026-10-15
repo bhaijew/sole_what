@@ -156,9 +156,29 @@ export default function StoreDashboardPage() {
 
     // Load Stores & Sessions on mount
     useEffect(() => {
-        fetchStores();
         fetchSessions();
+
+        // Check if tab is specified in URL query
+        if (typeof window !== "undefined") {
+            const urlParams = new URLSearchParams(window.location.search);
+            const requestedTab = urlParams.get("tab");
+            if (requestedTab && ["overview", "orders", "products", "slider", "delivery", "settings"].includes(requestedTab)) {
+                setActiveTab(requestedTab as any);
+            }
+        }
     }, []);
+
+    const handleTabChange = (newTab: "overview" | "orders" | "products" | "slider" | "delivery" | "settings") => {
+        setActiveTab(newTab);
+        if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.set("tab", newTab);
+            if (activeStore) {
+                url.searchParams.set("storeId", activeStore.id);
+            }
+            window.history.replaceState(null, "", url.toString());
+        }
+    };
 
     // Sync state when activeStore or tab changes
     useEffect(() => {
@@ -754,15 +774,38 @@ export default function StoreDashboardPage() {
                             </div>
                         </div>
 
-                        {/* TAB SLIDER NAVIGATION (Modern Horizontal Pill Slider) */}
-                        <div className="relative flex items-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs">
+                        {/* TAB SLIDER NAVIGATION (Modern Horizontal Mobile-Responsive Pill Slider) */}
+                        <div className="relative flex items-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs group">
+                            {/* Left Scroll Arrow for Mobile / Tablet */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const el = document.getElementById("store-tab-slider");
+                                    if (el) el.scrollBy({ left: -180, behavior: "smooth" });
+                                }}
+                                className="hidden sm:flex shrink-0 w-7 h-7 rounded-lg bg-white/95 hover:bg-white text-slate-600 hover:text-slate-900 shadow-2xs items-center justify-center mr-1 cursor-pointer border border-slate-200/80 transition active:scale-95 z-20"
+                                title="Slide Left"
+                                aria-label="Slide Left"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+
+                            {/* Left Gradient Fade Mask */}
+                            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-4 sm:w-6 bg-gradient-to-r from-slate-100/95 to-transparent z-10 rounded-l-2xl" />
+
+                            {/* The Scrolling Slider Container with Page Links */}
                             <div
                                 id="store-tab-slider"
-                                className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth w-full px-1"
+                                className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth w-full px-1.5 py-0.5"
                             >
-                                <button
-                                    onClick={() => setActiveTab("overview")}
-                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                {/* 1. Overview */}
+                                <Link
+                                    href={`/dashboard/store?tab=overview${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("overview");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                                         activeTab === "overview"
                                             ? "bg-slate-900 text-white shadow-sm"
                                             : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
@@ -770,11 +813,16 @@ export default function StoreDashboardPage() {
                                 >
                                     <Layers className="w-4 h-4" />
                                     <span>Overview</span>
-                                </button>
+                                </Link>
 
-                                <button
-                                    onClick={() => setActiveTab("orders")}
-                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                {/* 2. Orders */}
+                                <Link
+                                    href={`/dashboard/store?tab=orders${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("orders");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                                         activeTab === "orders"
                                             ? "bg-emerald-600 text-white shadow-sm"
                                             : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
@@ -787,11 +835,16 @@ export default function StoreDashboardPage() {
                                             {pendingOrdersCount}
                                         </span>
                                     )}
-                                </button>
+                                </Link>
 
-                                <button
-                                    onClick={() => setActiveTab("products")}
-                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                {/* 3. Products */}
+                                <Link
+                                    href={`/dashboard/store?tab=products${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("products");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                                         activeTab === "products"
                                             ? "bg-emerald-600 text-white shadow-sm"
                                             : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
@@ -799,11 +852,26 @@ export default function StoreDashboardPage() {
                                 >
                                     <Package className="w-4 h-4" />
                                     <span>Products ({products.length})</span>
-                                </button>
+                                </Link>
 
-                                <button
-                                    onClick={() => setActiveTab("slider")}
-                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                {/* 4. DEDICATED ADD PRODUCT PAGE LINK (Mobile Responsive Hero Link) */}
+                                <Link
+                                    href={`/dashboard/store/products/new${activeStore ? `?storeId=${activeStore.id}` : ""}`}
+                                    className="px-3.5 py-2 font-black text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs hover:scale-[1.02] active:scale-95 ring-2 ring-emerald-500/30"
+                                    title="Naye Dedicated Page Par Product Add Karein"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>+ Add Product</span>
+                                </Link>
+
+                                {/* 5. Slider / Banners */}
+                                <Link
+                                    href={`/dashboard/store?tab=slider${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("slider");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                                         activeTab === "slider"
                                             ? "bg-emerald-600 text-white shadow-sm"
                                             : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
@@ -818,11 +886,16 @@ export default function StoreDashboardPage() {
                                     ) : (
                                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                     )}
-                                </button>
+                                </Link>
 
-                                <button
-                                    onClick={() => setActiveTab("delivery")}
-                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                {/* 6. Delivery & Auqaat */}
+                                <Link
+                                    href={`/dashboard/store?tab=delivery${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("delivery");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                                         activeTab === "delivery"
                                             ? "bg-emerald-600 text-white shadow-sm"
                                             : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
@@ -830,11 +903,16 @@ export default function StoreDashboardPage() {
                                 >
                                     <Truck className="w-4 h-4" />
                                     <span>Delivery & Auqaat</span>
-                                </button>
+                                </Link>
 
-                                <button
-                                    onClick={() => setActiveTab("settings")}
-                                    className={`px-4 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                {/* 7. Domain & Automation */}
+                                <Link
+                                    href={`/dashboard/store?tab=settings${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("settings");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
                                         activeTab === "settings"
                                             ? "bg-emerald-600 text-white shadow-sm"
                                             : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
@@ -842,8 +920,51 @@ export default function StoreDashboardPage() {
                                 >
                                     <Globe className="w-4 h-4" />
                                     <span>Domain & Automation</span>
+                                </Link>
+
+                                {/* Separator */}
+                                <div className="h-5 w-px bg-slate-300 shrink-0 mx-0.5" />
+
+                                {/* 8. LIVE STOREFRONT LINK */}
+                                <a
+                                    href={currentLiveStoreUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-white hover:bg-slate-50 text-emerald-700 hover:text-emerald-800 border border-emerald-200 shadow-2xs active:scale-95"
+                                    title="Customer Live Storefront Dekhein"
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    <span>Live Store ➔</span>
+                                </a>
+
+                                {/* 9. COUNTER QR STAND QUICK ACTION */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCounterQrModal(true)}
+                                    className="px-3 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 shadow-2xs active:scale-95"
+                                    title="Shop Counter QR Poster Print Karein"
+                                >
+                                    <Printer className="w-3.5 h-3.5" />
+                                    <span>Counter QR</span>
                                 </button>
                             </div>
+
+                            {/* Right Gradient Fade Mask */}
+                            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-4 sm:w-6 bg-gradient-to-l from-slate-100/95 to-transparent z-10 rounded-r-2xl" />
+
+                            {/* Right Scroll Arrow for Mobile / Tablet */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const el = document.getElementById("store-tab-slider");
+                                    if (el) el.scrollBy({ left: 180, behavior: "smooth" });
+                                }}
+                                className="hidden sm:flex shrink-0 w-7 h-7 rounded-lg bg-white/95 hover:bg-white text-slate-600 hover:text-slate-900 shadow-2xs items-center justify-center ml-1 cursor-pointer border border-slate-200/80 transition active:scale-95 z-20"
+                                title="Slide Right"
+                                aria-label="Slide Right"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
                         </div>
 
                         {/* TAB 1: OVERVIEW & RECENT ACTIVITY */}
@@ -857,7 +978,7 @@ export default function StoreDashboardPage() {
                                             <p className="text-xs text-slate-500">Taza tareen WhatsApp orders aur unka live status</p>
                                         </div>
                                         <button
-                                            onClick={() => setActiveTab("orders")}
+                                            onClick={() => handleTabChange("orders")}
                                             className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
                                         >
                                             Tamam Orders Dekhein ➔
@@ -1467,6 +1588,10 @@ export default function StoreDashboardPage() {
                                                     <div className="min-w-0">
                                                         <p className="font-bold text-slate-900 truncate">{slide.title}</p>
                                                         <p className="text-[11px] text-slate-500 truncate">{slide.subtitle}</p>
+                                                        <p className="text-[10px] text-emerald-700 font-medium truncate flex items-center gap-1 mt-0.5">
+                                                            <span className="font-bold">🔗 Click Link:</span>
+                                                            <span className="font-mono bg-emerald-50 px-1 rounded">{slide.linkUrl || "#products-catalog"}</span>
+                                                        </p>
                                                     </div>
                                                 </div>
 

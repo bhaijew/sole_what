@@ -20,7 +20,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Truck,
-    Settings
+    Settings,
+    ArrowUpRight
 } from "lucide-react";
 import { PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
 
@@ -449,19 +450,37 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                             </p>
                                         </div>
 
-                                        {/* Delivery Badge on Slider */}
-                                        <div className="flex items-center gap-2 text-[10px] sm:text-xs font-medium text-emerald-300">
-                                            <span className="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10">
-                                                <Truck className="w-3 h-3 text-emerald-400" />
-                                                <span>
-                                                    {Number(store.deliveryFee) === 0 ? "FREE Delivery" : `Delivery: ${store.currencySymbol} ${store.deliveryFee}`}
+                                        {/* Delivery Badge & Call-To-Action Link on Slider */}
+                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                            <div className="flex items-center gap-2 text-[10px] sm:text-xs font-medium text-emerald-300">
+                                                <span className="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10">
+                                                    <Truck className="w-3 h-3 text-emerald-400" />
+                                                    <span>
+                                                        {Number(store.deliveryFee) === 0 ? "FREE Delivery" : `Delivery: ${store.currencySymbol} ${store.deliveryFee}`}
+                                                    </span>
                                                 </span>
-                                            </span>
-                                            {store.freeDeliveryAbove && store.freeDeliveryAbove > 0 && (
-                                                <span className="hidden sm:inline bg-white/15 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10 text-white">
-                                                    Free over {store.currencySymbol} {store.freeDeliveryAbove}
-                                                </span>
-                                            )}
+                                                {store.freeDeliveryAbove && store.freeDeliveryAbove > 0 && (
+                                                    <span className="hidden sm:inline bg-white/15 px-2 py-0.5 rounded-lg backdrop-blur-md border border-white/10 text-white">
+                                                        Free over {store.currencySymbol} {store.freeDeliveryAbove}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Mobile Responsive Action Button / Link */}
+                                            <a
+                                                href={banner.linkUrl || "#products-catalog"}
+                                                onClick={(e) => {
+                                                    const targetUrl = banner.linkUrl || "#products-catalog";
+                                                    if (targetUrl === "#products" || targetUrl === "#products-catalog") {
+                                                        e.preventDefault();
+                                                        document.getElementById("products-catalog")?.scrollIntoView({ behavior: "smooth" });
+                                                    }
+                                                }}
+                                                className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-white bg-white/20 hover:bg-white/30 active:scale-95 backdrop-blur-md px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-xl border border-white/20 shadow-xs cursor-pointer transition"
+                                            >
+                                                <span>Saman Dekhein</span>
+                                                <ArrowUpRight className="w-3 h-3 text-emerald-300" />
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
@@ -504,8 +523,8 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                     </div>
                 )}
 
-                {/* Search Bar */}
-                <div className="relative mb-4">
+                {/* Search Bar & Catalog Target */}
+                <div id="products-catalog" className="relative mb-4 scroll-mt-20">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                         type="text"

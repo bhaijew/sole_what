@@ -10,6 +10,7 @@ export interface PresetBanner {
     badge: string;
     bgGradient: string;
     imageUrl: string;
+    linkUrl?: string;
 }
 
 export interface PresetProductItem {
@@ -30,7 +31,8 @@ export const PRESET_HERO_BANNERS: PresetBanner[] = [
         subtitle: "Taaza saman, behtareen rates aur foran delivery aapke darwazay par.",
         badge: "Taaza & Asal",
         bgGradient: "from-emerald-700 via-teal-800 to-slate-900",
-        imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80"
+        imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80",
+        linkUrl: "#products"
     },
     {
         id: "banner-2",
@@ -38,7 +40,8 @@ export const PRESET_HERO_BANNERS: PresetBanner[] = [
         subtitle: "Muft delivery hasil karein apne mohallay ki pasandeeda dukaan se.",
         badge: "Free Delivery",
         bgGradient: "from-amber-600 via-orange-700 to-slate-900",
-        imageUrl: "https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=1200&q=80"
+        imageUrl: "https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=1200&q=80",
+        linkUrl: "#products"
     },
     {
         id: "banner-3",
@@ -46,7 +49,8 @@ export const PRESET_HERO_BANNERS: PresetBanner[] = [
         subtitle: "Rozana subah ka fresh doodh, bread aur anday bina kisi jhanjhat ke.",
         badge: "Daily Fresh",
         bgGradient: "from-blue-700 via-indigo-800 to-slate-900",
-        imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=1200&q=80"
+        imageUrl: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=1200&q=80",
+        linkUrl: "#products"
     }
 ];
 
