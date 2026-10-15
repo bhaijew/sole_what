@@ -16,6 +16,10 @@ export interface CreateOrderInput {
     customerCity?: string;
     customerNotes?: string;
     paymentMethod?: string; // "COD" | "JAZZCASH" | "EASYPAISA" | "BANK"
+    discount?: number;
+    couponCode?: string;
+    transactionId?: string;
+    paymentProofUrl?: string;
     items: CreateOrderItemInput[];
 }
 
@@ -83,7 +87,16 @@ export function formatOrderWhatsAppReceipt(order: any, store: any, recipientType
 
     const subtotal = Number(order.subtotal).toLocaleString("en-PK");
     const delivery = Number(order.deliveryFee).toLocaleString("en-PK");
+    const discount = Number(order.discount || 0).toLocaleString("en-PK");
     const total = Number(order.total).toLocaleString("en-PK");
+
+    // Extract metadata snapshot if available
+    const metadata = (order.itemsSnapshot && typeof order.itemsSnapshot === "object" && !Array.isArray(order.itemsSnapshot))
+        ? (order.itemsSnapshot as any).metadata || {}
+        : {};
+    const couponCode = metadata.couponCode || null;
+    const transactionId = metadata.transactionId || null;
+    const paymentProofUrl = metadata.paymentProofUrl || null;
 
     if (recipientType === "owner") {
         return `🚨 *NAYA ORDER AAYA HAI!* 📦
@@ -104,9 +117,9 @@ ${itemsText}
 ━━━━━━━━━━━━━━━━━━━━
 💵 *Bill Breakdown:*
 • Subtotal: ${store.currencySymbol || "Rs."} ${subtotal}
-• Delivery Fee: ${Number(order.deliveryFee) === 0 ? "*FREE*" : `${store.currencySymbol || "Rs."} ${delivery}`}
+${Number(order.discount) > 0 ? `• Discount: -${store.currencySymbol || "Rs."} ${discount}${couponCode ? ` (Promo: *${couponCode}*)` : ""}\n` : ""}• Delivery Fee: ${Number(order.deliveryFee) === 0 ? "*FREE*" : `${store.currencySymbol || "Rs."} ${delivery}`}
 💰 *TOTAL BILL:* *${store.currencySymbol || "Rs."} ${total}*
-💳 *Payment:* ${order.paymentMethod || "Cash on Delivery (COD)"}
+💳 *Payment:* ${order.paymentMethod || "Cash on Delivery (COD)"}${transactionId ? ` (TID: *${transactionId}*)` : ""}${paymentProofUrl ? `\n📎 *Payment Proof:* ${paymentProofUrl}` : ""}
 ━━━━━━━━━━━━━━━━━━━━
 Dashboard se order ko confirm ya dispatch karein!`;
     } else {
@@ -122,9 +135,9 @@ Aapka order kamiyabi se receive ho gaya hai.
 ${itemsText}
 
 ━━━━━━━━━━━━━━━━━━━━
-💵 *Total Bill:* *${store.currencySymbol || "Rs."} ${total}*
+${Number(order.discount) > 0 ? `💵 *Discount:* -${store.currencySymbol || "Rs."} ${discount}\n` : ""}💵 *Total Bill:* *${store.currencySymbol || "Rs."} ${total}*
 📍 *Delivery Address:* ${order.customerAddress}
-💳 *Tareeqa:* ${order.paymentMethod || "Cash on Delivery (COD)"}
+💳 *Tareeqa:* ${order.paymentMethod || "Cash on Delivery (COD)"}${transactionId ? ` (TID: ${transactionId})` : ""}
 ━━━━━━━━━━━━━━━━━━━━
 Hamari team jald aapka order pack karke dispatch karegi. Agar koi sawal ho to isi chat par message karein!`;
     }
@@ -204,17 +217,25 @@ export async function createStoreOrder(input: CreateOrderInput) {
 
     // Calculate delivery fee
     let deliveryFee = store.deliveryFee;
-    if (store.freeDeliveryAbove && subtotal >= store.freeDeliveryAbove) {
+    const isFreeShipCoupon = input.couponCode?.trim().toUpperCase() === "FREESHIP";
+    if (isFreeShipCoupon || (store.freeDeliveryAbove && subtotal >= store.freeDeliveryAbove)) {
         deliveryFee = 0;
     }
 
-    const total = subtotal + deliveryFee;
+    const discountAmount = Math.max(0, Number(input.discount) || 0);
+    const total = Math.max(0, subtotal - discountAmount + deliveryFee);
 
     // Generate Human-friendly Order Number e.g. ORD-10023
     const orderCount = await prisma.order.count({ where: { storeId: store.id } });
     const orderNumber = `${store.orderPrefix || "ORD-"}${1001 + orderCount}`;
 
     const cleanCustomerPhone = formatPhoneNumberToWA(input.customerPhone);
+
+    const notesParts: string[] = [];
+    if (input.customerNotes?.trim()) notesParts.push(input.customerNotes.trim());
+    if (input.transactionId?.trim()) notesParts.push(`[TID: ${input.transactionId.trim()}]`);
+    if (input.couponCode?.trim()) notesParts.push(`[Coupon: ${input.couponCode.trim().toUpperCase()}]`);
+    if (input.paymentProofUrl?.trim()) notesParts.push(`[Proof: ${input.paymentProofUrl.trim()}]`);
 
     // Save Order to Database
     const order = await prisma.order.create({
@@ -225,15 +246,24 @@ export async function createStoreOrder(input: CreateOrderInput) {
             customerPhone: cleanCustomerPhone,
             customerAddress: input.customerAddress.trim(),
             customerCity: input.customerCity?.trim() || store.city || "Pakistan",
-            customerNotes: input.customerNotes?.trim() || null,
+            customerNotes: notesParts.join(" ") || null,
             subtotal: subtotal,
             deliveryFee: deliveryFee,
+            discount: discountAmount,
             total: total,
             currency: store.currency || "PKR",
             paymentMethod: input.paymentMethod || "COD",
-            paymentStatus: "UNPAID",
+            paymentStatus: input.paymentMethod === "COD" ? "UNPAID" : (input.transactionId ? "PAID" : "UNPAID"),
             status: "PENDING",
-            itemsSnapshot: itemsSnapshot,
+            itemsSnapshot: {
+                items: itemsSnapshot,
+                metadata: {
+                    couponCode: input.couponCode?.trim().toUpperCase() || null,
+                    discount: discountAmount,
+                    transactionId: input.transactionId?.trim() || null,
+                    paymentProofUrl: input.paymentProofUrl?.trim() || null
+                }
+            },
             items: {
                 create: orderItemsData
             }

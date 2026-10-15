@@ -96,10 +96,14 @@ interface Order {
     customerPhone: string;
     customerAddress: string;
     customerNotes?: string | null;
+    subtotal?: number;
+    deliveryFee?: number;
+    discount?: number;
     total: number;
     status: string;
     paymentMethod: string;
     createdAt: string;
+    itemsSnapshot?: any;
     items: {
         id: string;
         productName: string;
@@ -1186,18 +1190,46 @@ export default function StoreDashboardPage() {
                                                             <span className="font-mono font-semibold">Rs. {it.totalPrice}</span>
                                                         </div>
                                                     ))}
-                                                    <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-slate-900 text-sm">
-                                                        <span>Total Bill ({order.paymentMethod}):</span>
+                                                    {Number(order.discount) > 0 && (
+                                                        <div className="flex justify-between text-emerald-700 font-semibold pt-1 border-t border-slate-200">
+                                                            <span>Discount Applied:</span>
+                                                            <span>-Rs. {Number(order.discount).toLocaleString("en-PK")}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="pt-2 border-t border-slate-200 flex justify-between items-center font-bold text-slate-900 text-sm">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span>Total Bill ({order.paymentMethod}):</span>
+                                                            {order.customerNotes?.match(/\[TID:\s*([^\]]+)\]/) && (
+                                                                <span className="bg-amber-100 text-amber-900 text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg border border-amber-300">
+                                                                    TID: {order.customerNotes.match(/\[TID:\s*([^\]]+)\]/)?.[1]}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <span className="text-emerald-700">Rs. {order.total.toLocaleString("en-PK")}</span>
                                                     </div>
                                                 </div>
 
-                                                {/* Customer Delivery Address */}
-                                                <div className="text-xs text-slate-600 flex items-start gap-1.5">
-                                                    <Truck className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                                                    <span><strong>Address:</strong> {order.customerAddress}</span>
-                                                    {order.customerNotes && (
-                                                        <span className="text-amber-700 ml-2">({order.customerNotes})</span>
+                                                {/* Customer Delivery Address & Proof */}
+                                                <div className="text-xs text-slate-600 space-y-1.5">
+                                                    <div className="flex items-start gap-1.5">
+                                                        <Truck className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                                        <span><strong>Address:</strong> {order.customerAddress}</span>
+                                                        {order.customerNotes && (
+                                                            <span className="text-amber-700 ml-2">({order.customerNotes})</span>
+                                                        )}
+                                                    </div>
+                                                    {order.customerNotes?.match(/\[Proof:\s*([^\]]+)\]/) && (
+                                                        <div className="pt-0.5 pl-5">
+                                                            <a
+                                                                href={order.customerNotes.match(/\[Proof:\s*([^\]]+)\]/)?.[1]}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] rounded-lg border border-indigo-200 transition cursor-pointer shadow-2xs"
+                                                            >
+                                                                <ImageIcon className="w-3.5 h-3.5" />
+                                                                <span>Payment Slip Dekhein (Click to View Proof) ➔</span>
+                                                            </a>
+                                                        </div>
                                                     )}
                                                 </div>
 

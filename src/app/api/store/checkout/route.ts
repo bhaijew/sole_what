@@ -13,6 +13,10 @@ export async function POST(req: Request) {
             customerCity,
             customerNotes,
             paymentMethod,
+            discount,
+            couponCode,
+            transactionId,
+            paymentProofUrl,
             items
         } = body;
 
@@ -44,6 +48,10 @@ export async function POST(req: Request) {
             customerCity,
             customerNotes,
             paymentMethod: paymentMethod || "COD",
+            discount: Number(discount) || 0,
+            couponCode: couponCode || undefined,
+            transactionId: transactionId || undefined,
+            paymentProofUrl: paymentProofUrl || undefined,
             items
         });
 

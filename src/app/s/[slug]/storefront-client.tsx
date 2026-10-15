@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
     ShoppingBag,
     Search,
@@ -21,9 +21,28 @@ import {
     ChevronRight,
     Truck,
     Settings,
-    ArrowUpRight
+    ArrowUpRight,
+    Tag,
+    Ticket,
+    Flame,
+    Copy,
+    Check,
+    UploadCloud,
+    Bot,
+    Send,
+    MessageSquare,
+    Receipt,
+    QrCode,
+    Loader2
 } from "lucide-react";
 import { PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
+
+const AVAILABLE_COUPONS: Record<string, { type: "PERCENT" | "FIXED" | "FREESHIP"; value: number; label: string; minSubtotal?: number }> = {
+    WELCOME10: { type: "PERCENT", value: 10, label: "10% OFF Total Order" },
+    FREESHIP: { type: "FREESHIP", value: 0, label: "100% Free Delivery" },
+    BACHAT50: { type: "FIXED", value: 50, label: "Rs. 50 OFF (Orders over Rs. 300)", minSubtotal: 300 },
+    VIP100: { type: "FIXED", value: 100, label: "Rs. 100 OFF (Orders over Rs. 800)", minSubtotal: 800 }
+};
 
 interface Category {
     id: string;
@@ -132,6 +151,60 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string>("");
 
+    // Feature 6: Coupons & Flash Deals State
+    const [couponInput, setCouponInput] = useState<string>("");
+    const [appliedCoupon, setAppliedCoupon] = useState<{
+        code: string;
+        type: "PERCENT" | "FIXED" | "FREESHIP";
+        value: number;
+        label: string;
+    } | null>(null);
+    const [couponError, setCouponError] = useState<string>("");
+    const [showCouponInput, setShowCouponInput] = useState<boolean>(false);
+    const [dealCountdown, setDealCountdown] = useState<{ hours: number; minutes: number; seconds: number }>({
+        hours: 3,
+        minutes: 42,
+        seconds: 18
+    });
+
+    // Feature 7: JazzCash / EasyPaisa Proof & TID State
+    const [transactionId, setTransactionId] = useState<string>("");
+    const [paymentProofUrl, setPaymentProofUrl] = useState<string>("");
+    const [isUploadingProof, setIsUploadingProof] = useState<boolean>(false);
+    const [copiedNumber, setCopiedNumber] = useState<boolean>(false);
+
+    // Feature 3: AI Dukandar Shopping Assistant State
+    const [isAiOpen, setIsAiOpen] = useState<boolean>(false);
+    const [aiMessages, setAiMessages] = useState<{ role: "assistant" | "user"; content: string }[]>([
+        {
+            role: "assistant",
+            content: `Assalam-o-Alaikum! 🏪 Main *${store.name}* ka virtual AI shopping assistant hoon. Kisi bhi item ki keemat, deals ya delivery ke bare mein poochhein!`
+        }
+    ]);
+    const [aiInput, setAiInput] = useState<string>("");
+    const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
+    const aiMessagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Scroll AI messages to bottom when new message arrives
+    useEffect(() => {
+        if (isAiOpen) {
+            aiMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [aiMessages, isAiOpen]);
+
+    // Live Deal Countdown Timer (Ticking every second)
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setDealCountdown(prev => {
+                if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
+                if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
+                if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
+                return { hours: 4, minutes: 0, seconds: 0 };
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
     // Order Success State
     const [completedOrder, setCompletedOrder] = useState<{
         orderNumber: string;
@@ -170,14 +243,28 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
         return cartItems.reduce((acc, item) => acc + item.lineTotal, 0);
     }, [cartItems]);
 
+    // Calculate dynamic discount from applied coupon
+    const discountAmount = useMemo(() => {
+        if (!appliedCoupon) return 0;
+        if (appliedCoupon.type === "PERCENT") {
+            return Math.round((subtotal * appliedCoupon.value) / 100);
+        }
+        if (appliedCoupon.type === "FIXED") {
+            return Math.min(subtotal, appliedCoupon.value);
+        }
+        return 0;
+    }, [appliedCoupon, subtotal]);
+
+    // Calculate delivery fee (0 if FREESHIP coupon or exceeds threshold)
     const deliveryFee = useMemo(() => {
+        if (appliedCoupon?.type === "FREESHIP") return 0;
         if (store.freeDeliveryAbove && subtotal >= store.freeDeliveryAbove) {
             return 0;
         }
         return store.deliveryFee;
-    }, [subtotal, store.deliveryFee, store.freeDeliveryAbove]);
+    }, [subtotal, store.deliveryFee, store.freeDeliveryAbove, appliedCoupon]);
 
-    const totalBill = subtotal + deliveryFee;
+    const totalBill = Math.max(0, subtotal - discountAmount + deliveryFee);
 
     const freeDeliveryDiff = useMemo(() => {
         if (!store.freeDeliveryAbove) return 0;
@@ -213,6 +300,117 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
             next.delete(productId);
             return next;
         });
+    };
+
+    // Feature 6: Apply Coupon Code Handler
+    const handleApplyCoupon = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        setCouponError("");
+        const clean = couponInput.trim().toUpperCase();
+        if (!clean) return;
+
+        const found = AVAILABLE_COUPONS[clean];
+        if (!found) {
+            setCouponError("Yeh coupon code durust nahi hai.");
+            return;
+        }
+
+        if (found.minSubtotal && subtotal < found.minSubtotal) {
+            setCouponError(`Is coupon ke liye kam az kam ${store.currencySymbol} ${found.minSubtotal} ka order zaroori hai.`);
+            return;
+        }
+
+        setAppliedCoupon({ code: clean, ...found });
+        setCouponInput("");
+        setCouponError("");
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedCoupon(null);
+        setCouponError("");
+    };
+
+    // Feature 5: Direct 1-Click WhatsApp Order
+    const handleQuickWhatsAppOrder = (product: Product) => {
+        const cleanPhone = store.phone ? store.phone.replace(/[^\d]/g, "") : "";
+        const formattedPhone = cleanPhone.startsWith("0") ? "92" + cleanPhone.slice(1) : cleanPhone;
+        const text = `Assalam-o-Alaikum! 🛒\nMujhe *${store.name}* se yeh item order karna hai:\n\n📦 *Item:* ${product.name}\n💵 *Keemat:* ${store.currencySymbol} ${product.price}${product.unit ? ` (${product.unit})` : ""}\n\n👤 *Mera Naam:*\n📍 *Delivery Pata / Address:*\n\nBaraye meherbani confirmation bhej dein. Shukriya!`;
+        const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(text)}`;
+        window.open(waUrl, "_blank");
+    };
+
+    // Feature 7: Upload Payment Screenshot Slip
+    const handleUploadReceipt = async (file: File) => {
+        setIsUploadingProof(true);
+        setErrorMessage("");
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await fetch("/api/store/upload-receipt", {
+                method: "POST",
+                body: fd
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Payment slip upload nahi ho saki.");
+            }
+            setPaymentProofUrl(data.url);
+        } catch (err: any) {
+            setErrorMessage(err.message || "Failed to upload payment slip");
+        } finally {
+            setIsUploadingProof(false);
+        }
+    };
+
+    // Copy Account Number helper
+    const handleCopyAccount = (accountStr: string) => {
+        navigator.clipboard.writeText(accountStr);
+        setCopiedNumber(true);
+        setTimeout(() => setCopiedNumber(false), 2000);
+    };
+
+    // Feature 3: AI Shopping Assistant Message Sender
+    const handleSendAiMessage = async (customText?: string) => {
+        const textToSend = (customText || aiInput).trim();
+        if (!textToSend || isAiLoading) return;
+
+        setAiInput("");
+        setAiMessages(prev => [...prev, { role: "user", content: textToSend }]);
+        setIsAiLoading(true);
+
+        try {
+            const res = await fetch("/api/store/ai-assistant", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    storeId: store.id,
+                    message: textToSend,
+                    history: aiMessages.slice(-4)
+                })
+            });
+            const data = await res.json();
+            if (data.success && data.reply) {
+                setAiMessages(prev => [...prev, { role: "assistant", content: data.reply }]);
+            } else {
+                setAiMessages(prev => [
+                    ...prev,
+                    {
+                        role: "assistant",
+                        content: "Mafi chahta hoon, is waqt connection issue hai. Aap direct WhatsApp par rabta kar sakte hain!"
+                    }
+                ]);
+            }
+        } catch {
+            setAiMessages(prev => [
+                ...prev,
+                {
+                    role: "assistant",
+                    content: "Internet connection check karein ya direct WhatsApp par rabta karein."
+                }
+            ]);
+        } finally {
+            setIsAiLoading(false);
+        }
     };
 
     // Filter products
@@ -268,6 +466,10 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                     customerCity: store.city || "Pakistan",
                     customerNotes,
                     paymentMethod,
+                    discount: discountAmount,
+                    couponCode: appliedCoupon?.code,
+                    transactionId: transactionId.trim() || undefined,
+                    paymentProofUrl: paymentProofUrl || undefined,
                     items: itemsPayload
                 })
             });
@@ -284,6 +486,9 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                 whatsappRedirectUrl: data.whatsappRedirectUrl
             });
             setCart(new Map());
+            setAppliedCoupon(null);
+            setTransactionId("");
+            setPaymentProofUrl("");
             setIsCartOpen(false);
         } catch (err: any) {
             setErrorMessage(err.message || "Failed to submit order. Please try again.");
@@ -314,6 +519,27 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                     <span>{store.noticeMessage}</span>
                 </div>
             )}
+
+            {/* Feature 6: Top Flash Deal & Promo Ticker with Live Timer */}
+            <div className="bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-700 text-white text-[11px] sm:text-xs py-2 px-3 sm:px-4 shadow-sm flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="flex items-center gap-1 bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-md font-bold tracking-wider text-[10px] uppercase">
+                        <Flame className="w-3.5 h-3.5 text-amber-300 animate-bounce" />
+                        <span>Flash Deal</span>
+                    </span>
+                    <span className="font-medium">
+                        Promo Code <strong className="bg-white/20 px-1.5 py-0.5 rounded font-mono font-bold tracking-wider text-amber-200">WELCOME10</strong> lagayein aur 10% discount payein!
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="hidden sm:inline text-white/80">Khatam honay mein:</span>
+                    <div className="flex items-center gap-1 font-mono font-bold bg-black/40 px-2 py-0.5 rounded-lg border border-white/20 text-amber-300 text-[10px] sm:text-xs">
+                        <span>{String(dealCountdown.hours).padStart(2, "0")}h</span>:
+                        <span>{String(dealCountdown.minutes).padStart(2, "0")}m</span>:
+                        <span>{String(dealCountdown.seconds).padStart(2, "0")}s</span>
+                    </div>
+                </div>
+            </div>
 
             {/* Store Header Banner */}
             <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm backdrop-blur-md bg-white/95">
@@ -648,33 +874,45 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                             )}
                                         </div>
 
-                                        {qty === 0 ? (
+                                        <div className="flex items-center gap-1.5">
+                                            {/* Feature 5: Direct 1-Click WhatsApp Quick Order Button */}
                                             <button
-                                                onClick={() => addToCart(product.id)}
-                                                className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-semibold text-xs transition flex items-center gap-1 active:scale-95 cursor-pointer border border-emerald-200 hover:border-emerald-600"
+                                                type="button"
+                                                onClick={() => handleQuickWhatsAppOrder(product)}
+                                                title="WhatsApp Par Direct 1-Click Order Karein"
+                                                className="p-1.5 rounded-xl bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 hover:border-green-600 transition flex items-center justify-center shadow-2xs active:scale-95 cursor-pointer"
                                             >
-                                                <Plus className="w-3.5 h-3.5" />
-                                                <span>Add</span>
+                                                <Phone className="w-3.5 h-3.5" />
                                             </button>
-                                        ) : (
-                                            <div className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl px-1.5 py-1 shadow-xs">
-                                                <button
-                                                    onClick={() => removeFromCart(product.id)}
-                                                    className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-emerald-700 transition"
-                                                >
-                                                    <Minus className="w-3 h-3" />
-                                                </button>
-                                                <span className="text-xs font-bold w-4 text-center">
-                                                    {qty}
-                                                </span>
+
+                                            {qty === 0 ? (
                                                 <button
                                                     onClick={() => addToCart(product.id)}
-                                                    className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-emerald-700 transition"
+                                                    className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-semibold text-xs transition flex items-center gap-1 active:scale-95 cursor-pointer border border-emerald-200 hover:border-emerald-600"
                                                 >
-                                                    <Plus className="w-3 h-3" />
+                                                    <Plus className="w-3.5 h-3.5" />
+                                                    <span>Add</span>
                                                 </button>
-                                            </div>
-                                        )}
+                                            ) : (
+                                                <div className="flex items-center gap-1.5 bg-emerald-600 text-white rounded-xl px-1.5 py-1 shadow-xs">
+                                                    <button
+                                                        onClick={() => removeFromCart(product.id)}
+                                                        className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-emerald-700 transition"
+                                                    >
+                                                        <Minus className="w-3 h-3" />
+                                                    </button>
+                                                    <span className="text-xs font-bold w-4 text-center">
+                                                        {qty}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => addToCart(product.id)}
+                                                        className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-emerald-700 transition"
+                                                    >
+                                                        <Plus className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -828,6 +1066,95 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                 )}
                             </div>
 
+                            {/* Feature 6: Coupon Promo Code Box */}
+                            <div className="pt-3 border-t border-slate-200">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                        <Ticket className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Promo / Discount Coupon</span>
+                                    </span>
+                                    {!appliedCoupon && !showCouponInput && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCouponInput(true)}
+                                            className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                                        >
+                                            + Coupon Add Karein
+                                        </button>
+                                    )}
+                                </div>
+
+                                {appliedCoupon ? (
+                                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 bg-emerald-600 text-white rounded-lg flex items-center justify-center font-bold text-xs">
+                                                %
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+                                                    <span>{appliedCoupon.code}</span>
+                                                    <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.2 rounded-full font-semibold">
+                                                        Applied!
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-emerald-700">
+                                                    {appliedCoupon.label} (-{store.currencySymbol} {discountAmount.toLocaleString("en-PK")})
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveCoupon}
+                                            className="p-1 rounded-lg hover:bg-emerald-200 text-emerald-700 transition cursor-pointer"
+                                            title="Remove Coupon"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ) : showCouponInput ? (
+                                    <div className="space-y-1.5">
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <Tag className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter coupon (e.g. WELCOME10, FREESHIP)"
+                                                    value={couponInput}
+                                                    onChange={e => setCouponInput(e.target.value.toUpperCase())}
+                                                    className="w-full uppercase font-mono text-xs bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleApplyCoupon}
+                                                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer shrink-0"
+                                            >
+                                                Apply
+                                            </button>
+                                        </div>
+                                        {couponError && (
+                                            <p className="text-[11px] text-rose-600 font-medium">{couponError}</p>
+                                        )}
+                                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+                                            <span className="text-[10px] text-slate-400">Available:</span>
+                                            {Object.keys(AVAILABLE_COUPONS).map(code => (
+                                                <button
+                                                    key={code}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setCouponInput(code);
+                                                        setCouponError("");
+                                                    }}
+                                                    className="px-2 py-0.5 bg-slate-100 hover:bg-emerald-50 text-[10px] font-mono font-bold text-slate-700 hover:text-emerald-700 rounded-md border border-slate-200 transition cursor-pointer shrink-0"
+                                                >
+                                                    {code}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+
                             {/* Customer Information Form */}
                             <form id="checkout-form" onSubmit={handleCheckout} className="space-y-3 pt-2 border-t border-slate-200">
                                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
@@ -904,34 +1231,149 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                 </div>
 
                                 {/* Payment Method */}
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                                        Payment Method
+                                <div className="space-y-2.5 pt-1">
+                                    <label className="block text-xs font-semibold text-slate-700">
+                                        Payment Method *
                                     </label>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-3 gap-2">
                                         <button
                                             type="button"
                                             onClick={() => setPaymentMethod("COD")}
-                                            className={`py-2 px-3 rounded-xl border text-xs font-semibold text-center transition cursor-pointer ${
+                                            className={`py-2 px-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold text-center transition cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                                                 paymentMethod === "COD"
-                                                    ? "bg-emerald-50 border-emerald-600 text-emerald-800"
+                                                    ? "bg-emerald-50 border-emerald-600 text-emerald-800 font-bold shadow-2xs"
                                                     : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                                             }`}
                                         >
-                                            💵 Cash on Delivery
+                                            <span className="text-sm">💵</span>
+                                            <span>Cash (COD)</span>
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setPaymentMethod("JAZZCASH")}
-                                            className={`py-2 px-3 rounded-xl border text-xs font-semibold text-center transition cursor-pointer ${
+                                            className={`py-2 px-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold text-center transition cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                                                 paymentMethod === "JAZZCASH"
-                                                    ? "bg-emerald-50 border-emerald-600 text-emerald-800"
+                                                    ? "bg-orange-50 border-orange-500 text-orange-900 font-bold shadow-2xs"
                                                     : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                                             }`}
                                         >
-                                            📲 JazzCash / Easypaisa
+                                            <span className="text-sm">📱</span>
+                                            <span>JazzCash</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentMethod("EASYPAISA")}
+                                            className={`py-2 px-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold text-center transition cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                                                paymentMethod === "EASYPAISA"
+                                                    ? "bg-teal-50 border-teal-500 text-teal-900 font-bold shadow-2xs"
+                                                    : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                                            }`}
+                                        >
+                                            <span className="text-sm">🟢</span>
+                                            <span>EasyPaisa</span>
                                         </button>
                                     </div>
+
+                                    {/* Feature 7: Interactive Payment Details for JazzCash & EasyPaisa */}
+                                    {(paymentMethod === "JAZZCASH" || paymentMethod === "EASYPAISA") && (
+                                        <div className={`p-3.5 rounded-2xl border text-xs space-y-3 animate-fade-in ${
+                                            paymentMethod === "JAZZCASH"
+                                                ? "bg-gradient-to-br from-amber-50 to-orange-50/70 border-orange-200"
+                                                : "bg-gradient-to-br from-emerald-50 to-teal-50/70 border-teal-200"
+                                        }`}>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-lg">
+                                                        {paymentMethod === "JAZZCASH" ? "📱" : "🟢"}
+                                                    </span>
+                                                    <div>
+                                                        <strong className="text-slate-900">
+                                                            {paymentMethod === "JAZZCASH" ? "JazzCash Account" : "EasyPaisa Account"}
+                                                        </strong>
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Title: <strong>{store.name}</strong>
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopyAccount(store.phone)}
+                                                    className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-mono text-[11px] font-bold text-slate-800 transition flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
+                                                >
+                                                    {copiedNumber ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-slate-500" />}
+                                                    <span>{copiedNumber ? "Copied!" : store.phone}</span>
+                                                </button>
+                                            </div>
+
+                                            <p className="text-[11px] text-slate-600 leading-relaxed bg-white/70 p-2 rounded-xl border border-black/5">
+                                                💡 Apne {paymentMethod === "JAZZCASH" ? "JazzCash" : "EasyPaisa"} App se is number par total bill <strong>{store.currencySymbol} {totalBill.toLocaleString("en-PK")}</strong> send karke neeche TID ya screenshot darj karein.
+                                            </p>
+
+                                            {/* TID Input */}
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                                    Transaction ID (TID) *
+                                                </label>
+                                                <div className="relative">
+                                                    <Receipt className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="e.g. 12-digit TID Number (SMS se)"
+                                                        value={transactionId}
+                                                        onChange={e => setTransactionId(e.target.value)}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Receipt Screenshot Upload */}
+                                            <div>
+                                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                                    Payment Screenshot / Slip (Optional)
+                                                </label>
+                                                {paymentProofUrl ? (
+                                                    <div className="flex items-center justify-between p-2 bg-emerald-100/70 border border-emerald-300 rounded-xl text-emerald-900">
+                                                        <div className="flex items-center gap-2">
+                                                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                                            <span className="text-[11px] font-bold">Payment Slip Verified!</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPaymentProofUrl("")}
+                                                            className="text-[10px] text-rose-600 font-bold hover:underline"
+                                                        >
+                                                            Hataiye (Remove)
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <label className="flex items-center justify-center gap-2 p-2.5 border border-dashed border-slate-300 hover:border-emerald-500 bg-white hover:bg-emerald-50/50 rounded-xl cursor-pointer transition text-xs font-semibold text-slate-700">
+                                                        {isUploadingProof ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                                                                <span>Slip Upload Ho Rahi Hai...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <UploadCloud className="w-4 h-4 text-emerald-600" />
+                                                                <span>Payment Slip / Screenshot Upload Karein</span>
+                                                            </>
+                                                        )}
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            className="hidden"
+                                                            disabled={isUploadingProof}
+                                                            onChange={e => {
+                                                                const f = e.target.files?.[0];
+                                                                if (f) handleUploadReceipt(f);
+                                                            }}
+                                                        />
+                                                    </label>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </form>
                         </div>
@@ -943,6 +1385,15 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                     <span>Subtotal:</span>
                                     <span>{store.currencySymbol} {subtotal.toLocaleString("en-PK")}</span>
                                 </div>
+                                {discountAmount > 0 && (
+                                    <div className="flex justify-between text-emerald-700 font-bold">
+                                        <span className="flex items-center gap-1">
+                                            <Ticket className="w-3.5 h-3.5" />
+                                            <span>Discount {appliedCoupon ? `(${appliedCoupon.code})` : ""}:</span>
+                                        </span>
+                                        <span>-{store.currencySymbol} {discountAmount.toLocaleString("en-PK")}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between">
                                     <span>Delivery Charges:</span>
                                     <span>
@@ -1019,6 +1470,134 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                             >
                                 Band Karein (Close)
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Feature 3: Floating AI Dukandar Shopping Assistant Trigger Button */}
+            <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-40">
+                <button
+                    type="button"
+                    onClick={() => setIsAiOpen(true)}
+                    className="group relative flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs sm:text-sm py-2.5 px-3.5 rounded-full shadow-xl border-2 border-white transition active:scale-95 cursor-pointer"
+                >
+                    <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-200"></span>
+                    </span>
+                    <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-white shrink-0" />
+                    <span className="tracking-wide">AI Dukandar</span>
+                    <span className="bg-white/20 text-[10px] px-1.5 py-0.2 rounded-full font-mono">
+                        Online
+                    </span>
+                </button>
+            </div>
+
+            {/* Feature 3: AI Dukandar Sliding Chat Drawer */}
+            {isAiOpen && (
+                <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-fade-in">
+                    <div className="w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-slide-left">
+                        {/* Chat Header */}
+                        <div className="px-4 py-3.5 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-emerald-700 via-teal-800 to-slate-900 text-white">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-bold">
+                                    <Bot className="w-5 h-5 text-emerald-300" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-sm flex items-center gap-1.5">
+                                        <span>AI Dukandar</span>
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    </h3>
+                                    <p className="text-[10px] text-emerald-200">
+                                        {store.name} Shopping Guide
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsAiOpen(false)}
+                                className="p-1.5 rounded-xl hover:bg-white/20 text-white transition cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Quick Chips Banner */}
+                        <div className="p-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                            {[
+                                "🔥 Deals & Coupons?",
+                                "🚚 Delivery Fee Kitni Hai?",
+                                "⭐ Best Products Dikhayein",
+                                "🕒 Dukaan Timing Kya Hai?"
+                            ].map(chip => (
+                                <button
+                                    key={chip}
+                                    type="button"
+                                    onClick={() => handleSendAiMessage(chip)}
+                                    className="px-2.5 py-1 rounded-full bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 border border-slate-200 text-[10px] font-semibold whitespace-nowrap transition cursor-pointer shrink-0 shadow-2xs"
+                                >
+                                    {chip}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Chat Messages Feed */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50/50">
+                            {aiMessages.map((msg, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                                >
+                                    <div
+                                        className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed shadow-2xs whitespace-pre-line ${
+                                            msg.role === "user"
+                                                ? "bg-emerald-600 text-white rounded-tr-none font-medium"
+                                                : "bg-white text-slate-800 border border-slate-200/80 rounded-tl-none font-normal"
+                                        }`}
+                                    >
+                                        {msg.content}
+                                    </div>
+                                </div>
+                            ))}
+                            {isAiLoading && (
+                                <div className="flex justify-start">
+                                    <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-3 shadow-2xs flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce" />
+                                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce [animation-delay:0.2s]" />
+                                        <span className="w-2 h-2 rounded-full bg-emerald-600 animate-bounce [animation-delay:0.4s]" />
+                                        <span className="text-[11px] text-slate-400 font-semibold ml-1">AI Dukandar type kar raha hai...</span>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={aiMessagesEndRef} />
+                        </div>
+
+                        {/* Chat Input */}
+                        <div className="p-3 bg-white border-t border-slate-200">
+                            <form
+                                onSubmit={e => {
+                                    e.preventDefault();
+                                    handleSendAiMessage();
+                                }}
+                                className="flex items-center gap-2"
+                            >
+                                <input
+                                    type="text"
+                                    placeholder="Urdu ya English mein sawal poochhein..."
+                                    value={aiInput}
+                                    onChange={e => setAiInput(e.target.value)}
+                                    disabled={isAiLoading}
+                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!aiInput.trim() || isAiLoading}
+                                    className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white transition flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+                                >
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
