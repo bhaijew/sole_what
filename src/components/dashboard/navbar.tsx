@@ -6,7 +6,8 @@ import { SessionSelector } from "@/components/dashboard/session-selector";
 import { Button } from "@/components/ui/button";
 import { RealtimeClock } from "@/components/dashboard/realtime-clock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Bell, Inbox, Trash2 } from "lucide-react";
+import { Bell, Inbox, Trash2, Store } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { useSession } from "next-auth/react";
@@ -147,6 +148,14 @@ export function Navbar({ appName }: NavbarProps) {
 
             <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                 <span className="hidden sm:inline"><RealtimeClock /></span>
+                <Link
+                    href="/dashboard/store"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition border border-emerald-200/80 shadow-2xs cursor-pointer shrink-0"
+                    title="Digital Dukaan (Store Hub)"
+                >
+                    <Store className="w-4 h-4 text-emerald-600" />
+                    <span className="hidden sm:inline">Store Hub</span>
+                </Link>
                 <SessionSelector />
                 <div className="h-6 w-px bg-border/50 hidden sm:block" />
 

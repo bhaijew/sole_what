@@ -16,6 +16,7 @@ import {
     Zap,
     Globe,
     Sparkles,
+    Store,
 } from "lucide-react";
 
 import { auth } from "@/lib/auth";
@@ -91,6 +92,7 @@ export default async function DashboardPage() {
     const canAccessAi = isSuperAdmin || isOwner;
 
     const quickActions = [
+        { href: "/dashboard/store", label: "Digital Dukaan (Store)", icon: Store, description: "WhatsApp online store, orders & items" },
         ...(isSuperAdmin ? [{ href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, description: "WooCommerce, Shopify & APIs" }] : []),
         { href: "/dashboard/sessions", label: "Sessions / QR", icon: QrCode, description: "Manage WhatsApp devices" },
         { href: "/dashboard/chat", label: "Send Message", icon: Send, description: "Open chat interface" },
@@ -107,6 +109,11 @@ export default async function DashboardPage() {
                     <p className="text-sm text-slate-500 mt-1">Overview of your WhatsApp gateway &amp; website integrations</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Link href="/dashboard/store">
+                        <Button size="sm" variant="outline" className="gap-2 border-emerald-500/30 text-emerald-700 hover:bg-emerald-600 hover:text-white">
+                            <Store className="h-4 w-4" /> Digital Dukaan
+                        </Button>
+                    </Link>
                     {isSuperAdmin && (
                         <Link href="/dashboard/connect-website">
                             <Button size="sm" variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary hover:text-white">
