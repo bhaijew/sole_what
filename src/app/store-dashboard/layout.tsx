@@ -21,11 +21,11 @@ export default async function StoreDashboardLayout({
 
     return (
         <SessionProvider>
-            <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative overflow-hidden font-sans">
+            <div className="flex h-screen bg-background text-foreground relative overflow-hidden font-sans">
                 {/* Subtle Ambient Background Gradient */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                    <div className="absolute -top-[20%] -left-[10%] w-[38rem] h-[38rem] bg-emerald-500/[0.04] rounded-full blur-[110px]" />
-                    <div className="absolute -bottom-[20%] -right-[10%] w-[30rem] h-[30rem] bg-teal-500/[0.04] rounded-full blur-[90px]" />
+                    <div className="absolute -top-[20%] -left-[10%] w-[35rem] h-[35rem] bg-primary/[0.04] rounded-full blur-[100px]" />
+                    <div className="absolute -bottom-[20%] -right-[10%] w-[25rem] h-[25rem] bg-blue-500/[0.04] rounded-full blur-[80px]" />
                 </div>
 
                 {/* Dedicated Store Management Sidebar */}

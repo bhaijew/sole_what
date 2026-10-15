@@ -731,9 +731,9 @@ function StoreDashboardContent() {
             
             {/* TOP EXECUTIVE BAR & STORE SWITCHER (OVERVIEW ONLY) */}
             {currentTab === "overview" && (
-                <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="glass-panel border border-border/70 shadow-sm rounded-2xl p-4 sm:p-5 bg-card/90 dark:bg-card/80 backdrop-blur-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center font-bold text-xl shadow-md shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-emerald-600 to-teal-600 text-white flex items-center justify-center font-bold text-xl shadow-md shrink-0">
                         {activeStore ? activeStore.name.charAt(0) : "D"}
                     </div>
                     <div>
@@ -747,7 +747,7 @@ function StoreDashboardContent() {
                                             const s = stores.find(x => x.id === e.target.value);
                                             if (s) setActiveStore(s);
                                         }}
-                                        className="appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 rounded-xl px-3 py-1 text-sm sm:text-base font-extrabold text-slate-900 dark:text-white pr-8 focus:outline-none cursor-pointer"
+                                        className="appearance-none bg-background border border-border/70 hover:border-primary/50 rounded-xl px-3 py-1 text-sm sm:text-base font-extrabold text-foreground pr-8 focus:outline-none cursor-pointer transition"
                                     >
                                         {stores.map(st => (
                                             <option key={st.id} value={st.id}>
@@ -755,10 +755,10 @@ function StoreDashboardContent() {
                                             </option>
                                         ))}
                                     </select>
-                                    <ChevronDown className="w-4 h-4 text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 </div>
                             ) : (
-                                <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
+                                <h1 className="text-lg sm:text-xl font-extrabold text-foreground">
                                     {activeStore?.name || "Digital Dukaan"}
                                 </h1>
                             )}
@@ -770,8 +770,8 @@ function StoreDashboardContent() {
                                     title="Dukaan ka status badlein (Online / Closed)"
                                     className={`px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
                                         activeStore.isOpen
-                                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
-                                            : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-700"
+                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25"
                                     }`}
                                 >
                                     <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
@@ -782,7 +782,7 @@ function StoreDashboardContent() {
                             {/* Real-Time Live Sync Indicator */}
                             <div
                                 title={isLiveConnected ? "Real-time WebSocket Live Sync active (Auto-refresh on new orders)" : "Reconnecting to live sync..."}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 shadow-2xs"
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-2xs"
                             >
                                 <span className="relative flex h-2 w-2">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -802,11 +802,11 @@ function StoreDashboardContent() {
                                 title={isSoundEnabled ? "Naye order par bell bajegi (Click to mute)" : "Order chime mute hai (Click to turn on)"}
                                 className={`px-2.5 py-1 rounded-xl border text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs ${
                                     isSoundEnabled
-                                        ? "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                                        : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700"
+                                        ? "bg-primary/10 hover:bg-primary/20 text-primary border-primary/25"
+                                        : "bg-muted/50 hover:bg-muted text-muted-foreground border-border/60"
                                 }`}
                             >
-                                {isSoundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+                                {isSoundEnabled ? <Volume2 className="w-3.5 h-3.5 text-primary" /> : <VolumeX className="w-3.5 h-3.5 text-muted-foreground" />}
                                 <span className="text-[10px] hidden sm:inline">{isSoundEnabled ? "Sound On" : "Muted"}</span>
                             </button>
 
@@ -815,14 +815,14 @@ function StoreDashboardContent() {
                                 onClick={handleManualRefreshOrders}
                                 disabled={isRefreshingOrders}
                                 title="Check for new orders now"
-                                className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer transition shadow-2xs"
+                                className="p-1.5 rounded-xl border border-border/70 bg-background hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition shadow-2xs"
                             >
-                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? "animate-spin text-emerald-600" : ""}`} />
+                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? "animate-spin text-primary" : ""}`} />
                             </button>
                         </div>
 
                         {activeStore && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap font-medium">
                                 <span>📱 {activeStore.phone}</span>
                                 <span>•</span>
                                 <span>⏱️ {activeStore.estimatedDeliveryTime || "30-45 mins"}</span>
@@ -837,7 +837,7 @@ function StoreDashboardContent() {
                 <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 w-full lg:w-auto shrink-0">
                     <button
                         onClick={() => setShowPosModal(true)}
-                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
+                        className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 whitespace-nowrap"
                         title="Dukaan Counter POS Cashier Register Kholein"
                     >
                         <Calculator className="w-3.5 h-3.5" />
@@ -846,10 +846,10 @@ function StoreDashboardContent() {
 
                     <button
                         onClick={() => setShowBulkImportModal(true)}
-                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
+                        className="px-3.5 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border/60 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
                         title="CSV ya Excel se products bulk import karein"
                     >
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-primary" />
                         <span>Bulk Import</span>
                     </button>
 
@@ -857,17 +857,17 @@ function StoreDashboardContent() {
                         href={`/s/${activeStore?.slug}/track`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3.5 py-2 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
+                        className="px-3.5 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/25 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
                     >
-                        <Truck className="w-3.5 h-3.5 text-blue-600" />
+                        <Truck className="w-3.5 h-3.5 text-blue-500" />
                         <span>Track ↗</span>
                     </a>
 
                     <button
                         onClick={() => setShowCounterQrModal(true)}
-                        className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
+                        className="px-3.5 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
                     >
-                        <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                        <Printer className="w-3.5 h-3.5 text-indigo-500" />
                         <span>Counter QR</span>
                     </button>
 
@@ -875,7 +875,7 @@ function StoreDashboardContent() {
                         href={currentLiveStoreUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+                        className="px-3.5 py-2 bg-foreground hover:bg-foreground/90 text-background font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
                     >
                         <ExternalLink className="w-3.5 h-3.5" />
                         <span>Storefront ↗</span>
@@ -1030,288 +1030,292 @@ function StoreDashboardContent() {
                             <div className="space-y-6 animate-in fade-in duration-150">
                                 {/* EXECUTIVE KPI METRIC CARDS */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                            {/* Card 1: Total Orders */}
-                            <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-                                    <span>Total Orders</span>
-                                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 rounded-xl">
-                                        <ShoppingBag className="w-4 h-4" />
+                                    {/* Card 1: Total Orders */}
+                                    <div className="relative overflow-hidden group p-4 sm:p-5 rounded-2xl glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 space-y-2">
+                                        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                        <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold">
+                                            <span>Total Orders</span>
+                                            <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+                                                <ShoppingBag className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                                                {orders.length}
+                                            </span>
+                                            {pendingOrdersCount > 0 && (
+                                                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 animate-pulse">
+                                                    {pendingOrdersCount} naye
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground">WhatsApp par receive hue tamam orders</p>
+                                    </div>
+
+                                    {/* Card 2: Total Sales (PKR) */}
+                                    <div className="relative overflow-hidden group p-4 sm:p-5 rounded-2xl glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 space-y-2">
+                                        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                        <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold">
+                                            <span>Total Sales</span>
+                                            <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl border border-blue-500/20">
+                                                <TrendingUp className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black tracking-tight text-foreground truncate">
+                                            Rs. {totalRevenue.toLocaleString("en-PK")}
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground">Ghar tak delivery ka mukammal revenue</p>
+                                    </div>
+
+                                    {/* Card 3: Products in Catalog */}
+                                    <div className="relative overflow-hidden group p-4 sm:p-5 rounded-2xl glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 space-y-2">
+                                        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                        <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold">
+                                            <span>Products</span>
+                                            <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-500/20">
+                                                <Package className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                                                {products.length}
+                                            </span>
+                                            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                                {products.filter(p => p.inStock).length} in-stock
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground">Dukaan ki inventory mein available items</p>
+                                    </div>
+
+                                    {/* Card 4: WhatsApp Automation */}
+                                    <div className="relative overflow-hidden group p-4 sm:p-5 rounded-2xl glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 space-y-2">
+                                        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 to-green-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                        <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold">
+                                            <span>WhatsApp Alerts</span>
+                                            <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
+                                                <MessageCircle className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                                                <span>Active & Connected</span>
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground">Customer aur dukaan dar ko foran auto bill</p>
                                     </div>
                                 </div>
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-                                        {orders.length}
-                                    </span>
-                                    {pendingOrdersCount > 0 && (
-                                        <span className="text-[11px] font-bold text-amber-700 bg-amber-50 dark:bg-amber-950 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800 animate-pulse">
-                                            {pendingOrdersCount} naye
+
+                                {/* STORE READINESS CHECKLIST */}
+                                <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md shadow-sm space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                            <span className="text-xs sm:text-sm font-bold text-foreground">
+                                                Store Readiness & Launch Checklist:
+                                            </span>
+                                            <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                                {checklistScore}% Complete
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={copyStoreLink}
+                                            className="text-xs text-primary hover:text-primary/80 font-bold flex items-center gap-1 cursor-pointer transition"
+                                        >
+                                            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                            <span>{copied ? "Link Copied!" : "Copy Share Link"}</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="w-full bg-muted dark:bg-muted/60 h-2 rounded-full overflow-hidden">
+                                        <div
+                                            className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full transition-all duration-500 shadow-xs"
+                                            style={{ width: `${checklistScore}%` }}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 text-[11px]">
+                                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                            ✓ Dukaan Info Ready
                                         </span>
-                                    )}
-                                </div>
-                                <p className="text-[11px] text-slate-400">WhatsApp par receive hue tamam orders</p>
-                            </div>
-
-                            {/* Card 2: Total Sales (PKR) */}
-                            <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-                                    <span>Total Sales</span>
-                                    <div className="p-2 bg-blue-50 dark:bg-blue-950 text-blue-600 rounded-xl">
-                                        <TrendingUp className="w-4 h-4" />
+                                        <span className={`flex items-center gap-1 ${activeStore.estimatedDeliveryTime ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}`}>
+                                            {activeStore.estimatedDeliveryTime ? "✓ Delivery Set" : "○ Delivery Pending"}
+                                        </span>
+                                        <span className={`flex items-center gap-1 ${products.length > 0 ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}`}>
+                                            {products.length > 0 ? `✓ Products (${products.length})` : "○ Products Khali"}
+                                        </span>
+                                        <span className={`flex items-center gap-1 ${activeStore.phone ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}`}>
+                                            {activeStore.phone ? "✓ WhatsApp Alert" : "○ WhatsApp Missing"}
+                                        </span>
+                                        <button
+                                            onClick={() => setShowCounterQrModal(true)}
+                                            className="text-primary hover:text-primary/80 font-bold text-left cursor-pointer flex items-center gap-1 transition"
+                                        >
+                                            <span>🖨️ Print Counter QR ➔</span>
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white truncate">
-                                    Rs. {totalRevenue.toLocaleString("en-PK")}
-                                </div>
-                                <p className="text-[11px] text-slate-400">Ghar tak delivery ka mukammal revenue</p>
-                            </div>
-
-                            {/* Card 3: Products in Catalog */}
-                            <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-                                    <span>Products</span>
-                                    <div className="p-2 bg-amber-50 dark:bg-amber-950 text-amber-600 rounded-xl">
-                                        <Package className="w-4 h-4" />
-                                    </div>
-                                </div>
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
-                                        {products.length}
-                                    </span>
-                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full">
-                                        {products.filter(p => p.inStock).length} in-stock
-                                    </span>
-                                </div>
-                                <p className="text-[11px] text-slate-400">Dukaan ki inventory mein available items</p>
-                            </div>
-
-                            {/* Card 4: WhatsApp Automation */}
-                            <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-                                    <span>WhatsApp Alerts</span>
-                                    <div className="p-2 bg-green-50 dark:bg-green-950 text-green-600 rounded-xl">
-                                        <MessageCircle className="w-4 h-4" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                                        <span>Active & Connected</span>
-                                    </span>
-                                </div>
-                                <p className="text-[11px] text-slate-400">Customer aur dukaan dar ko foran auto bill</p>
-                            </div>
-                        </div>
-
-                        {/* STORE READINESS CHECKLIST */}
-                        <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                    <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                                        Store Readiness & Launch Checklist:
-                                    </span>
-                                    <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                                        {checklistScore}% Complete
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={copyStoreLink}
-                                    className="text-xs text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 cursor-pointer"
-                                >
-                                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                    <span>{copied ? "Link Copied!" : "Copy Share Link"}</span>
-                                </button>
-                            </div>
-
-                            <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                                <div
-                                    className="bg-emerald-600 h-full transition-all duration-500"
-                                    style={{ width: `${checklistScore}%` }}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 text-[11px]">
-                                <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-                                    ✓ Dukaan Info Ready
-                                </span>
-                                <span className={`flex items-center gap-1 ${activeStore.estimatedDeliveryTime ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
-                                    {activeStore.estimatedDeliveryTime ? "✓ Delivery Set" : "○ Delivery Pending"}
-                                </span>
-                                <span className={`flex items-center gap-1 ${products.length > 0 ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
-                                    {products.length > 0 ? `✓ Products (${products.length})` : "○ Products Khali"}
-                                </span>
-                                <span className={`flex items-center gap-1 ${activeStore.phone ? "text-emerald-700 font-semibold" : "text-slate-400"}`}>
-                                    {activeStore.phone ? "✓ WhatsApp Alert" : "○ WhatsApp Missing"}
-                                </span>
-                                <button
-                                    onClick={() => setShowCounterQrModal(true)}
-                                    className="text-indigo-600 hover:text-indigo-700 font-bold text-left cursor-pointer flex items-center gap-1"
-                                >
-                                    <span>🖨️ Print Counter QR ➔</span>
-                                </button>
-                            </div>
-                        </div>
 
                                 {/* RECENT ORDERS STREAM & COUNTER STAND */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Recent Orders Stream</h3>
-                                            <p className="text-xs text-slate-500">Taza tareen WhatsApp orders aur unka live status</p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleSwitchTab("orders")}
-                                            className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
-                                        >
-                                            Tamam Orders Dekhein ➔
-                                        </button>
-                                    </div>
-
-                                    {orders.length === 0 ? (
-                                        <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-2">
-                                            <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
-                                            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Abhi tak koi order receive nahi hua</p>
-                                            <p className="text-[11px] text-slate-400">Store ka link WhatsApp status ya Facebook group par share karein</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {orders.slice(0, 5).map(order => (
-                                                <div
-                                                    key={order.id}
-                                                    className={`p-3.5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-                                                        recentNewOrderId === order.id
-                                                            ? "border-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/60 ring-2 ring-emerald-500 shadow-md animate-pulse"
-                                                            : "border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:border-slate-300"
-                                                    }`}
-                                                >
-                                                    <div className="space-y-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <strong className="text-slate-900 dark:text-white font-mono font-bold">#{order.orderNumber}</strong>
-                                                            <span className="font-bold text-slate-800 dark:text-slate-200">{order.customerName}</span>
-                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                                order.status === "DELIVERED"
-                                                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
-                                                                    : order.status === "PENDING"
-                                                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300"
-                                                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300"
-                                                            }`}>
-                                                                {order.status}
-                                                            </span>
-                                                            {recentNewOrderId === order.id && (
-                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-emerald-600 text-white animate-bounce shadow-2xs flex items-center gap-1">
-                                                                    <Sparkles className="w-3 h-3" />
-                                                                    <span>NAYA ORDER</span>
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-slate-500 text-[11px]">
-                                                            {order.items.length} items • Total: <strong className="text-emerald-700 dark:text-emerald-400 font-extrabold">Rs. {order.total.toLocaleString("en-PK")}</strong> ({order.paymentMethod})
-                                                        </p>
-                                                        <p className="text-slate-400 text-[10px] truncate max-w-sm">
-                                                            📍 {order.customerAddress}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedLabelOrder(order);
-                                                                setShowLabelModal(true);
-                                                            }}
-                                                            className="p-1.5 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-[11px] flex items-center gap-1 border border-slate-200 dark:border-slate-600"
-                                                            title="Print Shipping Label & Slip"
-                                                        >
-                                                            <Printer className="w-3.5 h-3.5 text-emerald-600" />
-                                                            <span>Slip</span>
-                                                        </button>
-
-                                                        <a
-                                                            href={`https://wa.me/${order.customerPhone.replace(/[^\d]/g, "")}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="p-1.5 px-2.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 font-bold transition flex items-center gap-1 text-[11px]"
-                                                        >
-                                                            <MessageCircle className="w-3.5 h-3.5" />
-                                                            <span>Chat</span>
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Right Controls */}
-                                <div className="space-y-4">
-                                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 text-xs">
-                                        <h4 className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                                            <Globe className="w-4 h-4 text-emerald-600" />
-                                            <span>Aapka Live Storefront Link</span>
-                                        </h4>
-                                        <div className="bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-mono text-[11px] text-emerald-800 dark:text-emerald-300 font-bold truncate">
-                                            {currentLiveStoreUrl}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 pt-1">
+                                    <div className="lg:col-span-2 glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 rounded-2xl shadow-sm space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="font-extrabold text-base text-foreground">Recent Orders Stream</h3>
+                                                <p className="text-xs text-muted-foreground">Taza tareen WhatsApp orders aur unka live status</p>
+                                            </div>
                                             <button
-                                                onClick={copyStoreLink}
-                                                className="py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                                                onClick={() => handleSwitchTab("orders")}
+                                                className="text-xs font-bold text-primary hover:underline cursor-pointer"
                                             >
-                                                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                                <span>{copied ? "Copied" : "Copy Link"}</span>
+                                                Tamam Orders Dekhein ➔
                                             </button>
-                                            <a
-                                                href={currentLiveStoreUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
-                                            >
-                                                <ExternalLink className="w-3.5 h-3.5" />
-                                                <span>Open Store</span>
-                                            </a>
                                         </div>
+
+                                        {orders.length === 0 ? (
+                                            <div className="p-8 text-center border border-dashed border-border/70 rounded-2xl space-y-2">
+                                                <ShoppingBag className="w-8 h-8 text-muted-foreground/40 mx-auto" />
+                                                <p className="text-xs font-semibold text-foreground">Abhi tak koi order receive nahi hua</p>
+                                                <p className="text-[11px] text-muted-foreground">Store ka link WhatsApp status ya Facebook group par share karein</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {orders.slice(0, 5).map(order => (
+                                                    <div
+                                                        key={order.id}
+                                                        className={`p-3.5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                                                            recentNewOrderId === order.id
+                                                                ? "border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/50 shadow-md animate-pulse"
+                                                                : "border-border/60 bg-muted/20 dark:bg-muted/10 hover:border-border hover:bg-muted/40"
+                                                        }`}
+                                                    >
+                                                        <div className="space-y-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <strong className="text-foreground font-mono font-bold">#{order.orderNumber}</strong>
+                                                                <span className="font-bold text-foreground">{order.customerName}</span>
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                    order.status === "DELIVERED"
+                                                                        ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30"
+                                                                        : order.status === "PENDING"
+                                                                        ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+                                                                        : "bg-blue-500/15 text-blue-800 dark:text-blue-300 border border-blue-500/30"
+                                                                }`}>
+                                                                    {order.status}
+                                                                </span>
+                                                                {recentNewOrderId === order.id && (
+                                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-emerald-600 text-white animate-bounce shadow-2xs flex items-center gap-1">
+                                                                        <Sparkles className="w-3 h-3" />
+                                                                        <span>NAYA ORDER</span>
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-muted-foreground text-[11px]">
+                                                                {order.items.length} items • Total: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">Rs. {order.total.toLocaleString("en-PK")}</strong> ({order.paymentMethod})
+                                                            </p>
+                                                            <p className="text-muted-foreground/80 text-[10px] truncate max-w-sm">
+                                                                📍 {order.customerAddress}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedLabelOrder(order);
+                                                                    setShowLabelModal(true);
+                                                                }}
+                                                                className="p-1.5 px-2.5 rounded-xl bg-background/80 hover:bg-muted text-foreground border border-border/70 font-bold text-[11px] flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                                                                title="Print Shipping Label & Slip"
+                                                            >
+                                                                <Printer className="w-3.5 h-3.5 text-primary" />
+                                                                <span>Slip</span>
+                                                            </button>
+
+                                                            <a
+                                                                href={`https://wa.me/${order.customerPhone.replace(/[^\d]/g, "")}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="p-1.5 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 font-bold transition flex items-center gap-1 text-[11px]"
+                                                            >
+                                                                <MessageCircle className="w-3.5 h-3.5" />
+                                                                <span>Chat</span>
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-md space-y-3">
-                                        <div className="flex items-center gap-2">
-                                            <Printer className="w-5 h-5 text-indigo-400" />
-                                            <h4 className="font-extrabold text-sm text-white">Dukaan Counter Stand</h4>
+                                    {/* Right Controls */}
+                                    <div className="space-y-4">
+                                        <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 rounded-2xl shadow-sm space-y-3 text-xs">
+                                            <h4 className="font-extrabold text-foreground flex items-center gap-2">
+                                                <Globe className="w-4 h-4 text-primary" />
+                                                <span>Aapka Live Storefront Link</span>
+                                            </h4>
+                                            <div className="bg-muted/60 border border-border/60 p-2.5 rounded-xl font-mono text-[11px] text-primary font-bold truncate">
+                                                {currentLiveStoreUrl}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                <button
+                                                    onClick={copyStoreLink}
+                                                    className="py-2 bg-muted/70 hover:bg-muted text-foreground border border-border/60 font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+                                                >
+                                                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                                    <span>{copied ? "Copied" : "Copy Link"}</span>
+                                                </button>
+                                                <a
+                                                    href={currentLiveStoreUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1 cursor-pointer"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                    <span>Open Store</span>
+                                                </a>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-slate-300 leading-relaxed">
-                                            Apni dukaan ke counter ke liye QR Standee print karein taake mohallay ke log scan karke ghar se order kar sakein!
-                                        </p>
-                                        <button
-                                            onClick={() => setShowCounterQrModal(true)}
-                                            className="w-full py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                                        >
-                                            <Printer className="w-4 h-4" />
-                                            <span>Poster / Standee Print Karein</span>
-                                        </button>
+
+                                        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950/80 via-slate-900 to-slate-950 border border-indigo-500/30 text-white p-5 rounded-2xl shadow-md space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Printer className="w-5 h-5 text-indigo-400" />
+                                                <h4 className="font-extrabold text-sm text-white">Dukaan Counter Stand</h4>
+                                            </div>
+                                            <p className="text-xs text-slate-300 leading-relaxed">
+                                                Apni dukaan ke counter ke liye QR Standee print karein taake mohallay ke log scan karke ghar se order kar sakein!
+                                            </p>
+                                            <button
+                                                onClick={() => setShowCounterQrModal(true)}
+                                                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                                            >
+                                                <Printer className="w-4 h-4" />
+                                                <span>Poster / Standee Print Karein</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         )}
 
                         {/* TAB 2: POS COUNTER */}
                         {currentTab === "pos" && (
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-6">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+                            <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-6 rounded-2xl shadow-sm space-y-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <div className="p-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded-xl">
+                                            <div className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-500/20">
                                                 <Calculator className="w-5 h-5" />
                                             </div>
-                                            <h3 className="font-extrabold text-lg text-slate-900 dark:text-white">Dukaan Walk-In Counter POS</h3>
+                                            <h3 className="font-extrabold text-lg text-foreground">Dukaan Walk-In Counter POS</h3>
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-1">
+                                        <p className="text-xs text-muted-foreground mt-1">
                                             Dukaan par aane wale gahakon ke liye tez tareen barcode / item billing aur instant WhatsApp digital cash memo
                                         </p>
                                     </div>
 
                                     <button
                                         onClick={() => setShowPosModal(true)}
-                                        className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
+                                        className="px-5 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-extrabold text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
                                     >
                                         <Calculator className="w-4 h-4" />
                                         <span>Open Fullscreen Counter POS ➔</span>
@@ -1319,30 +1323,30 @@ function StoreDashboardContent() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-2">
-                                        <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-sm">
+                                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 dark:bg-muted/10 space-y-2">
+                                        <div className="flex items-center gap-2 font-bold text-foreground text-sm">
                                             <span className="text-xl">⚡</span>
                                             <span>Lightning-Fast Checkout</span>
                                         </div>
-                                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
                                             Product search karein ya barcode scan karein. Cart automatically calculate hogi aur change calculator cash return display karega.
                                         </p>
                                     </div>
-                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-2">
-                                        <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-sm">
+                                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 dark:bg-muted/10 space-y-2">
+                                        <div className="flex items-center gap-2 font-bold text-foreground text-sm">
                                             <span className="text-xl">📲</span>
                                             <span>Zero-Paper WhatsApp Slip</span>
                                         </div>
-                                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
                                             Customer ka phone number darj karein. Sale complete hote hi WhatsApp par digital receipt automatically dispatch ho jayegi.
                                         </p>
                                     </div>
-                                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-2">
-                                        <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-sm">
+                                    <div className="p-4 rounded-xl border border-border/60 bg-muted/20 dark:bg-muted/10 space-y-2">
+                                        <div className="flex items-center gap-2 font-bold text-foreground text-sm">
                                             <span className="text-xl">🖨️</span>
                                             <span>80mm Thermal Receipt</span>
                                         </div>
-                                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
                                             Standard 80mm thermal cash memo printer ya A4 par 1-click print slip generate karein jo offline dukaan par chalta hai.
                                         </p>
                                     </div>
@@ -1352,14 +1356,14 @@ function StoreDashboardContent() {
 
                         {/* TAB 3: ORDERS */}
                         {currentTab === "orders" && (
-                            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                            <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm space-y-4">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Orders Management ({orders.length})</h3>
+                                            <h3 className="font-extrabold text-base text-foreground">Orders Management ({orders.length})</h3>
                                             <div
                                                 title="Real-Time Orders Live Sync Active"
-                                                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300"
+                                                className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-emerald-500/30 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
                                             >
                                                 <span className="relative flex h-1.5 w-1.5">
                                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1371,12 +1375,12 @@ function StoreDashboardContent() {
                                                 onClick={handleManualRefreshOrders}
                                                 disabled={isRefreshingOrders}
                                                 title="Check for new orders now"
-                                                className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 text-slate-600 dark:text-slate-300 cursor-pointer transition"
+                                                className="p-1.5 rounded-lg border border-border/70 bg-background/80 hover:bg-muted text-muted-foreground cursor-pointer transition"
                                             >
-                                                <RefreshCw className={`w-3 h-3 ${isRefreshingOrders ? "animate-spin text-emerald-600" : ""}`} />
+                                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? "animate-spin text-primary" : ""}`} />
                                             </button>
                                         </div>
-                                        <p className="text-xs text-slate-500">Tamam orders real-time stream ho rahe hain, status change se customer ko auto WhatsApp jata hai</p>
+                                        <p className="text-xs text-muted-foreground">Tamam orders real-time stream ho rahe hain, status change se customer ko auto WhatsApp jata hai</p>
                                     </div>
 
                                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
@@ -1384,10 +1388,10 @@ function StoreDashboardContent() {
                                             <button
                                                 key={st}
                                                 onClick={() => setSelectedOrderStatus(st)}
-                                                className={`text-[11px] px-2.5 py-1 rounded-lg font-bold border transition cursor-pointer whitespace-nowrap ${
+                                                className={`text-[11px] px-3 py-1.5 rounded-xl font-bold border transition cursor-pointer whitespace-nowrap ${
                                                     selectedOrderStatus === st
-                                                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900"
-                                                        : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                                                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                                                        : "bg-muted/50 border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                                                 }`}
                                             >
                                                 {st === "ALL" ? "All Orders" : st}
@@ -1397,10 +1401,10 @@ function StoreDashboardContent() {
                                 </div>
 
                                 {orders.length === 0 ? (
-                                    <div className="p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl my-4 space-y-2">
-                                        <ShoppingBag className="w-10 h-10 text-slate-300 mx-auto" />
-                                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Koi order mojood nahi hai</p>
-                                        <p className="text-xs text-slate-400">Selected filter status ke mutabiq orders khali hain.</p>
+                                    <div className="p-12 text-center border border-dashed border-border/70 rounded-2xl my-4 space-y-2">
+                                        <ShoppingBag className="w-10 h-10 text-muted-foreground/40 mx-auto" />
+                                        <p className="text-sm font-semibold text-foreground">Koi order mojood nahi hai</p>
+                                        <p className="text-xs text-muted-foreground">Selected filter status ke mutabiq orders khali hain.</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3.5">
@@ -1409,24 +1413,24 @@ function StoreDashboardContent() {
                                                 key={order.id}
                                                 className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 space-y-3 shadow-2xs ${
                                                     recentNewOrderId === order.id
-                                                        ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/60 ring-2 ring-emerald-500 shadow-md animate-pulse"
-                                                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300"
+                                                        ? "border-emerald-500 bg-emerald-500/10 ring-2 ring-emerald-500/50 shadow-md animate-pulse"
+                                                        : "border-border/60 bg-card/60 dark:bg-card/40 hover:border-border"
                                                 }`}
                                             >
-                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-3">
                                                     <div>
                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                            <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
+                                                            <span className="font-mono font-bold text-sm text-foreground">
                                                                 #{order.orderNumber}
                                                             </span>
                                                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide ${
                                                                 order.status === "DELIVERED"
-                                                                    ? "bg-emerald-100 text-emerald-800"
+                                                                    ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30"
                                                                     : order.status === "PENDING"
-                                                                    ? "bg-amber-100 text-amber-800"
+                                                                    ? "bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30"
                                                                     : order.status === "CANCELLED"
-                                                                    ? "bg-rose-100 text-rose-800"
-                                                                    : "bg-blue-100 text-blue-800"
+                                                                    ? "bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/30"
+                                                                    : "bg-blue-500/15 text-blue-800 dark:text-blue-300 border border-blue-500/30"
                                                             }`}>
                                                                 {order.status}
                                                             </span>
@@ -1436,11 +1440,11 @@ function StoreDashboardContent() {
                                                                     <span>NAYA ORDER</span>
                                                                 </span>
                                                             )}
-                                                            <span className="text-xs text-slate-400 font-mono">
+                                                            <span className="text-xs text-muted-foreground font-mono">
                                                                 {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                             </span>
                                                         </div>
-                                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">
+                                                        <p className="text-xs font-semibold text-foreground/90 mt-1">
                                                             Customer: <strong>{order.customerName}</strong> ({order.customerPhone})
                                                         </p>
                                                     </div>
@@ -1451,9 +1455,9 @@ function StoreDashboardContent() {
                                                                 setSelectedLabelOrder(order);
                                                                 setShowLabelModal(true);
                                                             }}
-                                                            className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                                            className="px-2.5 py-1.5 rounded-xl bg-background/80 hover:bg-muted text-foreground border border-border/70 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
                                                         >
-                                                            <Printer className="w-3.5 h-3.5 text-emerald-600" />
+                                                            <Printer className="w-3.5 h-3.5 text-primary" />
                                                             <span>Print Label / Slip</span>
                                                         </button>
 
@@ -1461,7 +1465,7 @@ function StoreDashboardContent() {
                                                             href={`/s/${activeStore.slug}/track?q=${order.orderNumber}`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                                                            className="px-2.5 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/25 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
                                                         >
                                                             <Truck className="w-3.5 h-3.5" />
                                                             <span>Track</span>
@@ -1471,7 +1475,7 @@ function StoreDashboardContent() {
                                                             href={`https://wa.me/${order.customerPhone.replace(/[^\d]/g, "")}`}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="px-3 py-1.5 rounded-xl bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                                                            className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
                                                         >
                                                             <MessageCircle className="w-3.5 h-3.5" />
                                                             <span>WhatsApp</span>
@@ -1479,8 +1483,8 @@ function StoreDashboardContent() {
                                                     </div>
                                                 </div>
 
-                                                <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
-                                                    <div className="font-bold text-slate-900 dark:text-white text-[11px] mb-1">Items Ordered:</div>
+                                                <div className="bg-muted/40 border border-border/50 p-3 rounded-xl space-y-1.5 text-xs text-foreground">
+                                                    <div className="font-bold text-foreground text-[11px] mb-1">Items Ordered:</div>
                                                     {order.items.map((it, idx) => (
                                                         <div key={idx} className="flex justify-between">
                                                             <span>{it.quantity}x {it.productName}</span>
@@ -1488,32 +1492,32 @@ function StoreDashboardContent() {
                                                         </div>
                                                     ))}
                                                     {Number(order.discount) > 0 && (
-                                                        <div className="flex justify-between text-emerald-700 font-semibold pt-1 border-t border-slate-200 dark:border-slate-700">
+                                                        <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold pt-1 border-t border-border/60">
                                                             <span>Discount Applied:</span>
                                                             <span>-Rs. {Number(order.discount).toLocaleString("en-PK")}</span>
                                                         </div>
                                                     )}
-                                                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center font-bold text-slate-900 dark:text-white text-sm">
+                                                    <div className="pt-2 border-t border-border/60 flex justify-between items-center font-bold text-foreground text-sm">
                                                         <span>Total Bill ({order.paymentMethod}):</span>
-                                                        <span className="text-emerald-700">Rs. {order.total.toLocaleString("en-PK")}</span>
+                                                        <span className="text-emerald-600 dark:text-emerald-400">Rs. {order.total.toLocaleString("en-PK")}</span>
                                                     </div>
                                                 </div>
 
-                                                <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+                                                <div className="text-xs text-muted-foreground space-y-1.5">
                                                     <div className="flex items-start gap-1.5">
-                                                        <Truck className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                                        <Truck className="w-4 h-4 text-muted-foreground/60 shrink-0 mt-0.5" />
                                                         <span><strong>Address:</strong> {order.customerAddress}</span>
                                                     </div>
                                                 </div>
 
                                                 {/* Status Action Buttons */}
-                                                <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
-                                                    <span className="text-[11px] font-bold text-slate-500">Status Update:</span>
+                                                <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-border/60 text-xs">
+                                                    <span className="text-[11px] font-bold text-muted-foreground">Status Update:</span>
                                                     {order.status === "PENDING" && (
                                                         <button
                                                             disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "CONFIRMED")}
-                                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
+                                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition shadow-2xs"
                                                         >
                                                             {updatingOrderId === order.id ? "Updating..." : "✓ Confirm Order"}
                                                         </button>
@@ -1522,7 +1526,7 @@ function StoreDashboardContent() {
                                                         <button
                                                             disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "PREPARING")}
-                                                            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
+                                                            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition shadow-2xs"
                                                         >
                                                             {updatingOrderId === order.id ? "Updating..." : "🍲 Packing / Preparing"}
                                                         </button>
@@ -1531,7 +1535,7 @@ function StoreDashboardContent() {
                                                         <button
                                                             disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "OUT_FOR_DELIVERY")}
-                                                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
+                                                            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition shadow-2xs"
                                                         >
                                                             {updatingOrderId === order.id ? "Updating..." : "🛵 Rider Dispatched"}
                                                         </button>
@@ -1540,7 +1544,7 @@ function StoreDashboardContent() {
                                                         <button
                                                             disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "DELIVERED")}
-                                                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition"
+                                                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg cursor-pointer transition shadow-2xs"
                                                         >
                                                             {updatingOrderId === order.id ? "Updating..." : "🎉 Mark Delivered"}
                                                         </button>
@@ -1549,7 +1553,7 @@ function StoreDashboardContent() {
                                                         <button
                                                             disabled={!!updatingOrderId}
                                                             onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
-                                                            className="px-3 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed text-slate-600 hover:text-rose-700 font-semibold rounded-lg cursor-pointer ml-auto transition"
+                                                            className="px-3 py-1 bg-muted/60 hover:bg-rose-500/15 border border-border/60 disabled:opacity-50 disabled:cursor-not-allowed text-muted-foreground hover:text-rose-600 font-semibold rounded-lg cursor-pointer ml-auto transition"
                                                         >
                                                             Cancel Order
                                                         </button>
@@ -1564,42 +1568,42 @@ function StoreDashboardContent() {
 
                         {/* TAB 4: PRODUCTS */}
                         {currentTab === "products" && (
-                            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                            <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm space-y-4">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div>
-                                        <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Products Catalog ({products.length})</h3>
-                                        <p className="text-xs text-slate-500">Apne store ke items, prices, packing units aur stock availability control karein</p>
+                                        <h3 className="font-extrabold text-base text-foreground">Products Catalog ({products.length})</h3>
+                                        <p className="text-xs text-muted-foreground">Apne store ke items, prices, packing units aur stock availability control karein</p>
                                     </div>
 
                                     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 w-full sm:w-auto shrink-0">
                                         <button
                                             onClick={() => setShowBulkImportModal(true)}
-                                            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+                                            className="px-3.5 py-2 bg-background/80 hover:bg-muted text-foreground font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-border/70 cursor-pointer shadow-2xs"
                                         >
-                                            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                                            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                                             <span>Bulk Import CSV</span>
                                         </button>
 
                                         <button
                                             onClick={handleExportProductsCSV}
-                                            className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-slate-200 dark:border-slate-700 cursor-pointer shadow-2xs"
+                                            className="px-3.5 py-2 bg-background/80 hover:bg-muted text-foreground font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-border/70 cursor-pointer shadow-2xs"
                                         >
-                                            <Download className="w-4 h-4 text-blue-600" />
+                                            <Download className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                             <span>Export CSV</span>
                                         </button>
 
                                         <button
                                             onClick={handleImportPresets}
                                             disabled={isImportingPresets}
-                                            className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-indigo-200 dark:border-indigo-800 cursor-pointer disabled:opacity-50 shadow-2xs"
+                                            className="px-3.5 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-indigo-500/25 cursor-pointer disabled:opacity-50 shadow-2xs"
                                         >
-                                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                                            <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                                             <span>{isImportingPresets ? "Import Ho Raha Hai..." : "Pakistani Grocery (1-Click)"}</span>
                                         </button>
 
                                         <Link
                                             href={`/store-dashboard/products/new${activeStore ? `?storeId=${activeStore.id}` : ""}`}
-                                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                                            className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
                                         >
                                             <Plus className="w-4 h-4" />
                                             <span>Add Product</span>
@@ -1608,20 +1612,20 @@ function StoreDashboardContent() {
                                 </div>
 
                                 <div className="relative">
-                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                     <input
                                         type="text"
                                         placeholder="Product ka naam search karein (e.g. Olper's, Shan, Ghee, Bread)..."
                                         value={productSearch}
                                         onChange={(e) => setProductSearch(e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                        className="w-full bg-muted/40 border border-border/60 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                     />
                                 </div>
 
                                 {filteredProducts.length === 0 ? (
-                                    <div className="p-10 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl my-4 space-y-4">
-                                        <Package className="w-10 h-10 text-slate-300 mx-auto" />
-                                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Koi product nahi mila</p>
+                                    <div className="p-10 text-center border border-dashed border-border/70 rounded-2xl my-4 space-y-4">
+                                        <Package className="w-10 h-10 text-muted-foreground/40 mx-auto" />
+                                        <p className="text-sm font-semibold text-foreground">Koi product nahi mila</p>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -1629,7 +1633,7 @@ function StoreDashboardContent() {
                                             <div
                                                 key={p.id}
                                                 className={`p-3.5 rounded-2xl border transition flex items-center justify-between gap-3 ${
-                                                    p.inStock ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xs" : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 opacity-60"
+                                                    p.inStock ? "glass-panel bg-card/80 border-border/60 hover:border-border shadow-2xs" : "bg-muted/20 border-border/40 opacity-60"
                                                 }`}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
@@ -1637,18 +1641,18 @@ function StoreDashboardContent() {
                                                         <img
                                                             src={p.image}
                                                             alt={p.name}
-                                                            className="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0"
+                                                            className="w-12 h-12 rounded-xl object-cover border border-border/60 shrink-0"
                                                         />
                                                     ) : (
-                                                        <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                                                        <div className="w-12 h-12 rounded-xl bg-muted/60 text-muted-foreground flex items-center justify-center shrink-0 border border-border/40">
                                                             <Package className="w-6 h-6" />
                                                         </div>
                                                     )}
                                                     <div className="min-w-0">
-                                                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                                                        <h4 className="font-bold text-xs sm:text-sm text-foreground truncate">
                                                             {p.name}
                                                         </h4>
-                                                        <p className="text-[11px] text-slate-500">
+                                                        <p className="text-[11px] text-muted-foreground">
                                                             Rs. {p.price} {p.unit && `• ${p.unit}`}
                                                         </p>
                                                     </div>
@@ -1659,15 +1663,15 @@ function StoreDashboardContent() {
                                                         onClick={() => handleToggleProductStock(p)}
                                                         className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border cursor-pointer transition ${
                                                             p.inStock
-                                                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                                                : "bg-rose-50 text-rose-800 border-rose-200"
+                                                                ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30"
+                                                                : "bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/30"
                                                         }`}
                                                     >
                                                         {p.inStock ? "In Stock" : "Out of Stock"}
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteProduct(p)}
-                                                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition"
+                                                        className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 cursor-pointer transition"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -1681,18 +1685,18 @@ function StoreDashboardContent() {
 
                         {/* TAB 5: ABANDONED CARTS */}
                         {currentTab === "abandoned" && (
-                            <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-6">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                            <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm space-y-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-4">
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
+                                            <div className="p-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl border border-amber-500/20">
                                                 <ShoppingCart className="w-5 h-5" />
                                             </div>
-                                            <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                            <h3 className="font-extrabold text-base sm:text-lg text-foreground">
                                                 WhatsApp Abandoned Cart Recovery 🛒
                                             </h3>
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-1">
+                                        <p className="text-xs text-muted-foreground mt-1">
                                             Jo customers checkout tak pohanch kar order place kiye baghair chale gaye, unhe WhatsApp par discount de kar recover karein!
                                         </p>
                                     </div>
@@ -1700,44 +1704,44 @@ function StoreDashboardContent() {
                                     <button
                                         onClick={() => activeStore && fetchAbandonedCarts(activeStore.id)}
                                         disabled={isLoadingAbandoned}
-                                        className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                                        className="px-3.5 py-2 bg-background/80 hover:bg-muted text-foreground border border-border/70 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
                                     >
-                                        <RefreshCw className={`w-4 h-4 ${isLoadingAbandoned ? "animate-spin" : ""}`} />
+                                        <RefreshCw className={`w-4 h-4 ${isLoadingAbandoned ? "animate-spin text-primary" : ""}`} />
                                         <span>Refresh Carts</span>
                                     </button>
                                 </div>
 
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
-                                        <span className="text-[11px] text-slate-500 font-bold">Total Lost Value</span>
-                                        <p className="text-xl font-extrabold text-slate-900 dark:text-white">
+                                    <div className="bg-muted/30 border border-border/60 p-4 rounded-xl space-y-1">
+                                        <span className="text-[11px] text-muted-foreground font-bold">Total Lost Value</span>
+                                        <p className="text-xl font-extrabold text-foreground">
                                             Rs. {abandonedCarts.reduce((sum, c) => sum + (c.subtotal || 0), 0).toLocaleString("en-PK")}
                                         </p>
                                     </div>
-                                    <div className="bg-amber-50/60 dark:bg-amber-950/40 p-4 rounded-xl border border-amber-200 space-y-1">
-                                        <span className="text-[11px] text-amber-800 dark:text-amber-300 font-bold">Pending Recovery</span>
-                                        <p className="text-xl font-extrabold text-amber-900 dark:text-amber-200">
+                                    <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl space-y-1">
+                                        <span className="text-[11px] text-amber-700 dark:text-amber-300 font-bold">Pending Recovery</span>
+                                        <p className="text-xl font-extrabold text-amber-800 dark:text-amber-200">
                                             {abandonedCarts.filter(c => !c.recovered).length} Carts
                                         </p>
                                     </div>
-                                    <div className="bg-emerald-50/60 dark:bg-emerald-950/40 p-4 rounded-xl border border-emerald-200 space-y-1">
-                                        <span className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold">Recovered Orders</span>
-                                        <p className="text-xl font-extrabold text-emerald-900 dark:text-emerald-200">
+                                    <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl space-y-1">
+                                        <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-bold">Recovered Orders</span>
+                                        <p className="text-xl font-extrabold text-emerald-800 dark:text-emerald-200">
                                             {abandonedCarts.filter(c => c.recovered).length}
                                         </p>
                                     </div>
-                                    <div className="bg-indigo-50/60 dark:bg-indigo-950/40 p-4 rounded-xl border border-indigo-200 space-y-1">
-                                        <span className="text-[11px] text-indigo-800 dark:text-indigo-300 font-bold">Incentive Code</span>
-                                        <p className="text-xl font-extrabold text-indigo-900 dark:text-indigo-200 font-mono">
+                                    <div className="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-xl space-y-1">
+                                        <span className="text-[11px] text-indigo-700 dark:text-indigo-300 font-bold">Incentive Code</span>
+                                        <p className="text-xl font-extrabold text-indigo-800 dark:text-indigo-200 font-mono">
                                             WELCOME10
                                         </p>
                                     </div>
                                 </div>
 
                                 {abandonedCarts.length === 0 ? (
-                                    <div className="p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-2">
-                                        <ShoppingCart className="w-10 h-10 text-slate-300 mx-auto" />
-                                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Koi abandoned cart nahi mila!</p>
+                                    <div className="p-12 text-center border border-dashed border-border/70 rounded-2xl space-y-2">
+                                        <ShoppingCart className="w-10 h-10 text-muted-foreground/40 mx-auto" />
+                                        <p className="text-sm font-semibold text-foreground">Koi abandoned cart nahi mila!</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -1746,30 +1750,30 @@ function StoreDashboardContent() {
                                                 key={cart.id}
                                                 className={`p-4 rounded-xl border transition flex flex-col md:flex-row md:items-center justify-between gap-4 ${
                                                     cart.recovered
-                                                        ? "bg-emerald-50/30 border-emerald-200"
-                                                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-2xs"
+                                                        ? "bg-emerald-500/10 border-emerald-500/30"
+                                                        : "bg-card/70 border-border/60 shadow-2xs"
                                                 }`}
                                             >
                                                 <div className="space-y-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                        <strong className="text-sm text-slate-900 dark:text-white">{cart.customerName}</strong>
-                                                        <span className="font-mono text-xs text-slate-600 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
+                                                        <strong className="text-sm text-foreground">{cart.customerName}</strong>
+                                                        <span className="font-mono text-xs text-muted-foreground bg-muted/70 px-2 py-0.5 rounded-md border border-border/50">
                                                             {cart.customerPhone}
                                                         </span>
                                                         {cart.recovered ? (
-                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30">
                                                                 ✓ Recovered
                                                             </span>
                                                         ) : (
-                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
                                                                 Pending Recovery
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1">
+                                                    <p className="text-xs text-muted-foreground line-clamp-1">
                                                         🛒 {cart.itemsSummary}
                                                     </p>
-                                                    <p className="text-xs font-bold text-emerald-700">
+                                                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                                                         Potential Sale: Rs. {cart.subtotal.toLocaleString("en-PK")}
                                                     </p>
                                                 </div>
@@ -1794,17 +1798,17 @@ function StoreDashboardContent() {
                         {/* TAB 6: SLIDER / HERO BANNERS */}
                         {currentTab === "slider" && (
                             <div className="space-y-6">
-                                <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
+                                            <div className="p-2 bg-primary/10 text-primary rounded-xl border border-primary/20">
                                                 <ImageIcon className="w-5 h-5" />
                                             </div>
-                                            <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                                            <h3 className="font-extrabold text-base sm:text-lg text-foreground">
                                                 Storefront Hero Slider & Banners
                                             </h3>
                                         </div>
-                                        <p className="text-xs text-slate-500">
+                                        <p className="text-xs text-muted-foreground">
                                             Apni dukaan ke promotional banner slides manage karein ya default slider ko band karein
                                         </p>
                                     </div>
@@ -1813,8 +1817,8 @@ function StoreDashboardContent() {
                                         onClick={() => setIsSliderEnabled(!isSliderEnabled)}
                                         className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs ${
                                             isSliderEnabled
-                                                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                : "bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300"
+                                                ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                                                : "bg-rose-500/15 hover:bg-rose-500/25 text-rose-800 dark:text-rose-300 border border-rose-500/30"
                                         }`}
                                     >
                                         {isSliderEnabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -1826,7 +1830,7 @@ function StoreDashboardContent() {
                                     <button
                                         onClick={handleSaveBanners}
                                         disabled={isSavingBanners}
-                                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
+                                        className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
                                     >
                                         {isSavingBanners ? "Saving..." : "Save Slider Changes"}
                                     </button>
@@ -1836,32 +1840,32 @@ function StoreDashboardContent() {
 
                         {/* TAB 7: DELIVERY & TIMINGS */}
                         {currentTab === "delivery" && (
-                            <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-5">
-                                <div className="flex items-center gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-4">
-                                    <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                            <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm space-y-5">
+                                <div className="flex items-center gap-2.5 border-b border-border/60 pb-4">
+                                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                                         <Truck className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">Delivery Charges & Auqaat</h3>
-                                        <p className="text-xs text-slate-500">Apne mohallay ya city ke mutabiq delivery charges aur timing set karein</p>
+                                        <h3 className="font-extrabold text-sm sm:text-base text-foreground">Delivery Charges & Auqaat</h3>
+                                        <p className="text-xs text-muted-foreground">Apne mohallay ya city ke mutabiq delivery charges aur timing set karein</p>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-bold text-foreground mb-1">
                                             Delivery Fee ({activeStore.currencySymbol})
                                         </label>
                                         <input
                                             type="number"
                                             value={deliveryFeeInput}
                                             onChange={e => setDeliveryFeeInput(e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            className="w-full bg-muted/40 border border-border/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-bold text-foreground mb-1">
                                             Free Delivery Above Order ({activeStore.currencySymbol})
                                         </label>
                                         <input
@@ -1869,37 +1873,37 @@ function StoreDashboardContent() {
                                             placeholder="e.g. 1500"
                                             value={freeDeliveryAboveInput}
                                             onChange={e => setFreeDeliveryAboveInput(e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            className="w-full bg-muted/40 border border-border/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-bold text-foreground mb-1">
                                             Estimated Delivery Time
                                         </label>
                                         <input
                                             type="text"
                                             value={deliveryTimeInput}
                                             onChange={e => setDeliveryTimeInput(e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            className="w-full bg-muted/40 border border-border/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        <label className="block text-xs font-bold text-foreground mb-1">
                                             Opening Hours (Auqaat)
                                         </label>
                                         <input
                                             type="text"
                                             value={openingHoursInput}
                                             onChange={e => setOpeningHoursInput(e.target.value)}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                            className="w-full bg-muted/40 border border-border/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                         />
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                    <label className="block text-xs font-bold text-foreground mb-1">
                                         Top Notice / Announcement Banner
                                     </label>
                                     <input
@@ -1907,7 +1911,7 @@ function StoreDashboardContent() {
                                         placeholder="e.g. 🎉 Rs. 1000 se zyada ke order par muft delivery!"
                                         value={noticeMessageInput}
                                         onChange={e => setNoticeMessageInput(e.target.value)}
-                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                                        className="w-full bg-muted/40 border border-border/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                     />
                                 </div>
 
@@ -1915,7 +1919,7 @@ function StoreDashboardContent() {
                                     <button
                                         onClick={handleSaveDelivery}
                                         disabled={isSavingDelivery}
-                                        className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
+                                        className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
                                     >
                                         {isSavingDelivery ? "Saving..." : "Save Delivery Settings"}
                                     </button>
@@ -1926,20 +1930,20 @@ function StoreDashboardContent() {
                         {/* TAB 8: DOMAIN & WHATSAPP SETTINGS */}
                         {currentTab === "settings" && (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                                <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm space-y-4">
                                     <div className="flex items-center gap-2.5">
-                                        <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+                                        <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                                             <Globe className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">Custom Domain Integration</h3>
-                                            <p className="text-xs text-slate-500">Apni khud ki domain connect karein (e.g. shop.mybrand.pk)</p>
+                                            <h3 className="font-extrabold text-sm sm:text-base text-foreground">Custom Domain Integration</h3>
+                                            <p className="text-xs text-muted-foreground">Apni khud ki domain connect karein (e.g. shop.mybrand.pk)</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-3 pt-2">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                            <label className="block text-xs font-bold text-foreground mb-1">
                                                 Domain Name
                                             </label>
                                             <input
@@ -1947,32 +1951,32 @@ function StoreDashboardContent() {
                                                 placeholder="e.g. shop.bismillahstore.pk"
                                                 value={customDomainInput}
                                                 onChange={e => setCustomDomainInput(e.target.value)}
-                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                                className="w-full bg-muted/40 border border-border/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                             />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                                <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm space-y-4">
                                     <div className="flex items-center gap-2.5">
-                                        <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+                                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                             <Phone className="w-5 h-5" />
                                         </div>
                                         <div>
-                                            <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">WhatsApp Session Connection</h3>
-                                            <p className="text-xs text-slate-500">Order aate hi dukaan aur customer ko auto message dispatch karne ke liye</p>
+                                            <h3 className="font-extrabold text-sm sm:text-base text-foreground">WhatsApp Session Connection</h3>
+                                            <p className="text-xs text-muted-foreground">Order aate hi dukaan aur customer ko auto message dispatch karne ke liye</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-3 pt-2 text-xs">
                                         <div>
-                                            <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                            <label className="block font-bold text-foreground mb-1">
                                                 Connected Baileys WhatsApp Session
                                             </label>
                                             <select
                                                 value={selectedSessionId}
                                                 onChange={e => setSelectedSessionId(e.target.value)}
-                                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                                className="w-full bg-muted/40 border border-border/60 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                             >
                                                 <option value="">-- Direct WhatsApp Chat Mode (No Bot) --</option>
                                                 {sessions.map(s => (
@@ -1987,7 +1991,7 @@ function StoreDashboardContent() {
                                             <button
                                                 onClick={handleSaveDomainAndSession}
                                                 disabled={isSavingDomain}
-                                                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
+                                                className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl shadow-xs transition disabled:opacity-50 cursor-pointer"
                                             >
                                                 {isSavingDomain ? "Saving..." : "Save Settings"}
                                             </button>
