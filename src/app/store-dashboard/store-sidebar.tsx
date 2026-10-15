@@ -72,7 +72,7 @@ export default function StoreSidebar({
             items: [
                 { id: "overview", label: "Dashboard Overview", icon: LayoutDashboard },
                 { id: "pos", label: "Walk-In Counter POS", icon: Calculator, badge: "Tez Bill" },
-                { id: "orders", label: "Orders & Shipping", icon: ShoppingBag }
+                { id: "orders", label: "Orders & Shipping", icon: ShoppingBag, badge: "Live ⚡" }
             ]
         },
         {

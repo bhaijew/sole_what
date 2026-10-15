@@ -144,6 +144,17 @@ Aapka order #${existingOrder.orderNumber} cancel kar diya gaya hai. Agar koi saw
             }
         }
 
+        // Emit real-time order update event to Store Dashboard
+        try {
+            const io = (global as any).io;
+            if (io) {
+                io.to(`store:${storeId}`).emit("store:order_updated", {
+                    storeId,
+                    order: updatedOrder
+                });
+            }
+        } catch (socketErr) {}
+
         return NextResponse.json({ order: updatedOrder });
     } catch (error: any) {
         console.error("Update order error:", error);

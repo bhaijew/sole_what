@@ -20,5 +20,18 @@ export function setupSocket(io: Server) {
         socket.join(`user:${userId}`);
         logger.debug("Socket", `Socket ${socket.id} joined user room: user:${userId}`);
     });
+
+    // Handle joining store room for live order events
+    socket.on("join-store", (storeId: string) => {
+        if (!storeId) return;
+        socket.join(`store:${storeId}`);
+        logger.debug("Socket", `Socket ${socket.id} joined store room: store:${storeId}`);
+    });
+
+    socket.on("leave-store", (storeId: string) => {
+        if (!storeId) return;
+        socket.leave(`store:${storeId}`);
+        logger.debug("Socket", `Socket ${socket.id} left store room: store:${storeId}`);
+    });
   });
 }

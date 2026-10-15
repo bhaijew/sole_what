@@ -41,9 +41,13 @@ import {
     Send,
     ChevronLeft,
     ChevronRight,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Volume2,
+    VolumeX,
+    Radio
 } from "lucide-react";
 import { toast } from "sonner";
+import { useSocket } from "@/components/chat/socket-context";
 import { PRESET_CATALOG_PRODUCTS, PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
 import StoreSlider from "./store-slider";
 import StoreSetupWizardModal from "@/app/dashboard/store/store-setup-wizard-modal";
@@ -51,6 +55,43 @@ import CounterQrModal from "@/app/dashboard/store/counter-qr-modal";
 import ShippingLabelModal from "@/app/dashboard/store/shipping-label-modal";
 import BulkImportModal from "@/app/dashboard/store/bulk-import-modal";
 import POSModal from "@/app/dashboard/store/pos-modal";
+
+// Synthesise a pleasant double-bell order chime via standard Web Audio API
+function playOrderChime() {
+    try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContextClass) return;
+        const ctx = new AudioContextClass();
+        if (ctx.state === "suspended") {
+            ctx.resume().catch(() => {});
+        }
+
+        const now = ctx.currentTime;
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(880, now);
+        gain1.gain.setValueAtTime(0.28, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.35);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(1320, now + 0.12);
+        gain2.gain.setValueAtTime(0.32, now + 0.12);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.12);
+        osc2.stop(now + 0.65);
+    } catch {
+        // audio blocked before user gesture, non-fatal
+    }
+}
 
 interface StoreData {
     id: string;
@@ -168,6 +209,13 @@ function StoreDashboardContent() {
     const [selectedOrderStatus, setSelectedOrderStatus] = useState<string>("ALL");
     const [productSearch, setProductSearch] = useState<string>("");
     const [sessions, setSessions] = useState<WhatsAppSessionItem[]>([]);
+
+    // Socket.io Real-time hook & Live Sync state
+    const { getSocket, joinStore, leaveStore } = useSocket();
+    const [isLiveConnected, setIsLiveConnected] = useState<boolean>(true);
+    const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(true);
+    const [recentNewOrderId, setRecentNewOrderId] = useState<string | null>(null);
+    const [isRefreshingOrders, setIsRefreshingOrders] = useState<boolean>(false);
 
     // Abandoned Carts State
     const [abandonedCarts, setAbandonedCarts] = useState<any[]>([]);
@@ -288,7 +336,7 @@ function StoreDashboardContent() {
         }
     };
 
-    const fetchOrders = async (storeId: string) => {
+    const fetchOrders = async (storeId: string, silent = false) => {
         try {
             const url = selectedOrderStatus === "ALL"
                 ? `/api/stores/${storeId}/orders`
@@ -299,9 +347,81 @@ function StoreDashboardContent() {
                 setOrders(data.orders);
             }
         } catch (e) {
-            console.error("Error fetching orders:", e);
+            if (!silent) console.error("Error fetching orders:", e);
         }
     };
+
+    const handleManualRefreshOrders = async () => {
+        if (!activeStore) return;
+        setIsRefreshingOrders(true);
+        await fetchOrders(activeStore.id);
+        setTimeout(() => setIsRefreshingOrders(false), 500);
+        toast.success("Orders live sync updated! 🔄");
+    };
+
+    // Real-time live order updates via Socket.io & 8s background polling fallback
+    useEffect(() => {
+        if (!activeStore) return;
+        const storeId = activeStore.id;
+        const socket = getSocket();
+
+        joinStore(storeId);
+
+        const handleNewOrder = (payload: { storeId: string; order: Order }) => {
+            if (payload && payload.storeId === storeId && payload.order) {
+                if (isSoundEnabled) {
+                    playOrderChime();
+                }
+                setOrders(prev => {
+                    const exists = prev.some(o => o.id === payload.order.id);
+                    if (exists) return prev;
+                    return [payload.order, ...prev];
+                });
+                setRecentNewOrderId(payload.order.id);
+                setTimeout(() => setRecentNewOrderId(null), 9000);
+                toast.success(
+                    `🔔 NAYA ORDER AAYA! #${payload.order.orderNumber} - ${payload.order.customerName} (Rs. ${payload.order.total.toLocaleString("en-PK")})`,
+                    { duration: 7000 }
+                );
+            }
+        };
+
+        const handleOrderUpdated = (payload: { storeId: string; order: Order }) => {
+            if (payload && payload.storeId === storeId && payload.order) {
+                setOrders(prev => prev.map(o => o.id === payload.order.id ? { ...o, ...payload.order } : o));
+            }
+        };
+
+        if (socket) {
+            socket.on("store:new_order", handleNewOrder);
+            socket.on("store:order_updated", handleOrderUpdated);
+            if (socket.connected) {
+                joinStore(storeId);
+                setIsLiveConnected(true);
+            }
+            socket.on("connect", () => {
+                joinStore(storeId);
+                setIsLiveConnected(true);
+            });
+            socket.on("disconnect", () => {
+                setIsLiveConnected(false);
+            });
+        }
+
+        // 8-second background polling fallback so user NEVER has to refresh
+        const intervalId = setInterval(() => {
+            fetchOrders(storeId, true);
+        }, 8000);
+
+        return () => {
+            leaveStore(storeId);
+            clearInterval(intervalId);
+            if (socket) {
+                socket.off("store:new_order", handleNewOrder);
+                socket.off("store:order_updated", handleOrderUpdated);
+            }
+        };
+    }, [activeStore, getSocket, joinStore, leaveStore, isSoundEnabled, selectedOrderStatus]);
 
     const fetchAbandonedCarts = async (storeId: string) => {
         setIsLoadingAbandoned(true);
@@ -648,16 +768,57 @@ function StoreDashboardContent() {
                                 <button
                                     onClick={handleToggleStoreOpen}
                                     title="Dukaan ka status badlein (Online / Closed)"
-                                    className={`px-3 py-0.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                                    className={`px-3 py-1 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
                                         activeStore.isOpen
                                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
                                             : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-700"
                                     }`}
                                 >
                                     <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
-                                    <span>{activeStore.isOpen ? "Online (Accepting Orders)" : "Closed (Abhi Band Hai)"}</span>
+                                    <span>{activeStore.isOpen ? "Online" : "Closed"}</span>
                                 </button>
                             )}
+
+                            {/* Real-Time Live Sync Indicator */}
+                            <div
+                                title={isLiveConnected ? "Real-time WebSocket Live Sync active (Auto-refresh on new orders)" : "Reconnecting to live sync..."}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 shadow-2xs"
+                            >
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                <span className="text-[11px] font-mono">Real-Time Live</span>
+                            </div>
+
+                            {/* Audio Chime Bell Toggle */}
+                            <button
+                                onClick={() => {
+                                    const next = !isSoundEnabled;
+                                    setIsSoundEnabled(next);
+                                    if (next) playOrderChime();
+                                    toast.info(next ? "Order chime alert on 🔔" : "Order chime alert muted 🔕");
+                                }}
+                                title={isSoundEnabled ? "Naye order par bell bajegi (Click to mute)" : "Order chime mute hai (Click to turn on)"}
+                                className={`px-2.5 py-1 rounded-xl border text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs ${
+                                    isSoundEnabled
+                                        ? "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                                        : "bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700"
+                                }`}
+                            >
+                                {isSoundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+                                <span className="text-[10px] hidden sm:inline">{isSoundEnabled ? "Sound On" : "Muted"}</span>
+                            </button>
+
+                            {/* Quick Sync Button */}
+                            <button
+                                onClick={handleManualRefreshOrders}
+                                disabled={isRefreshingOrders}
+                                title="Check for new orders now"
+                                className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer transition shadow-2xs"
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? "animate-spin text-emerald-600" : ""}`} />
+                            </button>
                         </div>
 
                         {activeStore && (
@@ -780,7 +941,26 @@ function StoreDashboardContent() {
                     </div>
 
                     {/* Store Switcher & Live Store Quick Links */}
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap">
+                        <div
+                            title="Real-Time Orders Sync is Active"
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs font-bold border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 shadow-2xs"
+                        >
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span className="text-[10px] font-mono">Live</span>
+                        </div>
+
+                        <button
+                            onClick={handleManualRefreshOrders}
+                            disabled={isRefreshingOrders}
+                            title="Check for new orders now"
+                            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer transition shadow-2xs"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? "animate-spin text-emerald-600" : ""}`} />
+                        </button>
                         {stores.length > 1 && (
                             <div className="relative inline-block">
                                 <select
@@ -999,24 +1179,34 @@ function StoreDashboardContent() {
                                             {orders.slice(0, 5).map(order => (
                                                 <div
                                                     key={order.id}
-                                                    className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                                                    className={`p-3.5 rounded-2xl border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                                                        recentNewOrderId === order.id
+                                                            ? "border-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/60 ring-2 ring-emerald-500 shadow-md animate-pulse"
+                                                            : "border-slate-200/90 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:border-slate-300"
+                                                    }`}
                                                 >
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <strong className="text-slate-900 dark:text-white font-mono">#{order.orderNumber}</strong>
-                                                            <span className="font-semibold text-slate-800 dark:text-slate-200">{order.customerName}</span>
+                                                    <div className="space-y-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <strong className="text-slate-900 dark:text-white font-mono font-bold">#{order.orderNumber}</strong>
+                                                            <span className="font-bold text-slate-800 dark:text-slate-200">{order.customerName}</span>
                                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                                                 order.status === "DELIVERED"
-                                                                    ? "bg-emerald-100 text-emerald-800"
+                                                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300"
                                                                     : order.status === "PENDING"
-                                                                    ? "bg-amber-100 text-amber-800"
-                                                                    : "bg-blue-100 text-blue-800"
+                                                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300"
+                                                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300"
                                                             }`}>
                                                                 {order.status}
                                                             </span>
+                                                            {recentNewOrderId === order.id && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-emerald-600 text-white animate-bounce shadow-2xs flex items-center gap-1">
+                                                                    <Sparkles className="w-3 h-3" />
+                                                                    <span>NAYA ORDER</span>
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <p className="text-slate-500 text-[11px]">
-                                                            {order.items.length} items • Total: <strong>Rs. {order.total.toLocaleString("en-PK")}</strong> ({order.paymentMethod})
+                                                            {order.items.length} items • Total: <strong className="text-emerald-700 dark:text-emerald-400 font-extrabold">Rs. {order.total.toLocaleString("en-PK")}</strong> ({order.paymentMethod})
                                                         </p>
                                                         <p className="text-slate-400 text-[10px] truncate max-w-sm">
                                                             📍 {order.customerAddress}
@@ -1165,8 +1355,28 @@ function StoreDashboardContent() {
                             <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                     <div>
-                                        <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Orders Management ({orders.length})</h3>
-                                        <p className="text-xs text-slate-500">Tamam orders ko track karein aur status update karke auto WhatsApp alert bhejein</p>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-extrabold text-base text-slate-900 dark:text-white">Orders Management ({orders.length})</h3>
+                                            <div
+                                                title="Real-Time Orders Live Sync Active"
+                                                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300"
+                                            >
+                                                <span className="relative flex h-1.5 w-1.5">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                                </span>
+                                                <span>Live</span>
+                                            </div>
+                                            <button
+                                                onClick={handleManualRefreshOrders}
+                                                disabled={isRefreshingOrders}
+                                                title="Check for new orders now"
+                                                className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 hover:bg-slate-100 text-slate-600 dark:text-slate-300 cursor-pointer transition"
+                                            >
+                                                <RefreshCw className={`w-3 h-3 ${isRefreshingOrders ? "animate-spin text-emerald-600" : ""}`} />
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-500">Tamam orders real-time stream ho rahe hain, status change se customer ko auto WhatsApp jata hai</p>
                                     </div>
 
                                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
@@ -1197,11 +1407,15 @@ function StoreDashboardContent() {
                                         {orders.map(order => (
                                             <div
                                                 key={order.id}
-                                                className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 transition space-y-3 shadow-2xs"
+                                                className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 space-y-3 shadow-2xs ${
+                                                    recentNewOrderId === order.id
+                                                        ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/60 ring-2 ring-emerald-500 shadow-md animate-pulse"
+                                                        : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300"
+                                                }`}
                                             >
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
                                                     <div>
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-2 flex-wrap">
                                                             <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
                                                                 #{order.orderNumber}
                                                             </span>
@@ -1216,6 +1430,12 @@ function StoreDashboardContent() {
                                                             }`}>
                                                                 {order.status}
                                                             </span>
+                                                            {recentNewOrderId === order.id && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-emerald-600 text-white animate-bounce shadow-2xs flex items-center gap-1">
+                                                                    <Sparkles className="w-3 h-3" />
+                                                                    <span>NAYA ORDER</span>
+                                                                </span>
+                                                            )}
                                                             <span className="text-xs text-slate-400 font-mono">
                                                                 {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                             </span>

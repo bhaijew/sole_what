@@ -410,6 +410,23 @@ export async function createStoreOrder(input: CreateOrderInput) {
     );
     const whatsappRedirectUrl = `https://wa.me/${targetPhoneForCustomer}?text=${encodedReceipt}`;
 
+    // Real-time live order dispatch to Store Dashboard
+    try {
+        const io = (global as any).io;
+        if (io) {
+            io.to(`store:${store.id}`).emit("store:new_order", {
+                storeId: store.id,
+                order: order
+            });
+            io.to(`user:${store.userId}`).emit("store:new_order", {
+                storeId: store.id,
+                order: order
+            });
+        }
+    } catch (socketErr) {
+        // non-blocking
+    }
+
     return {
         success: true,
         orderId: order.id,
