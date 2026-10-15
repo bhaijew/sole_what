@@ -1194,6 +1194,23 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                             placeholder="e.g. 0300 1234567"
                                             value={customerPhone}
                                             onChange={e => setCustomerPhone(e.target.value)}
+                                            onBlur={() => {
+                                                if (customerPhone.trim().length >= 10 && cartItems.length > 0) {
+                                                    fetch("/api/store/abandoned", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            action: "record",
+                                                            storeId: store.id,
+                                                            customerName: customerName.trim() || "Customer",
+                                                            customerPhone: customerPhone.trim(),
+                                                            customerAddress: customerAddress.trim() || undefined,
+                                                            subtotal: subtotal,
+                                                            items: cartItems.map(item => ({ productName: item.product.name, quantity: item.quantity }))
+                                                        })
+                                                    }).catch(() => {});
+                                                }
+                                            }}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500"
                                         />
                                     </div>

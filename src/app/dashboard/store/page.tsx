@@ -32,6 +32,18 @@ import {
     Trash2,
     Eye,
     EyeOff,
+    Calculator,
+    ShoppingCart,
+    Download,
+    UploadCloud,
+    RotateCcw,
+    FileSpreadsheet,
+    Navigation,
+    Receipt,
+    Send,
+    Smartphone,
+    CheckCheck,
+    Barcode,
     Image as ImageIcon,
     ChevronLeft,
     ChevronRight
@@ -40,6 +52,9 @@ import { toast } from "sonner";
 import { PRESET_CATALOG_PRODUCTS, PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
 import StoreSetupWizardModal from "./store-setup-wizard-modal";
 import CounterQrModal from "./counter-qr-modal";
+import ShippingLabelModal from "./shipping-label-modal";
+import BulkImportModal from "./bulk-import-modal";
+import POSModal from "./pos-modal";
 
 interface StoreData {
     id: string;
@@ -123,13 +138,22 @@ interface WhatsAppSessionItem {
 export default function StoreDashboardPage() {
     const [stores, setStores] = useState<StoreData[]>([]);
     const [activeStore, setActiveStore] = useState<StoreData | null>(null);
-    const [activeTab, setActiveTab] = useState<"overview" | "orders" | "products" | "slider" | "delivery" | "settings">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "orders" | "pos" | "products" | "abandoned" | "slider" | "delivery" | "settings">("overview");
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [copied, setCopied] = useState<boolean>(false);
 
     // Modals
     const [showWizardModal, setShowWizardModal] = useState<boolean>(false);
     const [showCounterQrModal, setShowCounterQrModal] = useState<boolean>(false);
+    const [showLabelModal, setShowLabelModal] = useState<boolean>(false);
+    const [selectedLabelOrder, setSelectedLabelOrder] = useState<Order | null>(null);
+    const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
+    const [showPosModal, setShowPosModal] = useState<boolean>(false);
+
+    // Abandoned Carts State
+    const [abandonedCarts, setAbandonedCarts] = useState<any[]>([]);
+    const [isLoadingAbandoned, setIsLoadingAbandoned] = useState<boolean>(false);
+    const [recoveringCartId, setRecoveringCartId] = useState<string | null>(null);
 
     // Products & Orders state
     const [products, setProducts] = useState<Product[]>([]);
@@ -167,14 +191,17 @@ export default function StoreDashboardPage() {
         if (typeof window !== "undefined") {
             const urlParams = new URLSearchParams(window.location.search);
             const requestedTab = urlParams.get("tab");
-            if (requestedTab && ["overview", "orders", "products", "slider", "delivery", "settings"].includes(requestedTab)) {
+            if (requestedTab && ["overview", "orders", "pos", "products", "abandoned", "slider", "delivery", "settings"].includes(requestedTab)) {
                 setActiveTab(requestedTab as any);
             }
         }
     }, []);
 
-    const handleTabChange = (newTab: "overview" | "orders" | "products" | "slider" | "delivery" | "settings") => {
+    const handleTabChange = (newTab: "overview" | "orders" | "pos" | "products" | "abandoned" | "slider" | "delivery" | "settings") => {
         setActiveTab(newTab);
+        if (newTab === "abandoned" && activeStore) {
+            fetchAbandonedCarts(activeStore.id);
+        }
         if (typeof window !== "undefined") {
             const url = new URL(window.location.href);
             url.searchParams.set("tab", newTab);
@@ -221,6 +248,7 @@ export default function StoreDashboardPage() {
 
             fetchProducts(activeStore.id);
             fetchOrders(activeStore.id);
+            fetchAbandonedCarts(activeStore.id);
         }
     }, [activeStore]);
 
@@ -325,6 +353,68 @@ export default function StoreDashboardPage() {
             fetchOrders(activeStore.id);
         }
     }, [selectedOrderStatus]);
+
+    const fetchAbandonedCarts = async (storeId: string) => {
+        setIsLoadingAbandoned(true);
+        try {
+            const res = await fetch(`/api/store/abandoned?storeId=${storeId}`);
+            const data = await res.json();
+            if (res.ok && data.carts) {
+                setAbandonedCarts(data.carts);
+            }
+        } catch (e) {
+            console.error("Error fetching abandoned carts:", e);
+        } finally {
+            setIsLoadingAbandoned(false);
+        }
+    };
+
+    const handleRecoverCart = async (cartId: string) => {
+        if (!activeStore) return;
+        setRecoveringCartId(cartId);
+        try {
+            const res = await fetch("/api/store/abandoned", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "recover",
+                    storeId: activeStore.id,
+                    cartId
+                })
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Recovery message send nahi ho saka");
+            }
+            toast.success("Recovery WhatsApp alert send ho gaya! 📲");
+            fetchAbandonedCarts(activeStore.id);
+            if (data.whatsappDirectUrl) {
+                window.open(data.whatsappDirectUrl, "_blank");
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to recover cart");
+        } finally {
+            setRecoveringCartId(null);
+        }
+    };
+
+    const handleExportProductsCSV = () => {
+        if (!products.length) {
+            toast.error("Export karne ke liye koi product nahi hai");
+            return;
+        }
+        const headers = "Name,Category,Price,CompareAtPrice,Unit,ImageURL,InStock\n";
+        const rows = products.map(p => `"${p.name.replace(/"/g, '""')}","${(p as any).category || 'General'}",${p.price},${p.compareAtPrice || ''},"${p.unit || ''}","${p.image || ''}",${p.inStock}`).join("\n");
+        const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `${activeStore?.slug || "store"}-products.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Products CSV export ho gaya hai! 📄");
+    };
 
     const handleSaveDelivery = async () => {
         if (!activeStore) return;
@@ -593,7 +683,7 @@ export default function StoreDashboardPage() {
                     </div>
                 </div>
 
-                {/* Primary Actions: Setup Wizard, QR Poster, Live Store */}
+                {/* Primary Actions: Setup Wizard, POS Mode, Bulk Import, Tracking, QR Poster, Live Store */}
                 <div className="flex items-center gap-2 flex-wrap">
                     <button
                         onClick={() => setShowWizardModal(true)}
@@ -605,6 +695,35 @@ export default function StoreDashboardPage() {
 
                     {activeStore && (
                         <>
+                            <button
+                                onClick={() => setShowPosModal(true)}
+                                className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                                title="Dukaan Counter POS Cashier Register Kholein"
+                            >
+                                <Calculator className="w-4 h-4" />
+                                <span>⚡ Counter POS Mode</span>
+                            </button>
+
+                            <button
+                                onClick={() => setShowBulkImportModal(true)}
+                                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="CSV ya Excel se hazaron products 1-click mein import karein"
+                            >
+                                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                                <span>Bulk Import CSV</span>
+                            </button>
+
+                            <a
+                                href={`/s/${activeStore.slug}/track`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="Live Customer Order Tracking Portal Dekhein"
+                            >
+                                <Truck className="w-4 h-4 text-blue-600" />
+                                <span>Tracking Portal ↗</span>
+                            </a>
+
                             <button
                                 onClick={() => setShowCounterQrModal(true)}
                                 className="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -842,7 +961,24 @@ export default function StoreDashboardPage() {
                                     )}
                                 </Link>
 
-                                {/* 3. Products */}
+                                {/* 3. POS Counter Cashier Mode */}
+                                <Link
+                                    href={`/dashboard/store?tab=pos${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("pos");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "pos"
+                                            ? "bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/40"
+                                            : "text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 font-extrabold"
+                                    }`}
+                                >
+                                    <Calculator className="w-4 h-4" />
+                                    <span>⚡ POS Counter Mode</span>
+                                </Link>
+
+                                {/* 4. Products */}
                                 <Link
                                     href={`/dashboard/store?tab=products${activeStore ? `&storeId=${activeStore.id}` : ""}`}
                                     onClick={(e) => {
@@ -859,7 +995,7 @@ export default function StoreDashboardPage() {
                                     <span>Products ({products.length})</span>
                                 </Link>
 
-                                {/* 4. DEDICATED ADD PRODUCT PAGE LINK (Mobile Responsive Hero Link) */}
+                                {/* 5. DEDICATED ADD PRODUCT PAGE LINK */}
                                 <Link
                                     href={`/dashboard/store/products/new${activeStore ? `?storeId=${activeStore.id}` : ""}`}
                                     className="px-3.5 py-2 font-black text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs hover:scale-[1.02] active:scale-95 ring-2 ring-emerald-500/30"
@@ -869,7 +1005,27 @@ export default function StoreDashboardPage() {
                                     <span>+ Add Product</span>
                                 </Link>
 
-                                {/* 5. Slider / Banners */}
+                                {/* 6. Abandoned Carts Recovery */}
+                                <Link
+                                    href={`/dashboard/store?tab=abandoned${activeStore ? `&storeId=${activeStore.id}` : ""}`}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleTabChange("abandoned");
+                                    }}
+                                    className={`px-3.5 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all duration-200 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                        activeTab === "abandoned"
+                                            ? "bg-amber-600 text-white shadow-sm"
+                                            : "text-slate-600 hover:text-slate-900 hover:bg-white/70"
+                                    }`}
+                                >
+                                    <ShoppingCart className="w-4 h-4" />
+                                    <span>Abandoned Carts ({abandonedCarts.filter(c => !c.recovered).length})</span>
+                                    {abandonedCarts.filter(c => !c.recovered).length > 0 && (
+                                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                    )}
+                                </Link>
+
+                                {/* 7. Slider / Banners */}
                                 <Link
                                     href={`/dashboard/store?tab=slider${activeStore ? `&storeId=${activeStore.id}` : ""}`}
                                     onClick={(e) => {
@@ -893,7 +1049,7 @@ export default function StoreDashboardPage() {
                                     )}
                                 </Link>
 
-                                {/* 6. Delivery & Auqaat */}
+                                {/* 8. Delivery & Auqaat */}
                                 <Link
                                     href={`/dashboard/store?tab=delivery${activeStore ? `&storeId=${activeStore.id}` : ""}`}
                                     onClick={(e) => {
@@ -910,7 +1066,7 @@ export default function StoreDashboardPage() {
                                     <span>Delivery & Auqaat</span>
                                 </Link>
 
-                                {/* 7. Domain & Automation */}
+                                {/* 9. Domain & Automation */}
                                 <Link
                                     href={`/dashboard/store?tab=settings${activeStore ? `&storeId=${activeStore.id}` : ""}`}
                                     onClick={(e) => {
@@ -1168,7 +1324,30 @@ export default function StoreDashboardPage() {
                                                         </p>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedLabelOrder(order);
+                                                                setShowLabelModal(true);
+                                                            }}
+                                                            className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                                            title="Print Courier Shipping Label & 80mm Thermal Receipt"
+                                                        >
+                                                            <Printer className="w-3.5 h-3.5 text-emerald-600" />
+                                                            <span>Print Label / Slip</span>
+                                                        </button>
+
+                                                        <a
+                                                            href={`/s/${activeStore.slug}/track?q=${order.orderNumber}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
+                                                            title="Customer Live Tracking Page"
+                                                        >
+                                                            <Truck className="w-3.5 h-3.5" />
+                                                            <span>Track</span>
+                                                        </a>
+
                                                         <a
                                                             href={`https://wa.me/${order.customerPhone.replace(/[^\d]/g, "")}`}
                                                             target="_blank"
@@ -1176,7 +1355,7 @@ export default function StoreDashboardPage() {
                                                             className="px-3 py-1.5 rounded-xl bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
                                                         >
                                                             <MessageCircle className="w-3.5 h-3.5" />
-                                                            <span>WhatsApp Chat</span>
+                                                            <span>WhatsApp</span>
                                                         </a>
                                                     </div>
                                                 </div>
@@ -1284,6 +1463,78 @@ export default function StoreDashboardPage() {
                             </div>
                         )}
 
+                        {/* TAB: POS CASHIER COUNTER MODE */}
+                        {activeTab === "pos" && (
+                            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+                                                <Calculator className="w-5 h-5" />
+                                            </div>
+                                            <h3 className="font-extrabold text-lg text-slate-900">Dukaan Walk-In Counter POS</h3>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Dukaan par aane wale gahakon ke liye tez tareen barcode / item billing aur instant WhatsApp digital cash memo
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setShowPosModal(true)}
+                                        className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
+                                    >
+                                        <Calculator className="w-4 h-4" />
+                                        <span>Open Fullscreen Counter POS ➔</span>
+                                    </button>
+                                </div>
+
+                                {/* Feature Cards Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                                        <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                                            <span className="text-xl">⚡</span>
+                                            <span>Lightning-Fast Checkout</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Product search karein ya barcode scan karein. Cart automatically calculate hogi aur change calculator cash return display karega.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                                        <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                                            <span className="text-xl">📲</span>
+                                            <span>Zero-Paper WhatsApp Slip</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Customer ka phone number darj karein. Sale complete hote hi WhatsApp par digital receipt automatically dispatch ho jayegi.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
+                                        <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
+                                            <span className="text-xl">🖨️</span>
+                                            <span>80mm Thermal Receipt</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            Standard 80mm thermal cash memo printer ya A4 par 1-click print slip generate karein jo offline dukaan par chalta hai.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Launch Banner */}
+                                <div className="bg-gradient-to-r from-emerald-800 to-teal-900 text-white p-6 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <h4 className="text-base font-bold">Counter POS Register Ready Hai ({products.length} Products Loaded)</h4>
+                                        <p className="text-xs text-emerald-200">Bina internet interruption ke dukan counter par live billing shuru karein.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowPosModal(true)}
+                                        className="px-6 py-2.5 bg-white text-emerald-900 font-extrabold text-xs sm:text-sm rounded-xl hover:bg-slate-100 transition shadow cursor-pointer whitespace-nowrap"
+                                    >
+                                        POS Register Kholein
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {/* TAB 3: PRODUCTS & INVENTORY */}
                         {activeTab === "products" && (
                             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
@@ -1295,12 +1546,30 @@ export default function StoreDashboardPage() {
 
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <button
+                                            onClick={() => setShowBulkImportModal(true)}
+                                            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-slate-200 cursor-pointer shadow-2xs"
+                                            title="CSV ya Excel file se items import karein"
+                                        >
+                                            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                                            <span>Bulk Import CSV</span>
+                                        </button>
+
+                                        <button
+                                            onClick={handleExportProductsCSV}
+                                            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-slate-200 cursor-pointer shadow-2xs"
+                                            title="Tamam products ko CSV file mein download karein"
+                                        >
+                                            <Download className="w-4 h-4 text-blue-600" />
+                                            <span>Export CSV</span>
+                                        </button>
+
+                                        <button
                                             onClick={handleImportPresets}
                                             disabled={isImportingPresets}
                                             className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition border border-indigo-200 cursor-pointer disabled:opacity-50 shadow-2xs"
                                         >
                                             <Sparkles className="w-4 h-4 text-indigo-600" />
-                                            <span>{isImportingPresets ? "Import Ho Raha Hai..." : "Pakistani Grocery Items (1-Click Import)"}</span>
+                                            <span>{isImportingPresets ? "Import Ho Raha Hai..." : "Pakistani Grocery (1-Click)"}</span>
                                         </button>
 
                                         <Link
@@ -1395,6 +1664,130 @@ export default function StoreDashboardPage() {
                                                         className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer transition"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* TAB: ABANDONED CARTS RECOVERY */}
+                        {activeTab === "abandoned" && (
+                            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-amber-100 text-amber-800 rounded-xl">
+                                                <ShoppingCart className="w-5 h-5" />
+                                            </div>
+                                            <h3 className="font-extrabold text-base sm:text-lg text-slate-900">
+                                                WhatsApp Abandoned Cart Recovery 🛒
+                                            </h3>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Jo customers checkout drawer tak pohanch kar order place kiye baghair chale gaye, unhe WhatsApp par discount de kar recover karein!
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={() => activeStore && fetchAbandonedCarts(activeStore.id)}
+                                        disabled={isLoadingAbandoned}
+                                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 ${isLoadingAbandoned ? "animate-spin" : ""}`} />
+                                        <span>Refresh Carts</span>
+                                    </button>
+                                </div>
+
+                                {/* Executive Recovery Metrics */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
+                                        <span className="text-[11px] text-slate-500 font-bold">Total Lost Value</span>
+                                        <p className="text-xl font-extrabold text-slate-900">
+                                            Rs. {abandonedCarts.reduce((sum, c) => sum + (c.subtotal || 0), 0).toLocaleString("en-PK")}
+                                        </p>
+                                        <span className="text-[10px] text-slate-400">Gahak jo cart chorr gaye</span>
+                                    </div>
+                                    <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200/80 space-y-1">
+                                        <span className="text-[11px] text-amber-800 font-bold">Pending Recovery</span>
+                                        <p className="text-xl font-extrabold text-amber-900">
+                                            {abandonedCarts.filter(c => !c.recovered).length} Carts
+                                        </p>
+                                        <span className="text-[10px] text-amber-700">1-click WhatsApp recovery bhejain</span>
+                                    </div>
+                                    <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/80 space-y-1">
+                                        <span className="text-[11px] text-emerald-800 font-bold">Recovered Orders</span>
+                                        <p className="text-xl font-extrabold text-emerald-900">
+                                            {abandonedCarts.filter(c => c.recovered).length}
+                                        </p>
+                                        <span className="text-[10px] text-emerald-700">Kamiyab wapsi</span>
+                                    </div>
+                                    <div className="bg-indigo-50/60 p-4 rounded-xl border border-indigo-200/80 space-y-1">
+                                        <span className="text-[11px] text-indigo-800 font-bold">Recovery Incentive</span>
+                                        <p className="text-xl font-extrabold text-indigo-900 font-mono">
+                                            WELCOME10
+                                        </p>
+                                        <span className="text-[10px] text-indigo-700">Auto 10% coupon promo</span>
+                                    </div>
+                                </div>
+
+                                {/* Abandoned Carts Table / Cards */}
+                                {abandonedCarts.length === 0 ? (
+                                    <div className="p-12 text-center border border-dashed border-slate-200 rounded-2xl space-y-2">
+                                        <ShoppingCart className="w-10 h-10 text-slate-300 mx-auto" />
+                                        <p className="text-sm font-semibold text-slate-700">Koi abandoned cart nahi mila!</p>
+                                        <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                                            Jab koi customer store par contact number fill karke drop karega, wo foran yahan nazar aayega taake aap 1-click WhatsApp recovery bhej sakein.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {abandonedCarts.map(cart => (
+                                            <div
+                                                key={cart.id}
+                                                className={`p-4 rounded-xl border transition flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                                                    cart.recovered
+                                                        ? "bg-emerald-50/30 border-emerald-200"
+                                                        : "bg-white border-slate-200 shadow-2xs hover:border-slate-300"
+                                                }`}
+                                            >
+                                                <div className="space-y-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <strong className="text-sm text-slate-900">{cart.customerName}</strong>
+                                                        <span className="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                                                            {cart.customerPhone}
+                                                        </span>
+                                                        {cart.recovered ? (
+                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                                ✓ Recovered
+                                                            </span>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                                                Pending Recovery
+                                                            </span>
+                                                        )}
+                                                        <span className="text-[11px] text-slate-400">
+                                                            {new Date(cart.createdAt).toLocaleString("en-PK", { timeZone: "Asia/Karachi" })}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-600 line-clamp-1">
+                                                        🛒 <strong>Saman:</strong> {cart.itemsSummary}
+                                                    </p>
+                                                    <p className="text-xs font-bold text-emerald-700">
+                                                        Potential Sale: Rs. {cart.subtotal.toLocaleString("en-PK")}
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <button
+                                                        onClick={() => handleRecoverCart(cart.id)}
+                                                        disabled={recoveringCartId === cart.id}
+                                                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                                                    >
+                                                        <Send className="w-3.5 h-3.5" />
+                                                        <span>{recoveringCartId === cart.id ? "Sending Alert..." : "Recover via WhatsApp 📲"}</span>
                                                     </button>
                                                 </div>
                                             </div>
@@ -1959,6 +2352,53 @@ export default function StoreDashboardPage() {
                     isOpen={showCounterQrModal}
                     onClose={() => setShowCounterQrModal(false)}
                     store={activeStore}
+                />
+            )}
+
+            {/* MODAL 3: COURIER FLYER SHIPPING LABEL & 80MM THERMAL RECEIPT */}
+            {activeStore && (
+                <ShippingLabelModal
+                    isOpen={showLabelModal}
+                    onClose={() => setShowLabelModal(false)}
+                    order={selectedLabelOrder as any}
+                    store={{
+                        name: activeStore.name,
+                        phone: activeStore.phone,
+                        address: activeStore.address,
+                        city: activeStore.city,
+                        currencySymbol: activeStore.currencySymbol
+                    }}
+                />
+            )}
+
+            {/* MODAL 4: BULK CSV / EXCEL PRODUCT CATALOG IMPORT */}
+            {activeStore && (
+                <BulkImportModal
+                    isOpen={showBulkImportModal}
+                    onClose={() => setShowBulkImportModal(false)}
+                    storeId={activeStore.id}
+                    onSuccess={() => {
+                        fetchProducts(activeStore.id);
+                        toast.success("Products catalog refresh ho gaya hai! 📦");
+                    }}
+                />
+            )}
+
+            {/* MODAL 5: DUKAAN COUNTER POS CASHIER MODE */}
+            {activeStore && (
+                <POSModal
+                    isOpen={showPosModal}
+                    onClose={() => setShowPosModal(false)}
+                    store={{
+                        id: activeStore.id,
+                        name: activeStore.name,
+                        currencySymbol: activeStore.currencySymbol,
+                        city: activeStore.city
+                    }}
+                    products={products}
+                    onSaleComplete={() => {
+                        fetchOrders(activeStore.id);
+                    }}
                 />
             )}
 
