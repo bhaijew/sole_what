@@ -188,6 +188,124 @@ export default function SettingsPage() {
                 </CardContent>
             </Card>
 
+            {/* MONTHLY SUBSCRIPTION SYSTEM MASTER CONFIGURATION */}
+            <Card className="border-emerald-500/30 shadow-lg shadow-emerald-500/5">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                                <span>💳 Monthly Store Subscription & Paywall System</span>
+                            </CardTitle>
+                            <CardDescription>
+                                Agar aap yeh system ON karein gay, toh tamam dukaandaaro ka dashboard monthly payment ke baghair lock rahega.
+                            </CardDescription>
+                        </div>
+                        <Switch
+                            id="enable-subscription"
+                            checked={(systemConfig as any).enableSubscriptionSystem || false}
+                            onCheckedChange={c => setSystemConfig(prev => ({ ...prev, enableSubscriptionSystem: c }))}
+                            disabled={!isSuperAdmin}
+                        />
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2.5">
+                        <div className="font-bold shrink-0 mt-0.5">ℹ️ Notice:</div>
+                        <div className="leading-relaxed">
+                            Jab yeh feature <strong>ON</strong> hoga, user ko dashboard par <em>Monthly Paywall Modal</em> show hoga jahan aapke JazzCash / EasyPaisa / Bank details show hongi. Payment verify hone par Admin foran 1-click se unka account unlock kar sakta hai.
+                        </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold">Monthly Subscription Fee (PKR)</Label>
+                            <input
+                                type="number"
+                                className={inputClass}
+                                placeholder="1500"
+                                value={(systemConfig as any).subscriptionPriceMonthly ?? 1500}
+                                onChange={(e) => setSystemConfig(prev => ({ ...prev, subscriptionPriceMonthly: Number(e.target.value) }))}
+                                disabled={!isSuperAdmin}
+                            />
+                            <p className="text-xs text-muted-foreground">Per month charges in PKR (e.g. Rs. 1,500).</p>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold">Free Trial Days for New Stores</Label>
+                            <input
+                                type="number"
+                                className={inputClass}
+                                placeholder="7"
+                                value={(systemConfig as any).subscriptionTrialDays ?? 7}
+                                onChange={(e) => setSystemConfig(prev => ({ ...prev, subscriptionTrialDays: Number(e.target.value) }))}
+                                disabled={!isSuperAdmin}
+                            />
+                            <p className="text-xs text-muted-foreground">Days of free access before lock (0 = immediate paywall).</p>
+                        </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold">JazzCash Account Number & Title</Label>
+                            <input
+                                className={inputClass}
+                                placeholder="03001234567 (Title: Ali Khan)"
+                                value={(systemConfig as any).subscriptionJazzcashNumber || ""}
+                                onChange={(e) => setSystemConfig(prev => ({ ...prev, subscriptionJazzcashNumber: e.target.value }))}
+                                disabled={!isSuperAdmin}
+                            />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold">EasyPaisa Account Number & Title</Label>
+                            <input
+                                className={inputClass}
+                                placeholder="03457654321 (Title: Ali Khan)"
+                                value={(systemConfig as any).subscriptionEasypaisaNumber || ""}
+                                onChange={(e) => setSystemConfig(prev => ({ ...prev, subscriptionEasypaisaNumber: e.target.value }))}
+                                disabled={!isSuperAdmin}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold">Bank Account Transfer Details</Label>
+                            <input
+                                className={inputClass}
+                                placeholder="Meezan Bank - Title: SoleWhat - IBAN: PK36MEZN..."
+                                value={(systemConfig as any).subscriptionBankDetails || ""}
+                                onChange={(e) => setSystemConfig(prev => ({ ...prev, subscriptionBankDetails: e.target.value }))}
+                                disabled={!isSuperAdmin}
+                            />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold">WhatsApp Support Phone for Payment Slips</Label>
+                            <input
+                                className={inputClass}
+                                placeholder="923001234567"
+                                value={(systemConfig as any).subscriptionSupportPhone || ""}
+                                onChange={(e) => setSystemConfig(prev => ({ ...prev, subscriptionSupportPhone: e.target.value }))}
+                                disabled={!isSuperAdmin}
+                            />
+                            <p className="text-xs text-muted-foreground">WhatsApp number where merchants send payment receipts.</p>
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <Button
+                            onClick={handleSaveSystem}
+                            disabled={systemLoading || !isSuperAdmin}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                        >
+                            {systemLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            Save Subscription Settings
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* System Updates */}
             <Card>
                 <CardHeader>

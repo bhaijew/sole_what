@@ -3,6 +3,7 @@ import { SessionProvider } from "@/components/dashboard/session-provider";
 import { Toaster } from "sonner";
 import { prisma } from "@/lib/prisma";
 import StoreSidebar from "./store-sidebar";
+import SubscriptionPaywallModal from "@/components/dashboard/subscription-paywall-modal";
 
 export const metadata = {
     title: "Store Management Dashboard - SoleWhat Dukaan",
@@ -41,6 +42,12 @@ export default async function StoreDashboardLayout({
                         {children}
                     </main>
                 </div>
+
+                {/* Monthly Store Subscription Paywall Modal (Blocks dashboard if expired) */}
+                <SubscriptionPaywallModal
+                    enabled={Boolean(systemConfig?.enableSubscriptionSystem)}
+                    isSuperAdmin={session?.user?.role === "SUPERADMIN"}
+                />
 
                 <Toaster position="top-right" richColors />
             </div>

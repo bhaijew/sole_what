@@ -305,6 +305,15 @@ model SystemConfig {
   timezone           String   @default("Asia/Karachi")
   enableRegistration Boolean  @default(false)
   
+  // Monthly Subscription System Master Configuration
+  enableSubscriptionSystem      Boolean  @default(false)
+  subscriptionPriceMonthly      Float    @default(1500)
+  subscriptionTrialDays         Int      @default(7)
+  subscriptionJazzcashNumber    String?
+  subscriptionEasypaisaNumber   String?
+  subscriptionBankDetails       String?  @db.Text
+  subscriptionSupportPhone      String?
+  
   updatedAt          DateTime @updatedAt
 }
 
@@ -507,6 +516,14 @@ model Store {
   // Status Controls
   isActive              Boolean       @default(true)
   isOpen                Boolean       @default(true) // Open / Closed toggle
+
+  // Monthly Subscription Controls
+  subscriptionStatus        String        @default("ACTIVE") // ACTIVE, TRIAL, EXPIRED, PENDING_APPROVAL, LIFETIME
+  subscriptionExpiresAt     DateTime?
+  subscriptionPlan          String?       @default("MONTHLY")
+  subscriptionPaymentProof  String?       @db.Text
+  subscriptionTransactionId String?
+  subscriptionNotes         String?       @db.Text
 
   // WhatsApp Notification Settings
   autoNotifyOwner       Boolean       @default(true) // Send WA alert to store owner on new order

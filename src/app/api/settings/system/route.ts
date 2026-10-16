@@ -29,13 +29,53 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { appName, logoUrl, faviconUrl, timezone, enableRegistration } = body;
+        const {
+            appName,
+            logoUrl,
+            faviconUrl,
+            timezone,
+            enableRegistration,
+            enableSubscriptionSystem,
+            subscriptionPriceMonthly,
+            subscriptionTrialDays,
+            subscriptionJazzcashNumber,
+            subscriptionEasypaisaNumber,
+            subscriptionBankDetails,
+            subscriptionSupportPhone
+        } = body;
 
         // @ts-ignore
         const config = await prisma.systemConfig.upsert({
             where: { id: "default" },
-            update: { appName, logoUrl, faviconUrl, timezone, enableRegistration: enableRegistration ?? false },
-            create: { id: "default", appName: appName || "SoleWhat", logoUrl: logoUrl || "", faviconUrl: faviconUrl || "/favicon.ico", timezone: timezone || "Asia/Karachi", enableRegistration: enableRegistration ?? false }
+            update: {
+                appName,
+                logoUrl,
+                faviconUrl,
+                timezone,
+                enableRegistration: enableRegistration ?? false,
+                enableSubscriptionSystem: enableSubscriptionSystem ?? false,
+                subscriptionPriceMonthly: subscriptionPriceMonthly !== undefined ? Number(subscriptionPriceMonthly) : 1500,
+                subscriptionTrialDays: subscriptionTrialDays !== undefined ? Number(subscriptionTrialDays) : 7,
+                subscriptionJazzcashNumber: subscriptionJazzcashNumber || null,
+                subscriptionEasypaisaNumber: subscriptionEasypaisaNumber || null,
+                subscriptionBankDetails: subscriptionBankDetails || null,
+                subscriptionSupportPhone: subscriptionSupportPhone || null,
+            },
+            create: {
+                id: "default",
+                appName: appName || "SoleWhat",
+                logoUrl: logoUrl || "",
+                faviconUrl: faviconUrl || "/favicon.ico",
+                timezone: timezone || "Asia/Karachi",
+                enableRegistration: enableRegistration ?? false,
+                enableSubscriptionSystem: enableSubscriptionSystem ?? false,
+                subscriptionPriceMonthly: subscriptionPriceMonthly !== undefined ? Number(subscriptionPriceMonthly) : 1500,
+                subscriptionTrialDays: subscriptionTrialDays !== undefined ? Number(subscriptionTrialDays) : 7,
+                subscriptionJazzcashNumber: subscriptionJazzcashNumber || null,
+                subscriptionEasypaisaNumber: subscriptionEasypaisaNumber || null,
+                subscriptionBankDetails: subscriptionBankDetails || null,
+                subscriptionSupportPhone: subscriptionSupportPhone || null,
+            }
         });
 
         return NextResponse.json({ status: true, message: "System settings updated", data: config });

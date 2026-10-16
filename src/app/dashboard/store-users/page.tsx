@@ -29,7 +29,16 @@ import {
     TrendingUp,
     Check,
     SlidersHorizontal,
-    QrCode
+    QrCode,
+    CreditCard,
+    Calendar,
+    Sparkles,
+    Eye,
+    MessageCircle,
+    Copy,
+    Lock,
+    Unlock,
+    Award
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,6 +87,12 @@ interface StoreUserItem {
     isActive: boolean;
     isOpen: boolean;
     createdAt: string;
+    subscriptionStatus?: string;
+    subscriptionExpiresAt?: string | null;
+    subscriptionPlan?: string | null;
+    subscriptionPaymentProof?: string | null;
+    subscriptionTransactionId?: string | null;
+    subscriptionNotes?: string | null;
     user?: {
         id: string;
         name: string | null;
@@ -132,9 +147,50 @@ export default function StoreUsersAdminPage() {
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    // Confirmation dialogs
+    // Confirmation and review dialogs
     const [banTarget, setBanTarget] = useState<StoreUserItem | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<StoreUserItem | null>(null);
+    const [proofTarget, setProofTarget] = useState<StoreUserItem | null>(null);
+    const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+    const [copiedProofTrx, setCopiedProofTrx] = useState(false);
+
+    // 1-Click Subscription Management Actions
+    const handleSubscriptionAction = async (storeId: string, action: string) => {
+        setActionLoadingId(storeId);
+        try {
+            const res = await fetch("/api/admin/store-users", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ storeId, action })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success(
+                    action === "approve_month"
+                        ? "Subscription approved for 1 Month (+30 Days)! 🟢"
+                        : action === "extend_3_months"
+                        ? "Subscription extended by 3 Months (+90 Days)! 🚀"
+                        : action === "grant_lifetime"
+                        ? "Lifetime subscription access granted! 👑"
+                        : action === "lock_expired"
+                        ? "Store subscription locked / expired! 🔴"
+                        : "Subscription updated successfully!"
+                );
+                setStores(prev =>
+                    prev.map(s => (s.id === storeId ? { ...s, ...data.store } : s))
+                );
+                if (proofTarget && proofTarget.id === storeId) {
+                    setProofTarget(null);
+                }
+            } else {
+                toast.error(data.error || "Failed to update subscription status");
+            }
+        } catch {
+            toast.error("Network error while updating subscription");
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
 
     const fetchStores = async (isManualRefresh = false) => {
         if (isManualRefresh) setRefreshing(true);
@@ -327,6 +383,11 @@ export default function StoreUsersAdminPage() {
         return Array.from(set);
     }, [stores]);
 
+    // Count of stores awaiting subscription payment verification
+    const pendingApprovalsCount = useMemo(() => {
+        return stores.filter(s => s.subscriptionStatus === "PENDING_APPROVAL").length;
+    }, [stores]);
+
     return (
         <div className="space-y-6">
             {/* Header Title & Actions */}
@@ -434,6 +495,34 @@ export default function StoreUsersAdminPage() {
                 </Card>
             </div>
 
+            {/* PENDING APPROVAL ALERT BANNER */}
+            {pendingApprovalsCount > 0 && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                            <Clock className="h-5 w-5 animate-pulse" />
+                        </div>
+                        <div>
+                            <div className="text-sm font-bold text-amber-900 dark:text-amber-300">
+                                {pendingApprovalsCount} Store(s) Monthly Subscription Proof Submit Kar Chuki Hain!
+                            </div>
+                            <div className="text-xs text-amber-800/80 dark:text-amber-300/70">
+                                Trx IDs aur receipts review karein aur 1-click se unka store dashboard unlock karein.
+                            </div>
+                        </div>
+                    </div>
+                    <Button
+                        size="sm"
+                        onClick={() => {
+                            setStatusFilter("pending_approval");
+                        }}
+                        className="rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+                    >
+                        View Pending Approvals ({pendingApprovalsCount})
+                    </Button>
+                </div>
+            )}
+
             {/* SEARCH AND FILTER BAR */}
             <Card className="rounded-2xl border-border/70 shadow-sm bg-card/80">
                 <CardContent className="p-4">
@@ -458,6 +547,8 @@ export default function StoreUsersAdminPage() {
                                 className="w-full h-10 px-3 rounded-xl bg-muted/40 border border-border/70 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                             >
                                 <option value="all">Status: All Stores</option>
+                                <option value="pending_approval">🟡 Proof Submitted ({pendingApprovalsCount})</option>
+                                <option value="expired">🔴 Subscription Expired</option>
                                 <option value="active">🟢 Active Only</option>
                                 <option value="inactive">🔴 Banned / Inactive Only</option>
                                 <option value="open">🏪 Open Now Only</option>
@@ -503,6 +594,7 @@ export default function StoreUsersAdminPage() {
                                 <th className="py-3 px-4">Owner / User</th>
                                 <th className="py-3 px-4">Location & Contact</th>
                                 <th className="py-3 px-4 text-center">Catalog & Orders</th>
+                                <th className="py-3 px-4 text-center">Subscription (Paywall)</th>
                                 <th className="py-3 px-4 text-center">Store Status</th>
                                 <th className="py-3 px-4 text-center">Ban / Active Control</th>
                                 <th className="py-3 px-4 text-right">Actions</th>
@@ -511,7 +603,7 @@ export default function StoreUsersAdminPage() {
                         <tbody className="divide-y divide-border/60">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                                    <td colSpan={8} className="py-12 text-center text-muted-foreground">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <RefreshCw className="h-6 w-6 animate-spin text-emerald-500" />
                                             <span>Loading store users...</span>
@@ -520,7 +612,7 @@ export default function StoreUsersAdminPage() {
                                 </tr>
                             ) : stores.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                                    <td colSpan={8} className="py-12 text-center text-muted-foreground">
                                         <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                                             <div className="h-12 w-12 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground">
                                                 <Store className="h-6 w-6" />
@@ -617,6 +709,95 @@ export default function StoreUsersAdminPage() {
                                                     </span>
                                                 </div>
                                                 <span className="text-[10px] text-muted-foreground">Items / Orders</span>
+                                            </div>
+                                        </td>
+
+                                        {/* MONTHLY SUBSCRIPTION & PAYWALL CONTROLS */}
+                                        <td className="py-3.5 px-4 align-middle text-center">
+                                            <div className="inline-flex flex-col items-center gap-1.5 min-w-[145px]">
+                                                {/* Subscription Status Badge */}
+                                                {store.subscriptionStatus === "ACTIVE" ? (
+                                                    <Badge className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-bold px-2 py-0.5">
+                                                        <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" />
+                                                        Active
+                                                    </Badge>
+                                                ) : store.subscriptionStatus === "PENDING_APPROVAL" ? (
+                                                    <Badge className="bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border-amber-500/35 text-[10px] font-bold px-2 py-0.5 animate-pulse">
+                                                        <Clock className="h-3 w-3 mr-1 text-amber-500" />
+                                                        Proof Submitted
+                                                    </Badge>
+                                                ) : store.subscriptionStatus === "LIFETIME" ? (
+                                                    <Badge className="bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30 text-[10px] font-bold px-2 py-0.5">
+                                                        <Award className="h-3 w-3 mr-1 text-purple-500" />
+                                                        Lifetime Free
+                                                    </Badge>
+                                                ) : store.subscriptionStatus === "TRIAL" ? (
+                                                    <Badge className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30 text-[10px] font-bold px-2 py-0.5">
+                                                        <Sparkles className="h-3 w-3 mr-1 text-blue-500" />
+                                                        Free Trial
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30 text-[10px] font-bold px-2 py-0.5">
+                                                        <Lock className="h-3 w-3 mr-1 text-rose-500" />
+                                                        Expired / Locked
+                                                    </Badge>
+                                                )}
+
+                                                {/* Expiry Date or Proof Review Trigger */}
+                                                {store.subscriptionStatus === "PENDING_APPROVAL" ? (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => setProofTarget(store)}
+                                                        className="h-6 px-2 text-[10px] font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white shadow-xs gap-1"
+                                                    >
+                                                        <Eye className="h-3 w-3" />
+                                                        <span>Review Proof</span>
+                                                    </Button>
+                                                ) : (
+                                                    <div className="text-[10px] text-muted-foreground font-mono">
+                                                        {store.subscriptionExpiresAt
+                                                            ? `Exp: ${new Date(store.subscriptionExpiresAt).toLocaleDateString()}`
+                                                            : store.subscriptionStatus === "LIFETIME" ? "Never Expires" : "Locked / No Expiry"}
+                                                    </div>
+                                                )}
+
+                                                {/* 1-Click Action Buttons */}
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={actionLoadingId === store.id}
+                                                        onClick={() => handleSubscriptionAction(store.id, "approve_month")}
+                                                        className="h-6 px-2 text-[9px] font-extrabold rounded-md border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                                                        title="Approve / extend 30 days"
+                                                    >
+                                                        +30d
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled={actionLoadingId === store.id}
+                                                        onClick={() => handleSubscriptionAction(store.id, "extend_3_months")}
+                                                        className="h-6 px-1.5 text-[9px] font-extrabold rounded-md text-muted-foreground hover:text-foreground"
+                                                        title="Extend 90 days"
+                                                    >
+                                                        +90d
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        disabled={actionLoadingId === store.id}
+                                                        onClick={() => handleSubscriptionAction(store.id, store.subscriptionStatus === "EXPIRED" ? "approve_month" : "lock_expired")}
+                                                        className={`h-6 px-1.5 text-[9px] font-bold rounded-md ${
+                                                            store.subscriptionStatus === "EXPIRED"
+                                                                ? "text-emerald-600 hover:bg-emerald-500/10"
+                                                                : "text-rose-500 hover:bg-rose-500/10"
+                                                        }`}
+                                                        title={store.subscriptionStatus === "EXPIRED" ? "Unlock Dashboard" : "Lock / Expire Dashboard"}
+                                                    >
+                                                        {store.subscriptionStatus === "EXPIRED" ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </td>
 
@@ -889,6 +1070,127 @@ export default function StoreUsersAdminPage() {
                             </Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* REVIEW PAYMENT PROOF MODAL DIALOG */}
+            <Dialog open={!!proofTarget} onOpenChange={open => !open && setProofTarget(null)}>
+                <DialogContent className="max-w-md rounded-3xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-lg font-black">
+                            <CreditCard className="h-5 w-5 text-emerald-500" />
+                            <span>Subscription Payment Proof</span>
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground">
+                            Store owner ki taraf se submit karda monthly fee slip aur transaction details.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {proofTarget && (
+                        <div className="space-y-4 pt-2">
+                            <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/70 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-foreground">{proofTarget.name}</span>
+                                    <Badge variant="outline" className="text-[10px] bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-300 font-bold">
+                                        Pending Approval
+                                    </Badge>
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Owner: <strong className="text-foreground">{proofTarget.user?.name || "Merchant"}</strong> ({proofTarget.user?.email})
+                                </div>
+                                <div className="text-xs text-muted-foreground flex items-center justify-between">
+                                    <span>Phone: <strong className="font-mono text-foreground">{proofTarget.phone}</strong></span>
+                                    <a
+                                        href={`https://wa.me/${proofTarget.phone.replace(/[^0-9]/g, "")}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:underline"
+                                    >
+                                        <MessageCircle className="h-3 w-3" />
+                                        <span>WhatsApp Chat</span>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold text-muted-foreground">Submitted Transaction ID (TID)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 p-2.5 rounded-xl bg-background border border-border/80 font-mono text-xs font-bold text-foreground">
+                                            {proofTarget.subscriptionTransactionId || "No TID provided"}
+                                        </div>
+                                        {proofTarget.subscriptionTransactionId && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(proofTarget.subscriptionTransactionId || "");
+                                                    setCopiedProofTrx(true);
+                                                    toast.success("TID copied to clipboard!");
+                                                    setTimeout(() => setCopiedProofTrx(false), 2000);
+                                                }}
+                                                className="h-9 w-9 p-0 rounded-xl"
+                                                title="Copy TID"
+                                            >
+                                                {copiedProofTrx ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {proofTarget.subscriptionPaymentProof && (
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Payment Proof Slip / Link</Label>
+                                        {proofTarget.subscriptionPaymentProof.startsWith("http") ? (
+                                            <a
+                                                href={proofTarget.subscriptionPaymentProof}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="p-2.5 rounded-xl bg-muted/40 border border-border/70 flex items-center justify-between text-xs text-emerald-600 font-bold hover:underline"
+                                            >
+                                                <span className="truncate max-w-[280px]">{proofTarget.subscriptionPaymentProof}</span>
+                                                <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                                            </a>
+                                        ) : (
+                                            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 text-xs text-foreground whitespace-pre-line font-mono">
+                                                {proofTarget.subscriptionPaymentProof}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {proofTarget.subscriptionNotes && (
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Sender Notes</Label>
+                                        <div className="p-2.5 rounded-xl bg-muted/40 border border-border/70 text-xs text-foreground">
+                                            {proofTarget.subscriptionNotes}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <DialogFooter className="pt-3 flex-col sm:flex-row gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => handleSubscriptionAction(proofTarget.id, "lock_expired")}
+                                    disabled={actionLoadingId === proofTarget.id}
+                                    className="rounded-xl text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 border-rose-500/30"
+                                >
+                                    Reject / Keep Expired
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => handleSubscriptionAction(proofTarget.id, "approve_month")}
+                                    disabled={actionLoadingId === proofTarget.id}
+                                    className="rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                                >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    <span>Approve 1 Month (+30 Days)</span>
+                                </Button>
+                            </DialogFooter>
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>

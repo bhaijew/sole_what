@@ -75,6 +75,10 @@ export async function GET(request: NextRequest) {
             filteredStores = filteredStores.filter(s => s.isOpen === true && s.isActive === true);
         } else if (status === "closed") {
             filteredStores = filteredStores.filter(s => s.isOpen === false || s.isActive === false);
+        } else if (status === "pending_approval") {
+            filteredStores = filteredStores.filter(s => s.subscriptionStatus === "PENDING_APPROVAL");
+        } else if (status === "expired") {
+            filteredStores = filteredStores.filter(s => s.subscriptionStatus === "EXPIRED");
         }
 
         if (city !== "all") {
@@ -118,10 +122,33 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { storeId, isActive, isOpen, name, phone, city, address, tagline, noticeMessage } = body;
+        const { 
+            storeId, 
+            isActive, 
+            isOpen, 
+            name, 
+            phone, 
+            city, 
+            address, 
+            tagline, 
+            noticeMessage,
+            action,
+            subscriptionStatus,
+            subscriptionExpiresAt,
+            subscriptionPlan,
+            subscriptionNotes
+        } = body;
 
         if (!storeId) {
             return NextResponse.json({ error: "storeId is required" }, { status: 400 });
+        }
+
+        const existingStore = await prisma.store.findUnique({
+            where: { id: storeId }
+        });
+
+        if (!existingStore) {
+            return NextResponse.json({ error: "Store not found" }, { status: 404 });
         }
 
         const updateData: any = {};
@@ -133,6 +160,37 @@ export async function PATCH(request: NextRequest) {
         if (address !== undefined) updateData.address = address.trim();
         if (tagline !== undefined) updateData.tagline = tagline?.trim() || null;
         if (noticeMessage !== undefined) updateData.noticeMessage = noticeMessage?.trim() || null;
+
+        // Subscription management actions
+        if (action === "approve_month") {
+            const now = new Date();
+            const currentExpiry = existingStore.subscriptionExpiresAt && new Date(existingStore.subscriptionExpiresAt) > now
+                ? new Date(existingStore.subscriptionExpiresAt)
+                : now;
+            updateData.subscriptionStatus = "ACTIVE";
+            updateData.subscriptionExpiresAt = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+        } else if (action === "extend_3_months") {
+            const now = new Date();
+            const currentExpiry = existingStore.subscriptionExpiresAt && new Date(existingStore.subscriptionExpiresAt) > now
+                ? new Date(existingStore.subscriptionExpiresAt)
+                : now;
+            updateData.subscriptionStatus = "ACTIVE";
+            updateData.subscriptionExpiresAt = new Date(currentExpiry.getTime() + 90 * 24 * 60 * 60 * 1000);
+        } else if (action === "grant_lifetime") {
+            updateData.subscriptionStatus = "LIFETIME";
+            updateData.subscriptionExpiresAt = new Date("2099-12-31T23:59:59.000Z");
+        } else if (action === "lock_expired") {
+            updateData.subscriptionStatus = "EXPIRED";
+            updateData.subscriptionExpiresAt = new Date();
+        } else if (action === "reset_trial") {
+            updateData.subscriptionStatus = "TRIAL";
+            updateData.subscriptionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        }
+
+        if (subscriptionStatus !== undefined && !action) updateData.subscriptionStatus = subscriptionStatus;
+        if (subscriptionExpiresAt !== undefined && !action) updateData.subscriptionExpiresAt = subscriptionExpiresAt ? new Date(subscriptionExpiresAt) : null;
+        if (subscriptionPlan !== undefined) updateData.subscriptionPlan = subscriptionPlan;
+        if (subscriptionNotes !== undefined) updateData.subscriptionNotes = subscriptionNotes;
 
         const updated = await prisma.store.update({
             where: { id: storeId },
