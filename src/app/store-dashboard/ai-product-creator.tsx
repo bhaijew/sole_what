@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
     Sparkles,
@@ -22,7 +22,9 @@ import {
     Check,
     X,
     HelpCircle,
-    Zap
+    Zap,
+    ImageIcon,
+    ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,6 +48,64 @@ interface AiProductCreatorProps {
     };
     onComplete?: () => void;
 }
+
+const SAMPLE_TABLE_DATA = `| Product Name | Quantity | Price (Rs.) |
+| ----------------------- | ------------- | ----------- |
+| Olper's Full Cream Milk | 1 Litre       | 349.60      |
+| Olper's Full Cream Milk | 500 ml        | 184         |
+| Olper's Full Cream Milk | 250 ml        | 93          |
+| Olper's Full Cream Milk | 1.5 Litre     | 504         |
+| Olper's Cream           | 200 ml        | 221         |
+| Omung Low Fat Milk      | 1 Litre       | 312         |
+| Tarang Tea Whitener     | 220 ml        | 57          |
+| Dawn Plain Bread Small  | 340 g         | 108         |
+| Dawn Plain Bread Large  | 725 g         | 211.60      |
+| Dawn Burger Buns        | 110 g         | 85          |
+| Dawn Bran Bread         | 340 g         | 170         |
+| Dawn Fruit Cake         | 100 g         | 120         |
+| Dawn Fruit Cake         | 200 g         | 230         |
+| Dawn Rusk               | 190 g         | 160         |
+| Fresh Eggs              | 12 pieces     | 313.50      |
+| Fresh Eggs              | 6 pieces      | 156.40      |
+| Coca-Cola               | 350 ml        | 60.90       |
+| Coca-Cola               | 1.5 Litre     | 174         |
+| Pepsi                   | 345 ml        | 63          |
+| 7UP                     | 345 ml        | 63          |
+| Slice Mango Drink       | 200 ml        | 41.80       |
+| Mezan Cooking Oil       | 1 Litre pouch | 545.40      |
+| Nestlé Milkpak Milk     | 250 ml        | 90          |
+| Nurpur Full Cream Milk  | 1 Litre       | 330         |
+| Prema Yogurt            | 450 g         | 210         |
+| Milkpak Yogurt          | 500 g         | 240         |
+| Dayfresh Dairy Cream    | 200 ml        | 220         |
+| Young's Mayonnaise      | 500 ml        | 316.80      |
+| Dairy Life Mozzarella Cheese | 200 g   | 636.40      |
+| National Apple Jam      | 200 g         | 230         |
+| Tang Instant Drink Powder | 375 g      | 320         |
+| Energile Original       | 100 g         | 90          |
+| Dayfresh Flavoured Milk | 225 ml        | 180         |
+| Dawn Special Burger Buns| 4 pieces      | 80          |`;
+
+const CURATED_PAKISTANI_GALLERY = [
+    { label: "Olper's / Milkpak Doodh", url: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80" },
+    { label: "Olper's / Dairy Cream", url: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80" },
+    { label: "Tarang / Tea Whitener", url: "https://images.unsplash.com/photo-1577968897966-3d4325b36b61?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Plain Bread", url: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Burger Buns", url: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Fruit Cake", url: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=600&q=80" },
+    { label: "Fresh Farm Eggs", url: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=600&q=80" },
+    { label: "Coca-Cola Can/Bottle", url: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=600&q=80" },
+    { label: "Pepsi Chilled", url: "https://images.unsplash.com/photo-1629203851122-3726ecdf080e?auto=format&fit=crop&w=600&q=80" },
+    { label: "7UP / Sprite Green", url: "https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?auto=format&fit=crop&w=600&q=80" },
+    { label: "Slice Mango Drink", url: "https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=600&q=80" },
+    { label: "Mezan / Dalda Cooking Oil", url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80" },
+    { label: "Prema / Milkpak Dahi", url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=600&q=80" },
+    { label: "Young's Mayonnaise", url: "https://images.unsplash.com/photo-1528751014936-863e6e7a319c?auto=format&fit=crop&w=600&q=80" },
+    { label: "Mozzarella Cheese", url: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=600&q=80" },
+    { label: "National Apple Jam", url: "https://images.unsplash.com/photo-1568651348301-443b7156950f?auto=format&fit=crop&w=600&q=80" },
+    { label: "Tang / Energile Powder", url: "https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dayfresh Flavoured Milk", url: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&q=80" }
+];
 
 const BUSINESS_PACKS = [
     {
@@ -118,6 +178,19 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
     const [parsedProducts, setParsedProducts] = useState<ProductRow[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Image Selector Modal State
+    const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
+    const [customImageInput, setCustomImageInput] = useState<string>("");
+
+    // Detect if input contains table rows
+    const tableDetection = useMemo(() => {
+        if (!promptText.includes("|")) return { isTable: false, count: 0 };
+        const rows = promptText
+            .split(/\r?\n/)
+            .filter((l) => l.includes("|") && !/^[-:\s|]+$/.test(l.trim()));
+        return { isTable: rows.length > 1, count: Math.max(0, rows.length - 1) };
+    }, [promptText]);
+
     // Initialize Web Speech API for Pakistani Urdu/English
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -128,7 +201,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                 const recognition = new SpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
-                recognition.lang = "ur-PK"; // Pakistani Urdu + Roman Urdu support
+                recognition.lang = "ur-PK";
 
                 recognition.onresult = (event: any) => {
                     let transcript = "";
@@ -170,7 +243,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
             try {
                 recognitionRef.current.start();
                 setIsListening(true);
-                toast.success("Mic active hai! Ab bolna shuru karein (e.g. 'Olpers doodh do sau assi rupay, dalda oil...')...");
+                toast.success("Mic active hai! Ab bolna shuru karein...");
             } catch (err) {
                 console.error("Mic start failed", err);
                 setIsListening(false);
@@ -213,9 +286,8 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
         setParsingStage("AI models connect ho rahe hain...");
 
         try {
-            // Stage animations for a delightful experience
-            const timer1 = setTimeout(() => setParsingStage("Parchi aur prices ko samjha ja raha hai..."), 1200);
-            const timer2 = setTimeout(() => setParsingStage("Categories aur photos auto-assign ho rahi hain..."), 2600);
+            const timer1 = setTimeout(() => setParsingStage("Parchi aur prices ko samjha ja raha hai..."), 1000);
+            const timer2 = setTimeout(() => setParsingStage("Pakistani brands aur photos auto-assign ho rahi hain..."), 2000);
 
             const res = await fetch("/api/store/ai-product-parser", {
                 method: "POST",
@@ -269,14 +341,23 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
             ...prev,
             {
                 name: "Naya Item",
-                category: "General",
+                category: "General Grocery",
                 price: 100,
-                compareAtPrice: 120,
+                compareAtPrice: 110,
                 unit: "item",
-                image: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=500&q=80",
+                image: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80",
                 inStock: true
             }
         ]);
+    };
+
+    // Apply Image from Modal
+    const handleApplySelectedImage = (imageUrl: string) => {
+        if (editingImageIndex === null) return;
+        handleUpdateRow(editingImageIndex, "image", imageUrl);
+        setEditingImageIndex(null);
+        setCustomImageInput("");
+        toast.success("Product ki photo tabdeel ho gayi!");
     };
 
     // 1-Click Final Bulk Save to Store DB
@@ -306,7 +387,6 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                 `🎉 Zabardast! ${data.count || parsedProducts.length} products aapki dukaan "${activeStore.name}" mein shamil ho gaye!`
             );
 
-            // Clean state & invoke complete
             setParsedProducts([]);
             setPromptText("");
             setSelectedImage(null);
@@ -336,11 +416,11 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                             <span>AI DUKAAN KAREEM ⚡ SPECIAL FOR PAKISTANI SHOPS</span>
                         </div>
                         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                            1-Click AI Magic Product Adder
+                            1-Click AI Magic Product Adder & Auto-Image Matcher
                         </h2>
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                            Ab dukaan dar ko aik aik cheez manually add karne ki zaroorat nahi. Bol kar batayein,
-                            parchi ya bill ki tasweer upload karein, ya 1-click pakistani category chun kar apni poori dukaan foran tayyar karein!
+                            Table paste karein, bol kar batayein, ya parchi ki photo upload karein. AI tamam items ki
+                            authentic PKR prices aur original Pakistani brand photos khud assign kar ke dukaan mein save karega!
                         </p>
                     </div>
 
@@ -366,8 +446,8 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                             : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
                     }`}
                 >
-                    <Mic className="w-4 h-4" />
-                    <span>Bol Kar Ya Roman Urdu Mein Likhein (بولیں یا لکھیں)</span>
+                    <FileText className="w-4 h-4" />
+                    <span>Table / Voice / Text (ٹیبل، بولیں یا لکھیں)</span>
                 </button>
 
                 <button
@@ -379,7 +459,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                     }`}
                 >
                     <Camera className="w-4 h-4" />
-                    <span>Parchi / Receipt Ki Photo (پرچی یا لسٹ کی تصویر)</span>
+                    <span>Parchi / Receipt Photo (پرچی یا لسٹ کی تصویر)</span>
                 </button>
 
                 <button
@@ -395,13 +475,13 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                 </button>
             </div>
 
-            {/* METHOD 1: VOICE / TEXT INPUT */}
+            {/* METHOD 1: VOICE / TABLE / TEXT INPUT */}
             {activeMethod === "text" && (
                 <div className="glass-panel border border-border/70 rounded-3xl p-5 sm:p-7 bg-card/90 dark:bg-card/80 backdrop-blur-md space-y-4 shadow-sm">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                             <h3 className="text-base font-extrabold text-foreground flex items-center gap-2">
-                                <span>Voice & Roman Urdu Text Input</span>
+                                <span>Table Paste, Voice ya Roman Urdu Text</span>
                                 {isListening && (
                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-rose-500/15 text-rose-600 dark:text-rose-300 border border-rose-500/30 animate-pulse">
                                         <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
@@ -410,7 +490,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                                 )}
                             </h3>
                             <p className="text-xs text-muted-foreground">
-                                Microphone daba kar bolte jayein ya neeche rough text/WhatsApp message paste karein. AI khud name, qeemat aur units alag kar lega.
+                                Excel ya Markdown table paste karein, microphone se bolen, ya rough WhatsApp rate list paste karein.
                             </p>
                         </div>
 
@@ -438,14 +518,28 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                         </button>
                     </div>
 
+                    {/* TABLE DETECTION NOTIFICATION */}
+                    {tableDetection.isTable && (
+                        <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-bold animate-in fade-in">
+                            <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <span>
+                                📊 Table format detected: Taam {tableDetection.count} items aur unki authentic PKR prices recognize ho chuki hain!
+                            </span>
+                        </div>
+                    )}
+
                     {/* TEXTAREA */}
                     <div className="relative">
                         <textarea
-                            rows={6}
+                            rows={8}
                             value={promptText}
                             onChange={(e) => setPromptText(e.target.value)}
-                            placeholder="Misaal: Olpers doodh 1L 280, Dalda oil 5L 2600, Tapal chai 430g 650, Guard chawal 5kg 1800, Surf Excel 1kg 520, Shan Biryani Masala 120, Cheeni 1kg 145..."
-                            className="w-full bg-background border border-border/80 focus:border-violet-500 rounded-2xl p-4 text-sm font-medium text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition resize-y leading-relaxed"
+                            placeholder="| Olper's Full Cream Milk | 1 Litre | 349.60 |
+| Dawn Plain Bread Small  | 340 g   | 108    |
+| Coca-Cola               | 1.5 L   | 174    |
+| Prema Yogurt            | 450 g   | 210    |
+ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
+                            className="w-full font-mono bg-background border border-border/80 focus:border-violet-500 rounded-2xl p-4 text-xs sm:text-sm font-medium text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition resize-y leading-relaxed"
                         />
                         {promptText && (
                             <button
@@ -458,12 +552,20 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                         )}
                     </div>
 
-                    {/* QUICK SAMPLES */}
+                    {/* QUICK SAMPLE BUTTONS */}
                     <div className="space-y-2">
                         <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-                            💡 Try Quick Sample Formats:
+                            💡 Try Popular Pakistani Catalogs & Tables:
                         </span>
                         <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setPromptText(SAMPLE_TABLE_DATA)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/30 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                            >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>📋 Olper&apos;s, Dawn & Beverage Table (34 Items)</span>
+                            </button>
                             <button
                                 type="button"
                                 onClick={() =>
@@ -486,17 +588,6 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                             >
                                 🍔 Fast Food Menu
                             </button>
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setPromptText(
-                                        "Fast Charger 20W 850, Type-C Cable 65W 400, Handsfree Bass 350, 10000mAh Powerbank 2800, Tempered Glass 250"
-                                    )
-                                }
-                                className="px-3 py-1.5 rounded-xl bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-semibold border border-border/60 transition cursor-pointer"
-                            >
-                                📱 Mobile Accessories
-                            </button>
                         </div>
                     </div>
 
@@ -511,12 +602,12 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                             {isParsing ? (
                                 <>
                                     <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                                    <span>AI Processing Kar Raha Hai...</span>
+                                    <span>AI Processing & Image Matching...</span>
                                 </>
                             ) : (
                                 <>
                                     <Sparkles className="w-4 h-4 text-amber-300" />
-                                    <span>AI Se Products Extract Karein ⚡</span>
+                                    <span>AI Se Verify Karein & Photos Match Karein ⚡</span>
                                 </>
                             )}
                         </button>
@@ -673,7 +764,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                                     onClick={() => {
                                         setPromptText(pack.prompt);
                                         setActiveMethod("text");
-                                        toast.info(`"${pack.title}" ka data load ho gaya. Ab 'Extract' par click karein.`);
+                                        toast.info(`"${pack.title}" ka data load ho gaya. Ab 'Verify & Extract' par click karein.`);
                                     }}
                                     className="w-full py-2 px-3 rounded-xl bg-violet-600/10 hover:bg-violet-600 text-violet-700 dark:text-violet-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                                 >
@@ -712,11 +803,11 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                                     Extracted Products Review ({parsedProducts.length})
                                 </h3>
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                    Ready To Save
+                                    Photos Assigned & Verified ✓
                                 </span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                Dukaan mein save karne se pehle agar kisi item ka naam ya qeemat tabdeel karni ho toh yahan direct edit kar sakte hain.
+                                Dukaan mein save karne se pehle agar kisi item ka naam, qeemat ya photo tabdeel karni ho toh direct edit karein ya photo par click karein.
                             </p>
                         </div>
 
@@ -756,26 +847,33 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                         <table className="w-full text-left text-xs">
                             <thead className="bg-muted/50 border-b border-border/60 text-muted-foreground font-bold">
                                 <tr>
-                                    <th className="py-3 px-3 w-16">Image</th>
+                                    <th className="py-3 px-3 w-16 text-center">Photo</th>
                                     <th className="py-3 px-3">Product Name (نام)</th>
                                     <th className="py-3 px-3">Category (کیٹگری)</th>
                                     <th className="py-3 px-3 w-28">Price (Rs.)</th>
                                     <th className="py-3 px-3 w-28">MRP / Compare</th>
-                                    <th className="py-3 px-3 w-24">Unit (پیکنگ)</th>
+                                    <th className="py-3 px-3 w-28">Unit (پیکنگ)</th>
                                     <th className="py-3 px-2 text-center w-12">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/60 font-medium">
                                 {parsedProducts.map((p, idx) => (
                                     <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                                        <td className="py-2 px-3">
-                                            <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-border/80 bg-background shrink-0">
+                                        <td className="py-2 px-3 text-center">
+                                            <div
+                                                onClick={() => setEditingImageIndex(idx)}
+                                                className="relative w-11 h-11 rounded-xl overflow-hidden border border-border/80 bg-background shrink-0 mx-auto cursor-pointer group hover:ring-2 hover:ring-violet-500 shadow-2xs"
+                                                title="Click to Change Image"
+                                            >
                                                 <Image
-                                                    src={p.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=500&q=80"}
+                                                    src={p.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80"}
                                                     alt={p.name}
                                                     fill
-                                                    className="object-cover"
+                                                    className="object-cover group-hover:scale-105 transition-transform"
                                                 />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <Camera className="w-3.5 h-3.5 text-white" />
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="py-2 px-3">
@@ -801,6 +899,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                                                 </span>
                                                 <input
                                                     type="number"
+                                                    step="0.01"
                                                     value={p.price}
                                                     onChange={(e) => handleUpdateRow(idx, "price", Number(e.target.value))}
                                                     className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg pl-8 pr-2 py-1.5 text-xs font-black text-emerald-600 dark:text-emerald-400 focus:outline-none"
@@ -814,6 +913,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                                                 </span>
                                                 <input
                                                     type="number"
+                                                    step="0.01"
                                                     value={p.compareAtPrice || ""}
                                                     placeholder="Optional"
                                                     onChange={(e) => handleUpdateRow(idx, "compareAtPrice", e.target.value ? Number(e.target.value) : null)}
@@ -826,7 +926,7 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                                                 type="text"
                                                 value={p.unit}
                                                 onChange={(e) => handleUpdateRow(idx, "unit", e.target.value)}
-                                                placeholder="item / kg / L"
+                                                placeholder="1 Litre / 500 ml"
                                                 className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none"
                                             />
                                         </td>
@@ -876,6 +976,107 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
                             >
                                 {isSaving ? "Saving to Store..." : "✓ Confirm & Save All To Store"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* IMAGE CHANGER MODAL */}
+            {editingImageIndex !== null && parsedProducts[editingImageIndex] && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-card border border-border/80 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-5">
+                        <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                            <div>
+                                <h4 className="font-extrabold text-base text-foreground">
+                                    Select Product Photo
+                                </h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    For: <strong>{parsedProducts[editingImageIndex].name}</strong>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setEditingImageIndex(null);
+                                    setCustomImageInput("");
+                                }}
+                                className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* CURRENT PHOTO */}
+                        <div className="flex items-center gap-4 p-3 rounded-2xl bg-muted/40 border border-border/60">
+                            <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-border shrink-0">
+                                <Image
+                                    src={parsedProducts[editingImageIndex].image || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80"}
+                                    alt="Current"
+                                    fill
+                                    className="object-cover"
+                                />
+                            </div>
+                            <div>
+                                <span className="text-xs font-bold text-foreground block">Mojooda Photo</span>
+                                <span className="text-[11px] text-muted-foreground">Agar yeh pasand nahi toh neeche se doosri photo chun lijiye:</span>
+                            </div>
+                        </div>
+
+                        {/* CURATED GALLERY */}
+                        <div className="space-y-2">
+                            <span className="text-xs font-bold text-muted-foreground block">
+                                🖼️ Popular Pakistani Store Photos:
+                            </span>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto p-1">
+                                {CURATED_PAKISTANI_GALLERY.map((item, gIdx) => (
+                                    <button
+                                        key={gIdx}
+                                        type="button"
+                                        onClick={() => handleApplySelectedImage(item.url)}
+                                        className="relative group rounded-xl overflow-hidden border border-border hover:border-violet-500 text-left transition cursor-pointer flex flex-col"
+                                    >
+                                        <div className="relative h-16 w-full bg-muted">
+                                            <Image
+                                                src={item.url}
+                                                alt={item.label}
+                                                fill
+                                                className="object-cover group-hover:scale-105 transition-transform"
+                                            />
+                                        </div>
+                                        <span className="text-[10px] font-semibold text-foreground p-1 line-clamp-1 bg-card/90">
+                                            {item.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* CUSTOM URL INPUT */}
+                        <div className="space-y-1.5">
+                            <span className="text-xs font-bold text-muted-foreground block">
+                                Ya Apni Custom Image Ka Link Paste Karein:
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="url"
+                                    placeholder="https://images.unsplash.com/..."
+                                    value={customImageInput}
+                                    onChange={(e) => setCustomImageInput(e.target.value)}
+                                    className="flex-1 bg-background border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-violet-500"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (!customImageInput.trim()) {
+                                            toast.error("Valid image URL enter karein.");
+                                            return;
+                                        }
+                                        handleApplySelectedImage(customImageInput.trim());
+                                    }}
+                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl"
+                                >
+                                    Apply
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
