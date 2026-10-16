@@ -23,11 +23,13 @@ import {
   Building2,
   UtensilsCrossed,
   Gem,
-  Scissors
+  Scissors,
+  Store
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import fs from "fs";
 import path from "path";
+import { StoreAccountCreator } from "@/components/landing/store-account-creator";
 
 export const metadata = {
   title: "SoleWhat | AI-Powered WhatsApp Business Gateway & E-Commerce Automation",
@@ -79,13 +81,19 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-2.5">
+            <Link href="#create-store">
+              <Button size="sm" className="rounded-full px-4 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer">
+                <Store className="h-3.5 w-3.5" />
+                <span>Create Store</span>
+              </Button>
+            </Link>
             <Link href="/auth/login">
-              <Button size="sm" variant="ghost" className="rounded-full px-4 text-xs font-semibold text-foreground hover:bg-muted">
+              <Button size="sm" variant="ghost" className="rounded-full px-3.5 text-xs font-semibold text-foreground hover:bg-muted">
                 Sign In
               </Button>
             </Link>
             <Link href="/dashboard">
-              <Button size="sm" className="rounded-full px-5 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25">
+              <Button size="sm" variant="outline" className="rounded-full px-3.5 text-xs font-bold border-border/80 hover:bg-muted">
                 Dashboard
               </Button>
             </Link>
@@ -127,21 +135,22 @@ export default function Home() {
               </div>
 
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3.5 pt-2 w-full sm:w-auto px-4">
-                <Link href="/dashboard" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full h-13 px-8 rounded-full text-sm sm:text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/30 group">
-                    Open Dashboard
+              <div className="flex flex-col sm:flex-row gap-3.5 pt-2 w-full sm:w-auto px-4 items-center justify-center">
+                <Link href="#create-store" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full h-13 px-8 rounded-full text-sm sm:text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-600/30 group cursor-pointer">
+                    <Store className="mr-2 h-4 w-4" />
+                    Create Store Account
                     <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Button>
                 </Link>
-                <Link href="/auth/login" className="w-full sm:w-auto">
-                  <Button size="lg" variant="outline" className="w-full h-13 px-8 rounded-full text-sm sm:text-base font-semibold border-border/80 hover:bg-muted/60 transition-all">
-                    Sign In to Portal
+                <Link href="/dashboard" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full h-13 px-7 rounded-full text-sm sm:text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/30">
+                    Open Dashboard
                   </Button>
                 </Link>
-                <Link href="/docs" className="w-full sm:w-auto">
-                  <Button size="lg" variant="ghost" className="w-full h-13 px-6 rounded-full text-sm sm:text-base font-semibold text-muted-foreground hover:text-foreground">
-                    API Docs
+                <Link href="/auth/login" className="w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="w-full h-13 px-6 rounded-full text-sm sm:text-base font-semibold border-border/80 hover:bg-muted/60 transition-all">
+                    Sign In
                   </Button>
                 </Link>
               </div>
@@ -245,6 +254,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* Dedicated Store Creation Account Creation Section */}
+        <StoreAccountCreator />
 
         {/* Feature Grid Section */}
         <section id="features" className="py-28 relative">

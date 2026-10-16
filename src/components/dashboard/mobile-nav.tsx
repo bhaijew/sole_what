@@ -119,6 +119,8 @@ export function MobileNav({ appName = "sole-what" }: { appName?: string }) {
     const { data: session } = useSession();
     // @ts-ignore
     const userRole = session?.user?.role;
+    // @ts-ignore
+    const isStoreOnly = session?.user?.isStoreOnly;
 
     const isActive = (href: string) => {
         if (href === "/dashboard") return pathname === "/dashboard";
@@ -133,13 +135,54 @@ export function MobileNav({ appName = "sole-what" }: { appName?: string }) {
                 </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[85vw] sm:w-[320px] p-0 flex flex-col">
-                <SheetHeader className="px-5 py-4 text-left border-b border-slate-100">
-                    <SheetTitle className="text-xl font-bold text-slate-800">{appName}</SheetTitle>
-                    <SheetDescription className="text-[11px] text-slate-400 -mt-1">WhatsApp Gateway</SheetDescription>
+                <SheetHeader className="px-5 py-4 text-left border-b border-border/40">
+                    <SheetTitle className="text-xl font-bold text-foreground">{appName}</SheetTitle>
+                    <SheetDescription className="text-[11px] text-muted-foreground -mt-1">
+                        {isStoreOnly ? "Digital Dukaan Manager" : "WhatsApp Gateway"}
+                    </SheetDescription>
                 </SheetHeader>
 
                 <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-1">
-                    {navGroups.map((group) => {
+                    {isStoreOnly ? (
+                        <div className="space-y-1">
+                            <p className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                Store Management
+                            </p>
+                            <Link
+                                href="/dashboard/sessions"
+                                onClick={() => setOpen(false)}
+                                className={`
+                                    flex items-center rounded-lg text-sm font-medium
+                                    transition-all duration-200 group relative
+                                    gap-3 px-3 py-2.5
+                                    ${isActive("/dashboard/sessions")
+                                        ? "text-primary bg-primary/10 shadow-sm font-bold"
+                                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                    }
+                                `}
+                            >
+                                <QrCode size={18} className="text-primary" />
+                                <span>WhatsApp Connect</span>
+                            </Link>
+                            <Link
+                                href="/store-dashboard"
+                                onClick={() => setOpen(false)}
+                                className={`
+                                    flex items-center rounded-lg text-sm font-medium
+                                    transition-all duration-200 group relative
+                                    gap-3 px-3 py-2.5
+                                    ${isActive("/store-dashboard")
+                                        ? "text-primary bg-primary/10 shadow-sm font-bold"
+                                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                    }
+                                `}
+                            >
+                                <Store size={18} className="text-emerald-500" />
+                                <span>My Store (Dukaan)</span>
+                            </Link>
+                        </div>
+                    ) : (
+                        navGroups.map((group) => {
                         const visibleItems = group.items.filter((item) => {
                             if (item.superadminOnly && userRole !== "SUPERADMIN") return false;
                             if (item.allowedRoles && (!userRole || !item.allowedRoles.includes(userRole))) return false;
@@ -184,7 +227,7 @@ export function MobileNav({ appName = "sole-what" }: { appName?: string }) {
                                 </div>
                             </div>
                         );
-                    })}
+                    }))}
                 </nav>
 
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50">

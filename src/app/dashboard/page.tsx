@@ -100,6 +100,169 @@ export default async function DashboardPage() {
         ...(!isSuperAdmin ? [{ href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot, description: "Configure chatbot" }] : []),
     ];
 
+    const isStoreOnly = Boolean((session.user as any)?.isStoreOnly);
+
+    // If Store-Only user, load their store and render only WhatsApp Connect Session and Store
+    if (isStoreOnly) {
+        const userStores = await prisma.store.findMany({
+            where: { userId: session.user.id },
+            include: {
+                _count: {
+                    select: { products: true, orders: true }
+                }
+            }
+        });
+
+        const activeStore = userStores[0] || null;
+        const activeSession = sessions.find(s => s.status === 'CONNECTED') || sessions[0] || null;
+
+        return (
+            <div className="space-y-6 max-w-5xl mx-auto py-2">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel border border-border/70 p-5 rounded-2xl">
+                    <div className="space-y-1">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <Sparkles className="h-3 w-3" /> Store Creation Mode
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                            Store Command Center
+                        </h1>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                            Manage your WhatsApp connection and Digital Store in one place.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        <Link href="/dashboard/sessions">
+                            <Button size="sm" variant="outline" className="gap-2 border-primary/30 text-primary hover:bg-primary/10">
+                                <QrCode className="h-4 w-4" /> WhatsApp Connect
+                            </Button>
+                        </Link>
+                        <Link href="/store-dashboard">
+                            <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20">
+                                <Store className="h-4 w-4" /> Open Store Dashboard
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+
+                {/* ONLY 2 CARDS: WhatsApp Connect Session & Store */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {/* CARD 1: WhatsApp Connect Session */}
+                    <div className="glass-panel border border-border/70 rounded-3xl p-6 sm:p-7 shadow-sm hover:shadow-md transition-all space-y-5 bg-card/90">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-500/20">
+                                    <QrCode className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-foreground">WhatsApp Connect Session</h2>
+                                    <p className="text-xs text-muted-foreground">For automatic order notifications</p>
+                                </div>
+                            </div>
+
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                                activeSession?.status === "CONNECTED"
+                                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                    : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                            }`}>
+                                {activeSession?.status === "CONNECTED" ? "● Connected" : "○ Not Connected"}
+                            </span>
+                        </div>
+
+                        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                            Connect your WhatsApp account via QR scan so your customers receive instant order confirmations and receipts directly on WhatsApp.
+                        </p>
+
+                        <div className="rounded-xl bg-muted/60 p-3.5 border border-border/50 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between font-semibold">
+                                <span className="text-muted-foreground">Active WhatsApp Session:</span>
+                                <span className="text-foreground">{activeSession?.name || "No session yet"}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-muted-foreground text-[11px]">
+                                <span>Status:</span>
+                                <span className={activeSession?.status === "CONNECTED" ? "text-emerald-600 font-bold" : "text-amber-600 font-bold"}>
+                                    {activeSession?.status || "DISCONNECTED"}
+                                </span>
+                            </div>
+                        </div>
+
+                        <Link href="/dashboard/sessions" className="block w-full">
+                            <Button className="w-full h-11 rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-md shadow-primary/20">
+                                <QrCode className="mr-2 h-4 w-4" />
+                                {activeSession?.status === "CONNECTED" ? "Manage WhatsApp Session" : "Scan QR & Connect WhatsApp"}
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </Link>
+                    </div>
+
+                    {/* CARD 2: Store (Digital Dukaan) */}
+                    <div className="glass-panel border border-border/70 rounded-3xl p-6 sm:p-7 shadow-sm hover:shadow-md transition-all space-y-5 bg-card/90">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-emerald-600 to-teal-600 text-white flex items-center justify-center font-bold shadow-md shadow-primary/20">
+                                    <Store className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-foreground">
+                                        {activeStore?.name || "Digital Dukaan Store"}
+                                    </h2>
+                                    <p className="text-xs text-muted-foreground">Online catalog, orders &amp; POS</p>
+                                </div>
+                            </div>
+
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/25">
+                                Storefront
+                            </span>
+                        </div>
+
+                        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                            Your full Digital Dukaan store command center. Add products, view orders, manage delivery rates, and use the walk-in counter POS.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-xl bg-muted/60 p-3 border border-border/50 text-center">
+                                <div className="text-xl font-extrabold text-foreground">
+                                    {activeStore?._count?.products ?? 0}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
+                                    Products
+                                </div>
+                            </div>
+                            <div className="rounded-xl bg-muted/60 p-3 border border-border/50 text-center">
+                                <div className="text-xl font-extrabold text-primary">
+                                    {activeStore?._count?.orders ?? 0}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mt-0.5">
+                                    Total Orders
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                            <Link href="/store-dashboard" className="flex-1">
+                                <Button className="w-full h-11 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20">
+                                    <Store className="mr-2 h-4 w-4" /> Open Store Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </Link>
+                            {activeStore && (
+                                <a
+                                    href={`/s/${activeStore.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2.5 rounded-xl border border-border/70 hover:bg-muted text-muted-foreground hover:text-foreground transition flex items-center justify-center shrink-0"
+                                    title="View Live Storefront"
+                                >
+                                    <Globe className="h-5 w-5" />
+                                </a>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8">
             {/* Header */}

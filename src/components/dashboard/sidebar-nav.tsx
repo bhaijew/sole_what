@@ -123,6 +123,8 @@ export function SidebarNav() {
     const { isCollapsed, toggleCollapse } = useSidebar();
     // @ts-ignore
     const userRole = session?.user?.role;
+    // @ts-ignore
+    const isStoreOnly = session?.user?.isStoreOnly;
 
     // Track collapsed groups — all expanded by default
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
@@ -135,6 +137,34 @@ export function SidebarNav() {
         if (href === "/dashboard") return pathname === "/dashboard";
         return pathname.startsWith(href);
     };
+
+    // Store Creation Accounts ONLY see WhatsApp Connect Session & Store
+    if (isStoreOnly) {
+        const storeNavItems: NavItem[] = [
+            { href: "/dashboard/sessions", label: "WhatsApp Connect", icon: QrCode },
+            { href: "/store-dashboard", label: "My Store (Dukaan)", icon: Store },
+        ];
+
+        return (
+            <TooltipProvider delayDuration={0}>
+                <nav className="flex-1 px-2 py-3 overflow-y-auto overflow-x-hidden space-y-1 styled-scrollbar">
+                    {!isCollapsed && (
+                        <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                            Store Management
+                        </div>
+                    )}
+                    {storeNavItems.map((item) => (
+                        <NavLink
+                            key={item.href}
+                            item={item}
+                            active={isActive(item.href)}
+                            isCollapsed={isCollapsed}
+                        />
+                    ))}
+                </nav>
+            </TooltipProvider>
+        );
+    }
 
     return (
         <TooltipProvider delayDuration={0}>

@@ -3,8 +3,8 @@
 import { SidebarNav } from "./sidebar-nav";
 import { useSidebar } from "./sidebar-context";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { LogOut, Store } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
 
 interface SidebarShellProps {
     appName: string;
@@ -15,6 +15,9 @@ interface SidebarShellProps {
 
 export function SidebarShell({ appName, userName, userEmail, version }: SidebarShellProps) {
     const { isCollapsed } = useSidebar();
+    const { data: session } = useSession();
+    // @ts-ignore
+    const isStoreOnly = session?.user?.isStoreOnly;
 
     const handleLogout = async () => {
         try {
@@ -39,16 +42,18 @@ export function SidebarShell({ appName, userName, userEmail, version }: SidebarS
             <div className={`border-b border-border/30 transition-all duration-300 ${isCollapsed ? "px-3 py-4" : "px-5 py-5"}`}>
                 {isCollapsed ? (
                     <div className="flex justify-center">
-                        <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center text-white font-bold text-sm shadow-md">
-                            {appName.charAt(0)}
+                        <div className="h-9 w-9 rounded-md bg-gradient-to-br from-emerald-500 to-primary flex items-center justify-center text-white font-bold text-sm shadow-md">
+                            {isStoreOnly ? <Store size={18} /> : appName.charAt(0)}
                         </div>
                     </div>
                 ) : (
                     <>
-                        <h1 className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">
-                            {appName}
+                        <h1 className="text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-primary">
+                            {appName} {isStoreOnly && <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-extrabold uppercase">Store</span>}
                         </h1>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">WhatsApp Gateway</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">
+                            {isStoreOnly ? "Digital Dukaan Manager" : "WhatsApp Gateway"}
+                        </p>
                     </>
                 )}
             </div>

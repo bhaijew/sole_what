@@ -24,14 +24,16 @@ import {
     Sparkles,
     ShieldCheck,
     ChevronRight,
-    MapPin
+    MapPin,
+    QrCode
 } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 interface StoreSidebarProps {
     appName: string;
     userName?: string | null;
     userEmail?: string | null;
+    isStoreOnly?: boolean;
 }
 
 interface NavItem {
@@ -46,8 +48,12 @@ interface NavItem {
 export default function StoreSidebar({
     appName,
     userName,
-    userEmail
+    userEmail,
+    isStoreOnly: initialIsStoreOnly
 }: StoreSidebarProps) {
+    const { data: session } = useSession();
+    // @ts-ignore
+    const isStoreOnly = initialIsStoreOnly ?? Boolean((session?.user as any)?.isStoreOnly);
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const searchParams = useSearchParams();
     const currentTab = searchParams.get("tab") || "overview";
@@ -123,11 +129,11 @@ export default function StoreSidebar({
 
                 <div className="flex items-center gap-2">
                     <Link
-                        href="/dashboard"
+                        href={isStoreOnly ? "/dashboard/sessions" : "/dashboard"}
                         className="px-2.5 py-1 text-[11px] font-bold text-muted-foreground bg-muted rounded-lg flex items-center gap-1"
                     >
-                        <ArrowLeft className="w-3 h-3" />
-                        <span>Bot</span>
+                        {isStoreOnly ? <QrCode className="w-3 h-3 text-primary" /> : <ArrowLeft className="w-3 h-3" />}
+                        <span>{isStoreOnly ? "WA QR" : "Bot"}</span>
                     </Link>
                     <button
                         onClick={() => setIsMobileOpen(!isMobileOpen)}
@@ -186,16 +192,22 @@ export default function StoreSidebar({
                         </button>
                     </div>
 
-                    {/* Quick Switch to Main WhatsApp Dashboard */}
+                    {/* Quick Switch to WhatsApp Connect Session */}
                     <Link
-                        href="/dashboard"
+                        href={isStoreOnly ? "/dashboard/sessions" : "/dashboard"}
                         className="w-full py-2 px-3 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground font-semibold text-xs transition flex items-center justify-between group shadow-2xs cursor-pointer border border-border/40"
                     >
                         <span className="flex items-center gap-1.5">
-                            <ArrowLeft className="w-3.5 h-3.5 text-muted-foreground group-hover:-translate-x-0.5 transition-transform" />
-                            <span>Main WhatsApp Bot</span>
+                            {isStoreOnly ? (
+                                <QrCode className="w-3.5 h-3.5 text-primary group-hover:scale-105 transition-transform" />
+                            ) : (
+                                <ArrowLeft className="w-3.5 h-3.5 text-muted-foreground group-hover:-translate-x-0.5 transition-transform" />
+                            )}
+                            <span>{isStoreOnly ? "WhatsApp Connect" : "Main WhatsApp Bot"}</span>
                         </span>
-                        <span className="text-[10px] text-muted-foreground/70 font-normal">Switch ➔</span>
+                        <span className="text-[10px] text-muted-foreground/70 font-normal">
+                            {isStoreOnly ? "QR ➔" : "Switch ➔"}
+                        </span>
                     </Link>
                 </div>
 
