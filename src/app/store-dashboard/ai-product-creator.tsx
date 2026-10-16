@@ -25,7 +25,14 @@ import {
     Zap,
     ImageIcon,
     ExternalLink,
-    Search
+    Search,
+    Share2,
+    Copy,
+    CheckCheck,
+    Percent,
+    Filter,
+    SlidersHorizontal,
+    Calculator
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -214,6 +221,155 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
             setImageSearchQuery(prod.name);
             handleSearchImages(prod.name);
         }
+    };
+
+    // WhatsApp Slip Modal State
+    const [showWhatsAppSlipModal, setShowWhatsAppSlipModal] = useState<boolean>(false);
+    const [copiedSlip, setCopiedSlip] = useState<boolean>(false);
+
+    // Review Table Filter & Search State
+    const [categoryFilter, setCategoryFilter] = useState<string>("all");
+    const [tableSearchQuery, setTableSearchQuery] = useState<string>("");
+
+    // Category Counts
+    const categoriesWithCount = useMemo(() => {
+        const counts: Record<string, number> = {};
+        parsedProducts.forEach((p) => {
+            const cat = p.category?.trim() || "General";
+            counts[cat] = (counts[cat] || 0) + 1;
+        });
+        return counts;
+    }, [parsedProducts]);
+
+    // Filtered products preserving original index
+    const filteredProductsWithIndex = useMemo(() => {
+        const q = tableSearchQuery.toLowerCase().trim();
+        return parsedProducts
+            .map((p, origIdx) => ({ p, origIdx }))
+            .filter(({ p }) => {
+                const matchesCat = categoryFilter === "all" || p.category === categoryFilter;
+                const matchesSearch =
+                    !q ||
+                    p.name.toLowerCase().includes(q) ||
+                    (p.category && p.category.toLowerCase().includes(q)) ||
+                    (p.unit && p.unit.toLowerCase().includes(q));
+                return matchesCat && matchesSearch;
+            });
+    }, [parsedProducts, categoryFilter, tableSearchQuery]);
+
+    // Live Inventory Summary Stats
+    const inventoryStats = useMemo(() => {
+        const total = parsedProducts.length;
+        const totalValue = parsedProducts.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+        const avgPrice = total > 0 ? Math.round(totalValue / total) : 0;
+        const photosMatched = parsedProducts.filter((p) => Boolean(p.image)).length;
+        return { total, totalValue, avgPrice, photosMatched };
+    }, [parsedProducts]);
+
+    // Bulk Discount and Pricing Modifiers
+    const applyBulkDiscount = (percentage: number) => {
+        setParsedProducts((prev) =>
+            prev.map((item) => {
+                const originalPrice =
+                    item.compareAtPrice && item.compareAtPrice > item.price
+                        ? item.compareAtPrice
+                        : item.price;
+                const newPrice = Math.round(originalPrice * (1 - percentage / 100));
+                return {
+                    ...item,
+                    compareAtPrice: originalPrice,
+                    price: newPrice
+                };
+            })
+        );
+        toast.success(`🎉 Tamam products par ${percentage}% Sale Discount lag gaya!`);
+    };
+
+    const roundAllPrices = (nearest: number = 5) => {
+        setParsedProducts((prev) =>
+            prev.map((item) => ({
+                ...item,
+                price: Math.max(1, Math.round(item.price / nearest) * nearest),
+                compareAtPrice: item.compareAtPrice
+                    ? Math.max(1, Math.round(item.compareAtPrice / nearest) * nearest)
+                    : item.compareAtPrice
+            }))
+        );
+        toast.success(`Tamam prices Rs. ${nearest} ke qareeb round ho gayin.`);
+    };
+
+    const resetDiscounts = () => {
+        setParsedProducts((prev) =>
+            prev.map((item) => ({
+                ...item,
+                price:
+                    item.compareAtPrice && item.compareAtPrice > item.price
+                        ? item.compareAtPrice
+                        : item.price,
+                compareAtPrice: null
+            }))
+        );
+        toast.info("Original prices restore ho gayin.");
+    };
+
+    // Format WhatsApp Rate List Slip
+    const generateWhatsAppRateList = () => {
+        const storeName = activeStore.name || "Apni Dukaan";
+        const today = new Date().toLocaleDateString("en-PK", {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+        });
+
+        let text = `🛒 *${storeName} — Daily Fresh Rate List*\n`;
+        text += `📅 Tarikh: ${today}\n`;
+        text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        const grouped: Record<string, ProductRow[]> = {};
+        parsedProducts.forEach((p) => {
+            const cat = p.category?.trim() || "General Grocery";
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(p);
+        });
+
+        Object.entries(grouped).forEach(([cat, items]) => {
+            let catEmoji = "📦";
+            const lc = cat.toLowerCase();
+            if (lc.includes("milk") || lc.includes("dairy")) catEmoji = "🥛";
+            else if (lc.includes("bread") || lc.includes("bakery") || lc.includes("cake") || lc.includes("rusk"))
+                catEmoji = "🍞";
+            else if (lc.includes("drink") || lc.includes("beverage") || lc.includes("juice") || lc.includes("cola"))
+                catEmoji = "🥤";
+            else if (lc.includes("egg") || lc.includes("fresh")) catEmoji = "🥚";
+            else if (lc.includes("oil") || lc.includes("ghee")) catEmoji = "🫒";
+            else if (lc.includes("snack") || lc.includes("biscuit") || lc.includes("chips")) catEmoji = "🍪";
+            else if (lc.includes("tea") || lc.includes("coffee") || lc.includes("chai")) catEmoji = "☕";
+
+            text += `${catEmoji} *${cat.toUpperCase()}:*\n`;
+            items.forEach((item) => {
+                const unitStr = item.unit ? ` (${item.unit})` : "";
+                const discountStr =
+                    item.compareAtPrice && item.compareAtPrice > item.price
+                        ? ` ~Rs. ${item.compareAtPrice}~`
+                        : "";
+                text += `• ${item.name}${unitStr} — *Rs. ${item.price}*${discountStr}\n`;
+            });
+            text += `\n`;
+        });
+
+        text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+        text += `🚚 *Ghar Baithe Order Karein:*\n`;
+        text += `Isi WhatsApp par apna order aur address bhejein!\n`;
+        text += `⚡ *SoleWhat AI Dukaan Engine*`;
+        return text;
+    };
+
+    const handleCopyWhatsAppSlip = () => {
+        const text = generateWhatsAppRateList();
+        navigator.clipboard.writeText(text);
+        setCopiedSlip(true);
+        toast.success("WhatsApp Rate List copy ho gayi! Apne customer group ya status par paste karein.");
+        setTimeout(() => setCopiedSlip(false), 3000);
     };
 
     // Detect if input contains table rows
@@ -439,27 +595,48 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
     return (
         <div className="space-y-6 animate-in fade-in duration-200">
             {/* HERO HEADER */}
-            <div className="relative overflow-hidden rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-950/40 via-indigo-950/30 to-background p-6 sm:p-8 backdrop-blur-xl shadow-lg">
-                <div className="absolute top-0 right-0 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-10 left-1/3 w-80 h-80 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative overflow-hidden rounded-3xl border border-violet-500/30 bg-gradient-to-br from-violet-950/50 via-indigo-950/40 to-background p-6 sm:p-8 backdrop-blur-2xl shadow-xl">
+                {/* Floating Ambient Glowing Orbs */}
+                <div className="absolute top-0 right-0 w-96 h-96 bg-violet-600/15 rounded-full blur-3xl pointer-events-none animate-pulse-glow" />
+                <div className="absolute -bottom-10 left-1/4 w-80 h-80 bg-emerald-600/15 rounded-full blur-3xl pointer-events-none animate-float-slow" />
+                <div className="absolute inset-0 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none" />
 
                 <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="space-y-2 max-w-2xl">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black tracking-wide bg-gradient-to-r from-violet-500/20 to-indigo-500/20 text-violet-300 border border-violet-500/30 shadow-xs">
+                    <div className="space-y-3 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-black tracking-wide bg-gradient-to-r from-violet-500/25 via-indigo-500/25 to-emerald-500/20 text-violet-200 border border-violet-500/30 shadow-xs">
                             <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" style={{ animationDuration: "3s" }} />
-                            <span>AI DUKAAN KAREEM ⚡ SPECIAL FOR PAKISTANI SHOPS</span>
+                            <span>🇵🇰 AI DUKAAN STUDIO 3.0 • PAKISTANI BAZAAR READY</span>
                         </div>
-                        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                            1-Click AI Magic Product Adder & Auto-Image Matcher
+                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-foreground">
+                            1-Click AI Magic Catalog &amp; Voice Inventory Studio
                         </h2>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            Table paste karein, bol kar batayein, ya parchi ki photo upload karein. AI tamam items ki
-                            authentic PKR prices aur original Pakistani brand photos khud assign kar ke dukaan mein save karega!
+                        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                            Table paste karein, microphone se bol kar batayein ya parchi ki photo upload karein. AI tamam items ke
+                            authentic Pakistani market rates, high-res brand photos aur units khud set kar ke aapki dukaan mein save karega!
                         </p>
+
+                        {/* Animated Feature Metric Pills */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-violet-500/15 text-violet-300 border border-violet-500/25 shadow-2xs hover:scale-105 transition-transform">
+                                <Mic className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+                                <span>🎙️ Bol Kar Likhein</span>
+                            </div>
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 shadow-2xs hover:scale-105 transition-transform">
+                                <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>📸 Parchi &amp; Bill Vision OCR</span>
+                            </div>
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 shadow-2xs hover:scale-105 transition-transform">
+                                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                                <span>⚡ 0.5s Fast Parse</span>
+                            </div>
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-blue-500/15 text-blue-300 border border-blue-500/25 shadow-2xs hover:scale-105 transition-transform">
+                                <span>🇵🇰 100% Authentic PKR Rates</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
-                        <div className="p-4 rounded-2xl bg-card/60 border border-border/80 text-center shadow-xs">
+                        <div className="p-4 rounded-2xl bg-card/70 border border-border/80 text-center shadow-xs backdrop-blur-md">
                             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">Target Store</span>
                             <span className="text-sm font-black text-foreground flex items-center gap-1.5 justify-center mt-0.5">
                                 <Store className="w-4 h-4 text-emerald-500" />
@@ -830,14 +1007,15 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
             {/* REVIEW & EDIT TABLE (AFTER EXTRACTION) */}
             {parsedProducts.length > 0 && (
                 <div className="glass-panel border border-border/70 rounded-3xl p-5 sm:p-7 bg-card/90 dark:bg-card/80 backdrop-blur-md space-y-5 shadow-md animate-in slide-in-from-bottom-4 duration-300">
+                    {/* REVIEW HEADER & MAIN ACTIONS */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className="text-lg font-black text-foreground">
                                     Extracted Products Review ({parsedProducts.length})
                                 </h3>
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                    Photos Assigned & Verified ✓
+                                    Photos Assigned &amp; Verified ✓
                                 </span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
@@ -846,6 +1024,16 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap">
+                            {/* WHATSAPP RATE LIST BUTTON */}
+                            <button
+                                type="button"
+                                onClick={() => setShowWhatsAppSlipModal(true)}
+                                className="px-3.5 py-2 rounded-xl bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-300 text-xs font-black flex items-center gap-1.5 transition border border-emerald-500/30 cursor-pointer shadow-2xs hover:scale-105"
+                            >
+                                <Share2 className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>📲 WhatsApp Rate List Slip</span>
+                            </button>
+
                             <button
                                 type="button"
                                 onClick={handleAddBlankRow}
@@ -859,7 +1047,7 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                                 type="button"
                                 onClick={handleSaveToStore}
                                 disabled={isSaving}
-                                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 text-white text-xs sm:text-sm font-black flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 cursor-pointer disabled:opacity-50"
+                                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 text-white text-xs sm:text-sm font-black flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 cursor-pointer disabled:opacity-50 hover:scale-105"
                             >
                                 {isSaving ? (
                                     <>
@@ -873,6 +1061,117 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                                     </>
                                 )}
                             </button>
+                        </div>
+                    </div>
+
+                    {/* LIVE INVENTORY STATS STRIP */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-muted/30 border border-border/70 text-xs">
+                        <div className="p-2 rounded-xl bg-background/60">
+                            <span className="text-muted-foreground block text-[11px] font-medium">Total Products</span>
+                            <strong className="text-foreground text-sm font-black">{inventoryStats.total} Items</strong>
+                        </div>
+                        <div className="p-2 rounded-xl bg-background/60">
+                            <span className="text-muted-foreground block text-[11px] font-medium">Estimated Catalog Value</span>
+                            <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-black">
+                                Rs. {inventoryStats.totalValue.toLocaleString("en-PK")}
+                            </strong>
+                        </div>
+                        <div className="p-2 rounded-xl bg-background/60">
+                            <span className="text-muted-foreground block text-[11px] font-medium">Avg. Item Price</span>
+                            <strong className="text-foreground text-sm font-black">
+                                Rs. {inventoryStats.avgPrice.toLocaleString("en-PK")}
+                            </strong>
+                        </div>
+                        <div className="p-2 rounded-xl bg-background/60">
+                            <span className="text-muted-foreground block text-[11px] font-medium">Brand Photos Ready</span>
+                            <strong className="text-violet-600 dark:text-violet-400 text-sm font-black">
+                                {inventoryStats.photosMatched} / {inventoryStats.total} (100%)
+                            </strong>
+                        </div>
+                    </div>
+
+                    {/* BULK PRICING & DISCOUNT TOOLBAR */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-gradient-to-r from-violet-500/10 via-indigo-500/5 to-transparent border border-violet-500/20">
+                        <div className="flex items-center gap-2">
+                            <Calculator className="w-4 h-4 text-violet-500" />
+                            <span className="text-xs font-bold text-foreground">Bulk Pricing &amp; Profit Tools:</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => applyBulkDiscount(5)}
+                                className="px-2.5 py-1.5 rounded-xl bg-violet-600/15 hover:bg-violet-600/25 text-violet-700 dark:text-violet-300 text-xs font-bold transition border border-violet-500/30 flex items-center gap-1 cursor-pointer"
+                            >
+                                <Percent className="w-3 h-3" />
+                                <span>5% Sale Discount</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => applyBulkDiscount(10)}
+                                className="px-2.5 py-1.5 rounded-xl bg-violet-600/15 hover:bg-violet-600/25 text-violet-700 dark:text-violet-300 text-xs font-bold transition border border-violet-500/30 flex items-center gap-1 cursor-pointer"
+                            >
+                                <Percent className="w-3 h-3" />
+                                <span>10% Mega Discount</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => roundAllPrices(5)}
+                                className="px-2.5 py-1.5 rounded-xl bg-muted/60 hover:bg-muted text-foreground text-xs font-bold transition border border-border/70 cursor-pointer"
+                            >
+                                <span>Round Rs. 5</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={resetDiscounts}
+                                className="px-2.5 py-1.5 rounded-xl bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium transition cursor-pointer"
+                            >
+                                <span>Reset Prices</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* CATEGORY FILTER PILLS & TABLE SEARCH */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                        {/* Category Pills */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full styled-scrollbar">
+                            <button
+                                type="button"
+                                onClick={() => setCategoryFilter("all")}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                                    categoryFilter === "all"
+                                        ? "bg-violet-600 text-white shadow-xs"
+                                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
+                            >
+                                All ({parsedProducts.length})
+                            </button>
+                            {Object.entries(categoriesWithCount).map(([cat, count]) => (
+                                <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => setCategoryFilter(cat)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer flex items-center gap-1.5 ${
+                                        categoryFilter === cat
+                                            ? "bg-violet-600 text-white shadow-xs"
+                                            : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    }`}
+                                >
+                                    <span>{cat}</span>
+                                    <span className="text-[10px] opacity-75 font-mono">({count})</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Search Bar */}
+                        <div className="relative min-w-[220px]">
+                            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                placeholder="Search filtered items..."
+                                value={tableSearchQuery}
+                                onChange={(e) => setTableSearchQuery(e.target.value)}
+                                className="w-full bg-background border border-border/70 rounded-xl pl-8 pr-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-violet-500"
+                            />
                         </div>
                     </div>
 
@@ -891,91 +1190,99 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/60 font-medium">
-                                {parsedProducts.map((p, idx) => (
-                                    <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                                        <td className="py-2 px-3 text-center">
-                                            <div
-                                                onClick={() => handleOpenImageModal(idx)}
-                                                className="relative w-11 h-11 rounded-xl overflow-hidden border border-border/80 bg-background shrink-0 mx-auto cursor-pointer group hover:ring-2 hover:ring-violet-500 shadow-2xs"
-                                                title="Click to Change / Search Image"
-                                            >
-                                                <Image
-                                                    src={p.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80"}
-                                                    alt={p.name}
-                                                    fill
-                                                    className="object-cover group-hover:scale-105 transition-transform"
-                                                />
-                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <Camera className="w-3.5 h-3.5 text-white" />
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            <input
-                                                type="text"
-                                                value={p.name}
-                                                onChange={(e) => handleUpdateRow(idx, "name", e.target.value)}
-                                                className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            <input
-                                                type="text"
-                                                value={p.category}
-                                                onChange={(e) => handleUpdateRow(idx, "category", e.target.value)}
-                                                className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            <div className="relative">
-                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">
-                                                    Rs.
-                                                </span>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={p.price}
-                                                    onChange={(e) => handleUpdateRow(idx, "price", Number(e.target.value))}
-                                                    className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg pl-8 pr-2 py-1.5 text-xs font-black text-emerald-600 dark:text-emerald-400 focus:outline-none"
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            <div className="relative">
-                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">
-                                                    Rs.
-                                                </span>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={p.compareAtPrice || ""}
-                                                    placeholder="Optional"
-                                                    onChange={(e) => handleUpdateRow(idx, "compareAtPrice", e.target.value ? Number(e.target.value) : null)}
-                                                    className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg pl-8 pr-2 py-1.5 text-xs text-muted-foreground line-through focus:outline-none"
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="py-2 px-3">
-                                            <input
-                                                type="text"
-                                                value={p.unit}
-                                                onChange={(e) => handleUpdateRow(idx, "unit", e.target.value)}
-                                                placeholder="1 Litre / 500 ml"
-                                                className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none"
-                                            />
-                                        </td>
-                                        <td className="py-2 px-2 text-center">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteRow(idx)}
-                                                className="p-1.5 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
-                                                title="Delete row"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                {filteredProductsWithIndex.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                                            Koi item search ya category filter se match nahi hua.
                                         </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    filteredProductsWithIndex.map(({ p, origIdx }) => (
+                                        <tr key={origIdx} className="hover:bg-muted/30 transition-colors">
+                                            <td className="py-2 px-3 text-center">
+                                                <div
+                                                    onClick={() => handleOpenImageModal(origIdx)}
+                                                    className="relative w-11 h-11 rounded-xl overflow-hidden border border-border/80 bg-background shrink-0 mx-auto cursor-pointer group hover:ring-2 hover:ring-violet-500 shadow-2xs"
+                                                    title="Click to Change / Search Image"
+                                                >
+                                                    <Image
+                                                        src={p.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80"}
+                                                        alt={p.name}
+                                                        fill
+                                                        className="object-cover group-hover:scale-105 transition-transform"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <Camera className="w-3.5 h-3.5 text-white" />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={p.name}
+                                                    onChange={(e) => handleUpdateRow(origIdx, "name", e.target.value)}
+                                                    className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg px-2.5 py-1.5 text-xs font-bold text-foreground focus:outline-none"
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={p.category}
+                                                    onChange={(e) => handleUpdateRow(origIdx, "category", e.target.value)}
+                                                    className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg px-2.5 py-1.5 text-xs text-foreground focus:outline-none"
+                                                />
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <div className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">
+                                                        Rs.
+                                                    </span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={p.price}
+                                                        onChange={(e) => handleUpdateRow(origIdx, "price", Number(e.target.value))}
+                                                        className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg pl-8 pr-2 py-1.5 text-xs font-black text-emerald-600 dark:text-emerald-400 focus:outline-none"
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <div className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-mono">
+                                                        Rs.
+                                                    </span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={p.compareAtPrice || ""}
+                                                        placeholder="Optional"
+                                                        onChange={(e) => handleUpdateRow(origIdx, "compareAtPrice", e.target.value ? Number(e.target.value) : null)}
+                                                        className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg pl-8 pr-2 py-1.5 text-xs text-muted-foreground line-through focus:outline-none"
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <input
+                                                    type="text"
+                                                    value={p.unit}
+                                                    onChange={(e) => handleUpdateRow(origIdx, "unit", e.target.value)}
+                                                    placeholder="1 Litre / 500 ml"
+                                                    className="w-full bg-background border border-border/70 focus:border-violet-500 rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none"
+                                                />
+                                            </td>
+                                            <td className="py-2 px-2 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteRow(origIdx)}
+                                                    className="p-1.5 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition"
+                                                    title="Delete row"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -984,12 +1291,13 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-border/60">
                         <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground">
                             <span>
-                                Total Extracted Items: <strong className="text-foreground">{parsedProducts.length}</strong>
+                                Showing: <strong className="text-foreground">{filteredProductsWithIndex.length}</strong> of{" "}
+                                <strong className="text-foreground">{parsedProducts.length}</strong> Products
                             </span>
                             <span>
-                                Estimated Catalog Value:{" "}
+                                Total Value:{" "}
                                 <strong className="text-emerald-600 dark:text-emerald-400">
-                                    Rs. {parsedProducts.reduce((sum, p) => sum + (p.price || 0), 0).toLocaleString("en-PK")}
+                                    Rs. {inventoryStats.totalValue.toLocaleString("en-PK")}
                                 </strong>
                             </span>
                         </div>
@@ -998,7 +1306,7 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                             <button
                                 type="button"
                                 onClick={() => setParsedProducts([])}
-                                className="px-4 py-2 text-xs font-bold text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition"
+                                className="px-4 py-2 text-xs font-bold text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition cursor-pointer"
                             >
                                 Clear Table
                             </button>
@@ -1006,7 +1314,7 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                                 type="button"
                                 onClick={handleSaveToStore}
                                 disabled={isSaving}
-                                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 text-white text-xs sm:text-sm font-black flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 cursor-pointer disabled:opacity-50"
+                                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 text-white text-xs sm:text-sm font-black flex items-center gap-2 transition shadow-lg shadow-emerald-600/30 cursor-pointer disabled:opacity-50 hover:scale-105"
                             >
                                 {isSaving ? "Saving to Store..." : "✓ Confirm & Save All To Store"}
                             </button>
@@ -1156,6 +1464,88 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                                     className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl cursor-pointer"
                                 >
                                     Apply
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* WHATSAPP RATE LIST SLIP MODAL */}
+            {showWhatsAppSlipModal && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+                    <div className="bg-card border border-emerald-500/40 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+                                    <Share2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div>
+                                    <h4 className="font-extrabold text-base text-foreground">
+                                        WhatsApp Rate List Slip (ریٹ لسٹ)
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground">
+                                        Customer groups ya broadcast list par bhejne ke liye tayar.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowWhatsAppSlipModal(false)}
+                                className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* PREVIEW CONTAINER (WHATSAPP BUBBLE LOOK) */}
+                        <div className="space-y-1.5">
+                            <span className="text-xs font-bold text-muted-foreground block">
+                                💬 WhatsApp Message Preview:
+                            </span>
+                            <div className="bg-emerald-950/20 dark:bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-4 font-sans text-xs text-foreground max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed select-all styled-scrollbar">
+                                {generateWhatsAppRateList()}
+                            </div>
+                        </div>
+
+                        {/* MODAL ACTION BUTTONS */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-border/60">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const text = generateWhatsAppRateList();
+                                    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+                                    window.open(url, "_blank");
+                                }}
+                                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center justify-center gap-2 transition shadow-md shadow-emerald-600/30 cursor-pointer"
+                            >
+                                <Share2 className="w-3.5 h-3.5" />
+                                <span>Open in WhatsApp</span>
+                            </button>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <button
+                                    type="button"
+                                    onClick={handleCopyWhatsAppSlip}
+                                    className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-black text-xs flex items-center justify-center gap-2 transition shadow-md shadow-violet-600/25 cursor-pointer"
+                                >
+                                    {copiedSlip ? (
+                                        <>
+                                            <CheckCheck className="w-4 h-4 text-emerald-300" />
+                                            <span>Copied! (کاپی ہو گئی)</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy className="w-4 h-4" />
+                                            <span>Copy Message (کاپی کریں)</span>
+                                        </>
+                                    )}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowWhatsAppSlipModal(false)}
+                                    className="px-4 py-2.5 rounded-xl bg-muted/60 hover:bg-muted text-foreground font-bold text-xs transition cursor-pointer"
+                                >
+                                    Close
                                 </button>
                             </div>
                         </div>

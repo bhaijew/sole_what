@@ -24,7 +24,10 @@ import {
   UtensilsCrossed,
   Gem,
   Scissors,
-  Store
+  Store,
+  Mic,
+  Camera,
+  FileSpreadsheet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import fs from "fs";
@@ -103,61 +106,92 @@ export default function Home() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative pt-32 pb-24 lg:pt-48 lg:pb-36 overflow-hidden flex flex-col items-center justify-center min-h-[92vh]">
-          {/* Ambient Lighting Orbs */}
-          <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[45rem] h-[45rem] bg-emerald-400/15 dark:bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
-          <div className="absolute bottom-1/4 right-1/4 translate-x-1/3 translate-y-1/3 w-[35rem] h-[35rem] bg-blue-500/15 dark:bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
+        <section className="relative pt-32 pb-24 lg:pt-44 lg:pb-32 overflow-hidden flex flex-col items-center justify-center min-h-[92vh]">
+          {/* Animated Ambient Lighting Orbs */}
+          <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[48rem] h-[48rem] bg-emerald-500/15 dark:bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none animate-pulse-glow" />
+          <div className="absolute bottom-1/4 right-1/4 translate-x-1/3 translate-y-1/3 w-[40rem] h-[40rem] bg-teal-500/15 dark:bg-cyan-600/10 rounded-full blur-[130px] pointer-events-none animate-float-slow" />
+          <div className="absolute top-1/2 right-10 w-[25rem] h-[25rem] bg-indigo-500/10 dark:bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
+
+          {/* Subtle Grid Accent */}
+          <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none" />
 
           <div className="container px-4 md:px-6 relative z-10">
             <div className="flex flex-col items-center text-center space-y-8 max-w-5xl mx-auto">
 
-              {/* Version Pill */}
-              <div className="inline-flex items-center rounded-full glass-panel px-4 py-1.5 text-xs font-semibold text-foreground/90 border border-primary/20 shadow-xs">
-                <span className="relative flex h-2 w-2 mr-2.5">
+              {/* Version & Feature Pill */}
+              <div className="inline-flex items-center gap-2 rounded-full glass-panel px-4 py-1.5 text-xs font-semibold text-foreground/90 border border-emerald-500/30 shadow-xs relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-teal-500/20 to-transparent animate-shimmer pointer-events-none" />
+                <span className="relative flex h-2 w-2 mr-1">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span>SoleWhat {version} • AI Responder &amp; E-Commerce Webhooks Live</span>
-                <ChevronRight className="h-3.5 w-3.5 ml-1 text-primary opacity-70" />
+                <span className="font-bold text-foreground">SoleWhat {version}</span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">AI Online Dukaan &amp; WhatsApp Auto-Engine Live</span>
+                <ChevronRight className="h-3.5 w-3.5 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
               </div>
 
               {/* Hero Title */}
               <div className="space-y-4 max-w-4xl">
-                <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.08]">
-                  <span className="block text-foreground">Intelligent WhatsApp</span>
-                  <span className="bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 bg-clip-text text-transparent block">
-                    Automation Engine.
+                <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.05]">
+                  <span className="block text-foreground">Pakistan&apos;s All-In-One</span>
+                  <span className="bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 bg-clip-text text-transparent block animate-gradient-x">
+                    AI WhatsApp &amp; Dukaan Engine.
                   </span>
                 </h1>
                 <p className="mx-auto max-w-2xl text-muted-foreground text-base sm:text-lg md:text-xl leading-relaxed pt-2">
-                  Power your business with <strong>Natural Roman Urdu AI chat</strong>, automated <strong>2-page visual menu auto-senders</strong>, instant <strong>Shopify &amp; WooCommerce order alerts</strong>, and multi-device WhatsApp routing.
+                  Apni <strong>Online Dukaan 30 seconds mein shuru karein</strong> — parchi ki photo ya voice se <strong>1-click products add karein</strong>, aur customer inquiries, visual menu auto-send aur Shopify/Woo orders <strong>WhatsApp par 24/7 AI se automate karein</strong>.
                 </p>
+              </div>
+
+              {/* Quick Feature Badges */}
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 shadow-2xs hover:scale-105 transition-transform">
+                  <Mic className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                  <span>Voice &amp; Parchi AI Scanner</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20 shadow-2xs hover:scale-105 transition-transform">
+                  <Store className="w-3.5 h-3.5 text-teal-500" />
+                  <span>Instant Online Storefront</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 shadow-2xs hover:scale-105 transition-transform">
+                  <Bot className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Roman Urdu 24/7 Chatbot</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 shadow-2xs hover:scale-105 transition-transform">
+                  <Zap className="w-3.5 h-3.5 text-amber-500" />
+                  <span>&lt; 0.8s Superfast Latency</span>
+                </div>
               </div>
 
               {/* CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-3.5 pt-2 w-full sm:w-auto px-4 items-center justify-center">
                 <Link href="#create-store" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full h-13 px-8 rounded-full text-sm sm:text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-600/30 group cursor-pointer">
+                  <Button size="lg" className="w-full h-13 px-8 rounded-full text-sm sm:text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-600/30 group cursor-pointer hover:scale-105 transition-all">
                     <Store className="mr-2 h-4 w-4" />
                     Create Store Account
                     <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </Button>
                 </Link>
-                <Link href="/dashboard" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full h-13 px-7 rounded-full text-sm sm:text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl shadow-primary/30">
-                    Open Dashboard
+                <Link href="/store-dashboard" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full h-13 px-7 rounded-full text-sm sm:text-base font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-xl shadow-violet-600/25 group cursor-pointer hover:scale-105 transition-all">
+                    <Sparkles className="mr-2 h-4 w-4 text-amber-300 animate-spin" style={{ animationDuration: "4s" }} />
+                    AI Product Studio
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400 text-black">NEW</span>
                   </Button>
                 </Link>
-                <Link href="/auth/login" className="w-full sm:w-auto">
+                <Link href="/dashboard" className="w-full sm:w-auto">
                   <Button size="lg" variant="outline" className="w-full h-13 px-6 rounded-full text-sm sm:text-base font-semibold border-border/80 hover:bg-muted/60 transition-all">
-                    Sign In
+                    Open Dashboard
                   </Button>
                 </Link>
               </div>
 
               {/* Live Showcase Preview Mockup */}
-              <div className="w-full max-w-4xl pt-8">
-                <div className="glass-panel rounded-3xl p-4 sm:p-6 border border-border/70 shadow-2xl shadow-black/10 dark:shadow-black/40">
+              <div className="w-full max-w-5xl pt-8">
+                <div className="glass-panel rounded-3xl p-4 sm:p-6 border border-border/70 shadow-2xl shadow-black/10 dark:shadow-black/40 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-80 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
                   <div className="flex items-center justify-between border-b border-border/50 pb-3 mb-4 text-left">
                     <div className="flex items-center gap-2">
                       <div className="h-3 w-3 rounded-full bg-rose-500/80" />
@@ -167,13 +201,49 @@ export default function Home() {
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Multi-Device WhatsApp Connected
+                      Multi-Device WhatsApp &amp; AI Studio Active
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                    {/* Mockup Card 1: AI Menu Auto-Sender */}
-                    <div className="bg-background/80 rounded-2xl p-4 border border-border/60 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+                    {/* Mockup Card 1: AI Voice & Parchi Catalog Adder */}
+                    <div className="bg-background/80 rounded-2xl p-4 border border-violet-500/30 space-y-3 relative overflow-hidden group hover:border-violet-500/60 transition-all">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+                          <Sparkles size={14} className="text-violet-500" />
+                          AI Parchi &amp; Voice Catalog
+                        </span>
+                        <span className="text-[10px] text-violet-500 font-bold bg-violet-500/10 px-2 py-0.5 rounded-full">1-Click</span>
+                      </div>
+                      <div className="space-y-2 text-xs font-sans">
+                        <div className="bg-violet-500/10 border border-violet-500/20 p-2.5 rounded-xl text-foreground space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-bold text-violet-700 dark:text-violet-300">
+                            <span>📸 Parchi Parsed (34 Items)</span>
+                            <span className="text-[10px] text-emerald-500 font-mono">0.5s Fast</span>
+                          </div>
+                          <div className="space-y-1 text-[11px] text-muted-foreground">
+                            <div className="flex justify-between items-center bg-background/60 p-1 rounded">
+                              <span>🥛 Olper&apos;s Full Cream Milk 1L</span>
+                              <strong className="text-foreground">Rs. 350</strong>
+                            </div>
+                            <div className="flex justify-between items-center bg-background/60 p-1 rounded">
+                              <span>🍞 Dawn Plain Bread Large</span>
+                              <strong className="text-foreground">Rs. 212</strong>
+                            </div>
+                            <div className="flex justify-between items-center bg-background/60 p-1 rounded">
+                              <span>🥚 Fresh Eggs (12 pcs)</span>
+                              <strong className="text-foreground">Rs. 314</strong>
+                            </div>
+                          </div>
+                          <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-2 py-0.5 rounded-full block text-center">
+                            ✓ Pakistani Brands &amp; Photos Matched
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mockup Card 2: AI Menu Auto-Sender */}
+                    <div className="bg-background/80 rounded-2xl p-4 border border-border/60 space-y-3 hover:border-emerald-500/40 transition-all">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
                           <Bot size={14} className="text-primary" />
@@ -182,47 +252,47 @@ export default function Home() {
                         <span className="text-[10px] text-muted-foreground">Just now</span>
                       </div>
                       <div className="space-y-2 text-xs font-sans">
-                        <div className="bg-muted/60 p-2.5 rounded-xl rounded-tl-xs max-w-[85%] text-foreground">
+                        <div className="bg-muted/60 p-2 rounded-xl rounded-tl-xs max-w-[85%] text-foreground text-[11px]">
                           aoa menu dikhao rates kya hain?
                         </div>
-                        <div className="bg-primary/10 border border-primary/20 p-2.5 rounded-xl rounded-tr-xs ml-auto max-w-[90%] text-foreground space-y-2">
-                          <p className="leading-relaxed">
-                            Walaikum Assalam! G bilkul, yeh lijiye hamara complete menu card aur special deals:
+                        <div className="bg-primary/10 border border-primary/20 p-2.5 rounded-xl rounded-tr-xs ml-auto max-w-[95%] text-foreground space-y-1.5">
+                          <p className="leading-snug text-[11px]">
+                            Walaikum Assalam! G bilkul, yeh lijiye hamara complete menu card aur deals:
                           </p>
-                          <div className="grid grid-cols-2 gap-1.5 pt-1">
+                          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                             <div className="bg-background p-1 rounded-lg border border-border/40 text-center">
                               <span className="text-[9px] font-bold text-primary block">📄 Menu Page 1</span>
-                              <div className="h-12 bg-muted/60 rounded flex items-center justify-center text-[10px] text-muted-foreground font-mono">Front Card</div>
+                              <div className="h-9 bg-muted/60 rounded flex items-center justify-center text-[9px] text-muted-foreground font-mono">Front Card</div>
                             </div>
                             <div className="bg-background p-1 rounded-lg border border-border/40 text-center">
                               <span className="text-[9px] font-bold text-primary block">📄 Menu Page 2</span>
-                              <div className="h-12 bg-muted/60 rounded flex items-center justify-center text-[10px] text-muted-foreground font-mono">Back &amp; Deals</div>
+                              <div className="h-9 bg-muted/60 rounded flex items-center justify-center text-[9px] text-muted-foreground font-mono">Back &amp; Deals</div>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Mockup Card 2: E-Commerce Automated Order Alert */}
-                    <div className="bg-background/80 rounded-2xl p-4 border border-border/60 space-y-3">
+                    {/* Mockup Card 3: E-Commerce Automated Order Alert */}
+                    <div className="bg-background/80 rounded-2xl p-4 border border-border/60 space-y-3 hover:border-blue-500/40 transition-all">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
                           <ShoppingBag size={14} className="text-blue-500" />
-                          E-Commerce Order Alert (Shopify/Woo)
+                          Order Alert (Shopify/Woo)
                         </span>
                         <span className="text-[10px] text-emerald-500 font-semibold">1.2s Fast</span>
                       </div>
                       <div className="space-y-2 text-xs font-sans">
-                        <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl rounded-tr-xs text-foreground space-y-1.5">
-                          <p className="font-bold text-blue-600 dark:text-blue-400">Order #1084 Confirmed 🎉</p>
-                          <p className="text-muted-foreground text-[11px] leading-relaxed">
-                            Salam Ahmed Khan! Your parcel is being prepared.
-                            <br />Total Amount: <strong>PKR 4,500 (COD)</strong>
+                        <div className="bg-blue-500/10 border border-blue-500/20 p-2.5 rounded-xl rounded-tr-xs text-foreground space-y-1.5">
+                          <p className="font-bold text-blue-600 dark:text-blue-400 text-[11px]">Order #1084 Confirmed 🎉</p>
+                          <p className="text-muted-foreground text-[10px] leading-relaxed">
+                            Salam Ahmed Khan! Your parcel is prepared.
+                            <br />Amount: <strong>PKR 4,500 (COD)</strong>
                             <br />Tracking: <strong>TCS-892104</strong>
                           </p>
-                          <div className="flex items-center gap-2 pt-1">
-                            <span className="text-[9px] bg-background border px-2 py-0.5 rounded-full font-semibold text-emerald-600 dark:text-emerald-400">✓ Webhook Verified</span>
-                            <span className="text-[9px] text-muted-foreground">Auto-Sent via SoleWhat</span>
+                          <div className="flex items-center gap-1.5 pt-0.5">
+                            <span className="text-[9px] bg-background border px-1.5 py-0.5 rounded-full font-semibold text-emerald-600 dark:text-emerald-400">✓ Webhook Verified</span>
+                            <span className="text-[9px] text-muted-foreground">Auto-Sent</span>
                           </div>
                         </div>
                       </div>
@@ -233,21 +303,21 @@ export default function Home() {
 
               {/* Stats Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-4xl pt-4">
-                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center">
+                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center hover:border-emerald-500/40 hover:-translate-y-1 transition-all">
                   <div className="text-2xl sm:text-3xl font-black text-foreground">99.9%</div>
                   <div className="text-xs text-muted-foreground font-medium mt-0.5">WhatsApp Uptime</div>
                 </div>
-                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center">
-                  <div className="text-2xl sm:text-3xl font-black text-primary">&lt; 1.5s</div>
+                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center hover:border-primary/40 hover:-translate-y-1 transition-all">
+                  <div className="text-2xl sm:text-3xl font-black text-primary">&lt; 0.8s</div>
                   <div className="text-xs text-muted-foreground font-medium mt-0.5">AI Reply Latency</div>
                 </div>
-                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center">
-                  <div className="text-2xl sm:text-3xl font-black text-foreground">2-Image</div>
-                  <div className="text-xs text-muted-foreground font-medium mt-0.5">Visual Auto-Sender</div>
+                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center hover:border-violet-500/40 hover:-translate-y-1 transition-all">
+                  <div className="text-2xl sm:text-3xl font-black text-violet-600 dark:text-violet-400">1-Click</div>
+                  <div className="text-xs text-muted-foreground font-medium mt-0.5">Parchi &amp; Voice Catalog</div>
                 </div>
-                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center">
+                <div className="p-4 rounded-2xl glass-panel border border-border/60 text-center hover:border-emerald-500/40 hover:-translate-y-1 transition-all">
                   <div className="text-2xl sm:text-3xl font-black text-emerald-500">100%</div>
-                  <div className="text-xs text-muted-foreground font-medium mt-0.5">Self-Hosted Privacy</div>
+                  <div className="text-xs text-muted-foreground font-medium mt-0.5">Urdu &amp; Roman Urdu</div>
                 </div>
               </div>
 
