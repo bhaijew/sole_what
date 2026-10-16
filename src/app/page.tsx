@@ -75,7 +75,11 @@ export default function Home() {
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-7">
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/dukaan" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 transition-colors flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <Store className="h-3.5 w-3.5" />
+              <span>Dukaan Directory</span>
+            </Link>
             <Link href="#features" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">Features</Link>
             <Link href="#ai-bot" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">AI Responder</Link>
             <Link href="#ecommerce" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">E-Commerce Alerts</Link>

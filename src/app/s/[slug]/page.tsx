@@ -63,13 +63,13 @@ export default async function StorePage({ params }: Props) {
                 noticeMessage: store.noticeMessage,
                 isOpen: store.isOpen,
                 customDomain: store.customDomain,
-                categories: store.categories.map(c => ({
+                categories: (store.categories || []).map((c: any) => ({
                     id: c.id,
                     name: c.name,
                     slug: c.slug,
                     icon: c.icon
                 })),
-                products: store.products.map(p => ({
+                products: (store.products || []).map((p: any) => ({
                     id: p.id,
                     categoryId: p.categoryId,
                     name: p.name,
