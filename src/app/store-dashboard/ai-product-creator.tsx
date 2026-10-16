@@ -24,7 +24,8 @@ import {
     HelpCircle,
     Zap,
     ImageIcon,
-    ExternalLink
+    ExternalLink,
+    Search
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -87,24 +88,29 @@ const SAMPLE_TABLE_DATA = `| Product Name | Quantity | Price (Rs.) |
 | Dawn Special Burger Buns| 4 pieces      | 80          |`;
 
 const CURATED_PAKISTANI_GALLERY = [
-    { label: "Olper's / Milkpak Doodh", url: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80" },
-    { label: "Olper's / Dairy Cream", url: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80" },
-    { label: "Tarang / Tea Whitener", url: "https://images.unsplash.com/photo-1577968897966-3d4325b36b61?auto=format&fit=crop&w=600&q=80" },
-    { label: "Dawn Plain Bread", url: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80" },
-    { label: "Dawn Burger Buns", url: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=600&q=80" },
-    { label: "Dawn Fruit Cake", url: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=600&q=80" },
-    { label: "Fresh Farm Eggs", url: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=600&q=80" },
-    { label: "Coca-Cola Can/Bottle", url: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=600&q=80" },
-    { label: "Pepsi Chilled", url: "https://images.unsplash.com/photo-1629203851122-3726ecdf080e?auto=format&fit=crop&w=600&q=80" },
-    { label: "7UP / Sprite Green", url: "https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?auto=format&fit=crop&w=600&q=80" },
-    { label: "Slice Mango Drink", url: "https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=600&q=80" },
-    { label: "Mezan / Dalda Cooking Oil", url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80" },
-    { label: "Prema / Milkpak Dahi", url: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=600&q=80" },
-    { label: "Young's Mayonnaise", url: "https://images.unsplash.com/photo-1528751014936-863e6e7a319c?auto=format&fit=crop&w=600&q=80" },
-    { label: "Mozzarella Cheese", url: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=600&q=80" },
-    { label: "National Apple Jam", url: "https://images.unsplash.com/photo-1568651348301-443b7156950f?auto=format&fit=crop&w=600&q=80" },
-    { label: "Tang / Energile Powder", url: "https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=600&q=80" },
-    { label: "Dayfresh Flavoured Milk", url: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&q=80" }
+    { label: "Olper's / Milkpak Milk Carton", url: "https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=600&q=80" },
+    { label: "Fresh Whole Milk Bottle", url: "https://images.unsplash.com/photo-1528750997573-59b89d56f4f7?auto=format&fit=crop&w=600&q=80" },
+    { label: "Olper's / Dairy Cream Pack", url: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80" },
+    { label: "Tarang Tea Whitener Chai Cup", url: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Plain Bread Slices", url: "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Bran Wheat Bread", url: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Burger Buns (Pack of 4)", url: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Candied Fruit Cake Loaf", url: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dawn Crisp Golden Tea Rusk", url: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=600&q=80" },
+    { label: "Farm Fresh Eggs Carton Tray", url: "https://images.unsplash.com/photo-1516448620398-c5f44bf9f441?auto=format&fit=crop&w=600&q=80" },
+    { label: "Coca-Cola Red Can (350ml)", url: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=600&q=80" },
+    { label: "Coca-Cola Family Bottle (1.5L)", url: "https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=600&q=80" },
+    { label: "Pepsi Chilled Blue Can", url: "https://images.unsplash.com/photo-1629203851122-3726ecdf080e?auto=format&fit=crop&w=600&q=80" },
+    { label: "7UP Lime Soda Green Can", url: "https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?auto=format&fit=crop&w=600&q=80" },
+    { label: "Slice Mango Juice Drink", url: "https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=600&q=80" },
+    { label: "Mezan Cooking Oil Pouch", url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80" },
+    { label: "Prema / Milkpak Dahi Tub", url: "https://images.unsplash.com/photo-1571212515416-fef01fc43637?auto=format&fit=crop&w=600&q=80" },
+    { label: "Young's Mayonnaise Glass Jar", url: "https://images.unsplash.com/photo-1528751014936-863e6e7a319c?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dairy Life Mozzarella Cheese Block", url: "https://images.unsplash.com/photo-1618060932014-4deda4932554?auto=format&fit=crop&w=600&q=80" },
+    { label: "National Apple Jam Glass Jar", url: "https://images.unsplash.com/photo-1568651348301-443b7156950f?auto=format&fit=crop&w=600&q=80" },
+    { label: "Tang Instant Orange Drink", url: "https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=600&q=80" },
+    { label: "Energile Original Energy Drink", url: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80" },
+    { label: "Dayfresh Flavoured Milk Bottle", url: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&q=80" }
 ];
 
 const BUSINESS_PACKS = [
@@ -181,6 +187,34 @@ export default function AiProductCreator({ activeStore, onComplete }: AiProductC
     // Image Selector Modal State
     const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
     const [customImageInput, setCustomImageInput] = useState<string>("");
+    const [imageSearchQuery, setImageSearchQuery] = useState<string>("");
+    const [imageSearchResults, setImageSearchResults] = useState<{ label: string; url: string }[]>([]);
+    const [isSearchingImages, setIsSearchingImages] = useState<boolean>(false);
+
+    const handleSearchImages = async (query: string) => {
+        if (!query.trim()) return;
+        setIsSearchingImages(true);
+        try {
+            const res = await fetch(`/api/store/image-search?q=${encodeURIComponent(query.trim())}`);
+            const data = await res.json();
+            if (data.images && Array.isArray(data.images)) {
+                setImageSearchResults(data.images);
+            }
+        } catch (e) {
+            console.warn("Failed to search images", e);
+        } finally {
+            setIsSearchingImages(false);
+        }
+    };
+
+    const handleOpenImageModal = (idx: number) => {
+        setEditingImageIndex(idx);
+        const prod = parsedProducts[idx];
+        if (prod) {
+            setImageSearchQuery(prod.name);
+            handleSearchImages(prod.name);
+        }
+    };
 
     // Detect if input contains table rows
     const tableDetection = useMemo(() => {
@@ -861,9 +895,9 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                                     <tr key={idx} className="hover:bg-muted/30 transition-colors">
                                         <td className="py-2 px-3 text-center">
                                             <div
-                                                onClick={() => setEditingImageIndex(idx)}
+                                                onClick={() => handleOpenImageModal(idx)}
                                                 className="relative w-11 h-11 rounded-xl overflow-hidden border border-border/80 bg-background shrink-0 mx-auto cursor-pointer group hover:ring-2 hover:ring-violet-500 shadow-2xs"
-                                                title="Click to Change Image"
+                                                title="Click to Change / Search Image"
                                             >
                                                 <Image
                                                     src={p.image || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80"}
@@ -984,20 +1018,21 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
             {/* IMAGE CHANGER MODAL */}
             {editingImageIndex !== null && parsedProducts[editingImageIndex] && (
                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
-                    <div className="bg-card border border-border/80 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-5">
+                    <div className="bg-card border border-border/80 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between border-b border-border/60 pb-3">
                             <div>
                                 <h4 className="font-extrabold text-base text-foreground">
-                                    Select Product Photo
+                                    Select Product Photo (تصویر تبدیل کریں)
                                 </h4>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    For: <strong>{parsedProducts[editingImageIndex].name}</strong>
+                                    Product: <strong className="text-foreground">{parsedProducts[editingImageIndex].name}</strong>
                                 </p>
                             </div>
                             <button
                                 onClick={() => {
                                     setEditingImageIndex(null);
                                     setCustomImageInput("");
+                                    setImageSearchResults([]);
                                 }}
                                 className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
                             >
@@ -1005,36 +1040,82 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                             </button>
                         </div>
 
-                        {/* CURRENT PHOTO */}
-                        <div className="flex items-center gap-4 p-3 rounded-2xl bg-muted/40 border border-border/60">
-                            <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-border shrink-0">
-                                <Image
-                                    src={parsedProducts[editingImageIndex].image || "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80"}
-                                    alt="Current"
-                                    fill
-                                    className="object-cover"
+                        {/* SEARCH BAR */}
+                        <div className="space-y-1.5">
+                            <span className="text-xs font-bold text-muted-foreground block">
+                                🔍 Search Authentic Product Photos:
+                            </span>
+                            <div className="relative">
+                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="Search e.g. Olpers Milk, Dawn Bread, Pepsi, Eggs..."
+                                    value={imageSearchQuery}
+                                    onChange={(e) => setImageSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            handleSearchImages(imageSearchQuery);
+                                        }
+                                    }}
+                                    className="w-full bg-background border border-border/80 focus:border-violet-500 rounded-xl pl-9 pr-24 py-2 text-xs text-foreground focus:outline-none"
                                 />
-                            </div>
-                            <div>
-                                <span className="text-xs font-bold text-foreground block">Mojooda Photo</span>
-                                <span className="text-[11px] text-muted-foreground">Agar yeh pasand nahi toh neeche se doosri photo chun lijiye:</span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSearchImages(imageSearchQuery)}
+                                    disabled={isSearchingImages}
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                    {isSearchingImages ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                                    <span>Search</span>
+                                </button>
                             </div>
                         </div>
 
-                        {/* CURATED GALLERY */}
+                        {/* SEARCH RESULTS IF FOUND */}
+                        {imageSearchResults.length > 0 && (
+                            <div className="space-y-2">
+                                <span className="text-xs font-bold text-violet-600 dark:text-violet-400 block">
+                                    ✨ Matching Photos Found ({imageSearchResults.length}):
+                                </span>
+                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-48 overflow-y-auto p-1">
+                                    {imageSearchResults.map((item, sIdx) => (
+                                        <button
+                                            key={sIdx}
+                                            type="button"
+                                            onClick={() => handleApplySelectedImage(item.url)}
+                                            className="relative group rounded-xl overflow-hidden border border-border hover:border-violet-500 text-left transition cursor-pointer flex flex-col shadow-2xs hover:shadow-md"
+                                        >
+                                            <div className="relative h-20 w-full bg-muted">
+                                                <Image
+                                                    src={item.url}
+                                                    alt={item.label}
+                                                    fill
+                                                    className="object-cover group-hover:scale-105 transition-transform"
+                                                />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-foreground p-1 line-clamp-1 bg-card/95">
+                                                {item.label}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* POPULAR PAKISTANI STORE PHOTOS */}
                         <div className="space-y-2">
                             <span className="text-xs font-bold text-muted-foreground block">
                                 🖼️ Popular Pakistani Store Photos:
                             </span>
-                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto p-1">
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-48 overflow-y-auto p-1">
                                 {CURATED_PAKISTANI_GALLERY.map((item, gIdx) => (
                                     <button
                                         key={gIdx}
                                         type="button"
                                         onClick={() => handleApplySelectedImage(item.url)}
-                                        className="relative group rounded-xl overflow-hidden border border-border hover:border-violet-500 text-left transition cursor-pointer flex flex-col"
+                                        className="relative group rounded-xl overflow-hidden border border-border hover:border-violet-500 text-left transition cursor-pointer flex flex-col shadow-2xs hover:shadow-md"
                                     >
-                                        <div className="relative h-16 w-full bg-muted">
+                                        <div className="relative h-18 w-full bg-muted">
                                             <Image
                                                 src={item.url}
                                                 alt={item.label}
@@ -1051,14 +1132,14 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                         </div>
 
                         {/* CUSTOM URL INPUT */}
-                        <div className="space-y-1.5">
+                        <div className="space-y-1.5 border-t border-border/60 pt-3">
                             <span className="text-xs font-bold text-muted-foreground block">
                                 Ya Apni Custom Image Ka Link Paste Karein:
                             </span>
                             <div className="flex items-center gap-2">
                                 <input
                                     type="url"
-                                    placeholder="https://images.unsplash.com/..."
+                                    placeholder="https://images.unsplash.com/... ya google link"
                                     value={customImageInput}
                                     onChange={(e) => setCustomImageInput(e.target.value)}
                                     className="flex-1 bg-background border border-border/80 rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:border-violet-500"
@@ -1072,7 +1153,7 @@ ya bol kar likhein: 'Olpers doodh 1 liter 350 rupay, dalda oil 2600 rupay'..."
                                         }
                                         handleApplySelectedImage(customImageInput.trim());
                                     }}
-                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl"
+                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl cursor-pointer"
                                 >
                                     Apply
                                 </button>

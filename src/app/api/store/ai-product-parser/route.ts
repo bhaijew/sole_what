@@ -16,115 +16,133 @@ interface ProductMatchRule {
 }
 
 const PRODUCT_IMAGE_REGISTRY: ProductMatchRule[] = [
-    // 1. Dairy Cream (Must match before generic milk)
+    // 1. Dairy Cream
     {
         match: ["olper's cream", "olpers cream", "dayfresh dairy cream", "dayfresh cream", "dairy cream", "heavy cream", "malai", "whipping cream"],
         image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80",
         category: "Dairy & Cream"
     },
-    // 2. Tea Whitener
+    // 2. Tea Whitener (Tarang / Everyday)
     {
-        match: ["tarang", "tea whitener", "everyday", "bunyad", "nido"],
-        image: "https://images.unsplash.com/photo-1577968897966-3d4325b36b61?auto=format&fit=crop&w=600&q=80",
+        match: ["tarang", "tea whitener", "everyday", "bunyad", "nido", "creamer"],
+        image: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80",
         category: "Dairy & Milk"
     },
-    // 3. Yogurt & Dahi (Must match before generic milk)
+    // 3. Plain Dahi & Yogurt (Prema / Milkpak)
     {
         match: ["prema yogurt", "milkpak yogurt", "nestle dahi", "yogurt", "dahi", "curd"],
-        image: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=600&q=80",
+        image: "https://images.unsplash.com/photo-1571212515416-fef01fc43637?auto=format&fit=crop&w=600&q=80",
         category: "Dairy & Yogurt"
     },
-    // 4. Cheese
+    // 4. Mozzarella & Cheddar Cheese (Dairy Life)
     {
-        match: ["mozzarella", "cheddar", "cheese", "paneer", "dairy life"],
-        image: "https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=600&q=80",
+        match: ["dairy life mozzarella", "mozzarella", "dairy life", "cheddar", "pizza cheese", "paneer", "cheese"],
+        image: "https://images.unsplash.com/photo-1618060932014-4deda4932554?auto=format&fit=crop&w=600&q=80",
         category: "Dairy & Cheese"
     },
-    // 5. Mayonnaise & Spreads
+    // 5. Mayonnaise (Young's)
     {
-        match: ["mayonnaise", "mayo", "young's mayonnaise", "youngs mayo", "garlic mayo", "sandwich spread"],
+        match: ["young's mayonnaise", "youngs mayo", "mayonnaise", "mayo", "garlic mayo", "sandwich spread"],
         image: "https://images.unsplash.com/photo-1528751014936-863e6e7a319c?auto=format&fit=crop&w=600&q=80",
         category: "Spreads & Sauces"
     },
-    // 6. Jam & Jellies
+    // 6. Jam & Marmalade (National Apple Jam)
     {
-        match: ["apple jam", "national apple jam", "jam", "marmalade", "jelly", "strawberry jam", "shezan jam", "mitchell's"],
+        match: ["national apple jam", "apple jam", "national jam", "jam", "marmalade", "jelly", "strawberry jam", "shezan jam"],
         image: "https://images.unsplash.com/photo-1568651348301-443b7156950f?auto=format&fit=crop&w=600&q=80",
         category: "Jams & Spreads"
     },
-    // 7. Burger Buns
+    // 7. Burger Buns (Dawn Buns)
     {
-        match: ["burger buns", "dawn burger buns", "dawn special burger buns", "buns", "burger bun"],
+        match: ["dawn special burger buns", "dawn burger buns", "burger buns", "buns", "burger bun"],
         image: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=600&q=80",
         category: "Bakery & Breads"
     },
-    // 8. Cakes & Tea Cakes
+    // 8. Fruit Cake & Tea Cake (Dawn Fruit Cake)
     {
-        match: ["fruit cake", "dawn fruit cake", "tea cake", "pound cake", "marble cake", "cake"],
-        image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=600&q=80",
+        match: ["dawn fruit cake", "fruit cake", "tea cake", "pound cake", "marble cake", "cake loaf"],
+        image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80",
         category: "Bakery & Cakes"
     },
-    // 9. Rusk
+    // 9. Rusk (Dawn Rusk)
     {
-        match: ["rusk", "dawn rusk", "cake rusk", "tea rusk", "biscotti"],
+        match: ["dawn rusk", "rusk", "cake rusk", "tea rusk", "toasts"],
+        image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=600&q=80",
+        category: "Bakery & Breads"
+    },
+    // 10. Bran Bread (Dawn Bran Bread)
+    {
+        match: ["dawn bran bread", "bran bread", "brown bread", "whole wheat bread"],
         image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
         category: "Bakery & Breads"
     },
-    // 10. Breads
+    // 11. Plain Bread (Dawn Plain Bread Small / Large)
     {
-        match: ["plain bread", "dawn plain bread", "bran bread", "milky bread", "sandwich bread", "bread", "roti", "loaf"],
-        image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
+        match: ["dawn plain bread", "plain bread", "dawn bread", "sandwich bread", "white bread", "bread", "loaf", "roti"],
+        image: "https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=600&q=80",
         category: "Bakery & Breads"
     },
-    // 11. Flavoured Milk
+    // 12. Flavoured Milk (Dayfresh)
     {
         match: ["flavoured milk", "flavored milk", "dayfresh flavoured milk", "chocolate milk", "strawberry milk", "banana milk", "milo", "pakola milk"],
         image: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&q=80",
         category: "Dairy & Beverages"
     },
-    // 12. Fresh Milk & Milk Brands
+    // 13. Tetra Pack Milk (Olper's / Milkpak / Nurpur / Omung)
     {
-        match: ["olper's full cream milk", "olpers full cream milk", "olper", "milkpak", "nestlé milkpak", "nurpur", "omung", "dayfresh", "full cream milk", "low fat milk", "fresh milk", "doodh"],
-        image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80",
+        match: ["olper's full cream milk", "olpers full cream milk", "olper", "milkpak", "nestlé milkpak", "nurpur", "omung", "full cream milk", "low fat milk", "fresh milk", "doodh", "milk"],
+        image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=600&q=80",
         category: "Dairy & Milk"
     },
-    // 13. Eggs
+    // 14. Fresh Eggs (12 pcs / 6 pcs) in carton
     {
-        match: ["fresh eggs", "eggs", "egg", "anday", "anda", "desi anday"],
-        image: "https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?auto=format&fit=crop&w=600&q=80",
+        match: ["fresh eggs", "eggs", "egg", "anday", "anda", "desi anday", "farm eggs"],
+        image: "https://images.unsplash.com/photo-1516448620398-c5f44bf9f441?auto=format&fit=crop&w=600&q=80",
         category: "Eggs & Farm"
     },
-    // 14. Coca-Cola
+    // 15. Coca-Cola 1.5 Litre (Bottle)
     {
-        match: ["coca-cola", "coca cola", "coke", "diet coke", "coke zero"],
+        match: ["coca-cola 1.5", "coca cola 1.5", "coke 1.5", "1.5 litre coke", "1.5 l coke"],
+        image: "https://images.unsplash.com/photo-1554866585-cd94860890b7?auto=format&fit=crop&w=600&q=80",
+        category: "Beverages & Cold Drinks"
+    },
+    // 16. Coca-Cola 350ml / Can
+    {
+        match: ["coca-cola", "coca cola", "coke", "diet coke", "coke zero", "coke can"],
         image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=600&q=80",
         category: "Beverages & Cold Drinks"
     },
-    // 15. Pepsi
+    // 17. Pepsi (Can / Bottle)
     {
-        match: ["pepsi", "diet pepsi", "pepsi max"],
+        match: ["pepsi", "diet pepsi", "pepsi max", "pepsi can"],
         image: "https://images.unsplash.com/photo-1629203851122-3726ecdf080e?auto=format&fit=crop&w=600&q=80",
         category: "Beverages & Cold Drinks"
     },
-    // 16. 7UP & Lime Sodas
+    // 18. 7UP & Lime Sodas
     {
         match: ["7up", "seven up", "sprite", "dew", "mountain dew", "marinda", "fanta"],
         image: "https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?auto=format&fit=crop&w=600&q=80",
         category: "Beverages & Cold Drinks"
     },
-    // 17. Mango Juice & Slice
+    // 19. Slice Mango Drink
     {
         match: ["slice mango drink", "slice mango", "slice", "mango drink", "mango juice", "fruita vitals", "shezan mango", "frooto"],
         image: "https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=600&q=80",
         category: "Beverages & Juices"
     },
-    // 18. Instant Drink Powders (Tang / Energile)
+    // 20. Tang Instant Drink Powder
     {
-        match: ["tang instant drink powder", "tang", "energile original", "energile", "glucose", "powder drink", "rooh afza", "jam-e-shirin"],
+        match: ["tang instant drink powder", "tang", "instant drink powder", "orange drink powder"],
         image: "https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=600&q=80",
         category: "Beverages & Powder Drinks"
     },
-    // 19. Cooking Oil & Ghee
+    // 21. Energile Original
+    {
+        match: ["energile original", "energile", "glucose", "energy drink powder", "glucon-d"],
+        image: "https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=600&q=80",
+        category: "Beverages & Powder Drinks"
+    },
+    // 22. Cooking Oil & Ghee (Mezan / Dalda)
     {
         match: ["mezan cooking oil", "mezan", "dalda", "cooking oil", "oil", "ghee", "banaspati", "canola", "sunflower", "sufi oil", "habib oil"],
         image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80",
