@@ -110,6 +110,7 @@ const navGroups: NavGroup[] = [
             { href: "/dashboard/media", label: "Media Manager", icon: HardDrive },
             { href: "/dashboard/sessions/access", label: "Session Access", icon: UserPlus },
             { href: "/dashboard/users", label: "Users", icon: Users, superadminOnly: true },
+            { href: "/dashboard/store-users", label: "Store Users", icon: Store, superadminOnly: true },
             { href: "/dashboard/settings", label: "Settings", icon: Settings },
             { href: "/dashboard/system-monitor", label: "System Monitor", icon: Activity, superadminOnly: true },
             { href: "/dashboard/notifications", label: "Notifications", icon: Bell, superadminOnly: true },
