@@ -33,7 +33,13 @@ import {
     MessageSquare,
     Receipt,
     QrCode,
-    Loader2
+    Loader2,
+    RefreshCw,
+    ExternalLink,
+    History,
+    Calendar,
+    ChevronDown,
+    ChevronUp
 } from "lucide-react";
 import { PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
 
@@ -89,12 +95,46 @@ interface StoreData {
     products: Product[];
 }
 
+export interface CachedCustomerOrderItem {
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    productImage?: string | null;
+}
+
+export interface CachedCustomerOrder {
+    orderNumber: string;
+    orderId?: string;
+    storeId: string;
+    storeSlug: string;
+    storeName: string;
+    customerName: string;
+    customerPhone: string;
+    customerAddress: string;
+    subtotal: number;
+    deliveryFee: number;
+    discount: number;
+    total: number;
+    paymentMethod: string;
+    status: string;
+    placedAt: string;
+    whatsappRedirectUrl?: string;
+    items: CachedCustomerOrderItem[];
+}
+
 export default function StorefrontClient({ store }: { store: StoreData }) {
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [searchQuery, setSearchQuery] = useState<string>("");
     const [cart, setCart] = useState<Map<string, number>>(new Map());
     const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
     const [currentSlide, setCurrentSlide] = useState<number>(0);
+
+    // Browser Cached Orders State (Order History saved in customer's local browser)
+    const [cachedOrders, setCachedOrders] = useState<CachedCustomerOrder[]>([]);
+    const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState<boolean>(false);
+    const [isRefreshingHistory, setIsRefreshingHistory] = useState<boolean>(false);
+    const [expandedOrderNum, setExpandedOrderNum] = useState<string | null>(null);
 
     // Dynamic banner configuration from store.bannerUrl (allows custom slides or hiding the slider completely)
     const bannerConfig = useMemo(() => {
@@ -151,6 +191,85 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const isSubmittingRef = useRef<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string>("");
+
+    // Load Cached Orders and profile from browser cache (localStorage)
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(`solewhat_orders_${store.id}`);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setCachedOrders(parsed);
+                    setExpandedOrderNum(parsed[0].orderNumber);
+                }
+            }
+            const profileRaw = localStorage.getItem("solewhat_customer_profile");
+            if (profileRaw) {
+                const profile = JSON.parse(profileRaw);
+                if (profile.name) setCustomerName(profile.name);
+                if (profile.phone) setCustomerPhone(profile.phone);
+                if (profile.address) setCustomerAddress(profile.address);
+            }
+        } catch (e) {
+            console.warn("Failed to read from browser cache:", e);
+        }
+    }, [store.id]);
+
+    // Live Sync / Auto-Status Refresh from /api/store/track
+    const refreshCachedOrdersStatus = async () => {
+        if (cachedOrders.length === 0 || isRefreshingHistory) return;
+        setIsRefreshingHistory(true);
+        try {
+            const updated = await Promise.all(
+                cachedOrders.map(async (ord) => {
+                    if (ord.status === "DELIVERED" || ord.status === "CANCELLED") {
+                        return ord;
+                    }
+                    try {
+                        const res = await fetch(`/api/store/track?slug=${encodeURIComponent(store.slug)}&query=${encodeURIComponent(ord.orderNumber)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.success && data.order) {
+                                return {
+                                    ...ord,
+                                    status: data.order.status || ord.status,
+                                    total: data.order.total ?? ord.total,
+                                    items: Array.isArray(data.order.items) && data.order.items.length > 0
+                                        ? data.order.items.map((it: any) => ({
+                                            productName: it.productName,
+                                            quantity: it.quantity,
+                                            unitPrice: it.unitPrice,
+                                            totalPrice: it.totalPrice,
+                                            productImage: it.productImage
+                                        }))
+                                        : ord.items
+                                };
+                            }
+                        }
+                    } catch {
+                        // ignore network error
+                    }
+                    return ord;
+                })
+            );
+            setCachedOrders(updated);
+            try {
+                localStorage.setItem(`solewhat_orders_${store.id}`, JSON.stringify(updated));
+            } catch {}
+        } catch (err) {
+            console.error("Failed to refresh cached orders status:", err);
+        } finally {
+            setIsRefreshingHistory(false);
+        }
+    };
+
+    const handleClearOrderHistory = () => {
+        if (!confirm("Kya aap waqai is browser se apni tamam order history khatam (clear) karna chahte hain?")) return;
+        try {
+            localStorage.removeItem(`solewhat_orders_${store.id}`);
+            setCachedOrders([]);
+        } catch {}
+    };
 
     // Feature 6: Coupons & Flash Deals State
     const [couponInput, setCouponInput] = useState<string>("");
@@ -483,7 +602,49 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                 throw new Error(data.error || "Order place karne mein masla pesh aaya.");
             }
 
-            // Order Placed Successfully
+            // Order Placed Successfully - Save to Customer's Browser Cache (localStorage)
+            const newCachedOrder: CachedCustomerOrder = {
+                orderNumber: data.orderNumber,
+                orderId: data.orderId,
+                storeId: store.id,
+                storeSlug: store.slug,
+                storeName: store.name,
+                customerName: customerName.trim(),
+                customerPhone: customerPhone.trim(),
+                customerAddress: customerAddress.trim(),
+                subtotal: subtotal,
+                deliveryFee: deliveryFee,
+                discount: discountAmount,
+                total: data.total || totalBill,
+                paymentMethod: paymentMethod,
+                status: "PENDING",
+                placedAt: new Date().toISOString(),
+                whatsappRedirectUrl: data.whatsappRedirectUrl,
+                items: cartItems.map(item => ({
+                    productName: item.product.name,
+                    quantity: item.quantity,
+                    unitPrice: item.product.price,
+                    totalPrice: item.product.price * item.quantity,
+                    productImage: item.product.image || null
+                }))
+            };
+
+            setCachedOrders(prev => {
+                const nextOrders = [newCachedOrder, ...prev.filter(o => o.orderNumber !== data.orderNumber)];
+                try {
+                    localStorage.setItem(`solewhat_orders_${store.id}`, JSON.stringify(nextOrders));
+                    localStorage.setItem("solewhat_customer_profile", JSON.stringify({
+                        name: customerName.trim(),
+                        phone: customerPhone.trim(),
+                        address: customerAddress.trim()
+                    }));
+                } catch (e) {
+                    console.warn("Failed to store order in localStorage:", e);
+                }
+                return nextOrders;
+            });
+            setExpandedOrderNum(data.orderNumber);
+
             setCompletedOrder({
                 orderNumber: data.orderNumber,
                 total: data.total,
@@ -582,7 +743,24 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                        {/* Browser Cached Order History Trigger */}
+                        <button
+                            onClick={() => {
+                                setIsOrderHistoryOpen(true);
+                                refreshCachedOrdersStatus();
+                            }}
+                            title="Aapke Orders (Browser Cache History)"
+                            className="relative px-2.5 sm:px-3 py-2 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 transition flex items-center gap-1.5 font-bold text-xs cursor-pointer shadow-2xs"
+                        >
+                            <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="hidden sm:inline">Orders</span>
+                            {cachedOrders.length > 0 && (
+                                <span className="bg-emerald-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+                                    {cachedOrders.length}
+                                </span>
+                            )}
+                        </button>
 
                         <button
                             onClick={handleShare}
@@ -1465,8 +1643,19 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                 <span>WhatsApp Par Dukaan Se Chat Karein</span>
                             </a>
                             <button
+                                onClick={() => {
+                                    setCompletedOrder(null);
+                                    setIsOrderHistoryOpen(true);
+                                    refreshCachedOrdersStatus();
+                                }}
+                                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 text-xs cursor-pointer"
+                            >
+                                <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>📜 Browser Order History Dekhein</span>
+                            </button>
+                            <button
                                 onClick={() => setCompletedOrder(null)}
-                                className="w-full py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+                                className="w-full py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition cursor-pointer"
                             >
                                 Band Karein (Close)
                             </button>
@@ -1598,6 +1787,398 @@ export default function StorefrontClient({ store }: { store: StoreData }) {
                                     <Send className="w-4 h-4" />
                                 </button>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Floating Recent Order Badge (Mobile & Desktop Quick Access when cart is empty) */}
+            {cartCount === 0 && cachedOrders.length > 0 && !isCartOpen && !isOrderHistoryOpen && (
+                <div className="fixed bottom-3 left-3 sm:bottom-6 sm:left-6 z-30 animate-bounce">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsOrderHistoryOpen(true);
+                            refreshCachedOrdersStatus();
+                        }}
+                        className="flex items-center gap-2 bg-slate-900/95 hover:bg-black text-white text-xs font-bold py-2.5 px-4 rounded-full shadow-2xl border border-slate-700/80 backdrop-blur-md cursor-pointer transition active:scale-95"
+                    >
+                        <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>📜 Recent Order: #{cachedOrders[0].orderNumber}</span>
+                        <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                            {cachedOrders[0].status}
+                        </span>
+                    </button>
+                </div>
+            )}
+
+            {/* Customer Order History Slide-over Drawer (Browser Cache) */}
+            {isOrderHistoryOpen && (
+                <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-fade-in">
+                    <div className="w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-slide-left">
+                        {/* Drawer Header */}
+                        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-xs">
+                                    <Clock className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h2 className="font-bold text-sm sm:text-base leading-tight">
+                                        📜 Aapki Order History
+                                    </h2>
+                                    <p className="text-[11px] text-slate-300">
+                                        Browser Cache mein mehfooz ({cachedOrders.length} {cachedOrders.length === 1 ? "Order" : "Orders"})
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={refreshCachedOrdersStatus}
+                                    disabled={isRefreshingHistory || cachedOrders.length === 0}
+                                    title="Refresh status from store"
+                                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer disabled:opacity-40"
+                                >
+                                    <RefreshCw className={`w-4 h-4 ${isRefreshingHistory ? "animate-spin text-emerald-400" : ""}`} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOrderHistoryOpen(false)}
+                                    className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Top Info Banner */}
+                        <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-2.5 text-xs text-emerald-900 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span className="text-[11px]">Bina account banaye orders aapke browser cache mein mehfooz hain.</span>
+                            </div>
+                            {cachedOrders.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={handleClearOrderHistory}
+                                    className="text-[10px] text-rose-600 hover:text-rose-700 font-bold underline shrink-0 cursor-pointer"
+                                >
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Orders List / Scrollable Container */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-slate-50 styled-scrollbar">
+                            {cachedOrders.length === 0 ? (
+                                <div className="text-center py-16 space-y-3">
+                                    <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto shadow-inner">
+                                        <ShoppingBag className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="font-extrabold text-sm text-slate-800">
+                                        Koi Purana Order Nahi Mila
+                                    </h3>
+                                    <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                                        Jab aap is dukaan se order place karenge, wo automatic aapke browser cache mein save ho jayega.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsOrderHistoryOpen(false)}
+                                        className="mt-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer inline-flex items-center gap-1.5"
+                                    >
+                                        <ShoppingBag className="w-3.5 h-3.5" />
+                                        <span>Abhi Shopping Karein</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                cachedOrders.map((ord) => {
+                                    const isExpanded = expandedOrderNum === ord.orderNumber;
+                                    const statusLower = (ord.status || "PENDING").toUpperCase();
+
+                                    const getStatusInfo = (st: string) => {
+                                        switch (st) {
+                                            case "DELIVERED":
+                                                return {
+                                                    label: "Delivered (پہنچ گیا)",
+                                                    bg: "bg-emerald-500/15 text-emerald-800 border-emerald-500/30",
+                                                    dot: "bg-emerald-500",
+                                                    stepIndex: 3
+                                                };
+                                            case "OUT_FOR_DELIVERY":
+                                                return {
+                                                    label: "On The Way (راستے میں ہے)",
+                                                    bg: "bg-purple-500/15 text-purple-800 border-purple-500/30",
+                                                    dot: "bg-purple-500 animate-pulse",
+                                                    stepIndex: 2
+                                                };
+                                            case "PREPARING":
+                                                return {
+                                                    label: "Packing (تیار ہو رہا ہے)",
+                                                    bg: "bg-amber-500/15 text-amber-800 border-amber-500/30",
+                                                    dot: "bg-amber-500",
+                                                    stepIndex: 1
+                                                };
+                                            case "CONFIRMED":
+                                                return {
+                                                    label: "Confirmed (منظور شدہ)",
+                                                    bg: "bg-blue-500/15 text-blue-800 border-blue-500/30",
+                                                    dot: "bg-blue-500",
+                                                    stepIndex: 1
+                                                };
+                                            case "CANCELLED":
+                                                return {
+                                                    label: "Cancelled (منسوخ)",
+                                                    bg: "bg-rose-500/15 text-rose-800 border-rose-500/30",
+                                                    dot: "bg-rose-500",
+                                                    stepIndex: -1
+                                                };
+                                            default:
+                                                return {
+                                                    label: "Pending (زیرِ غور)",
+                                                    bg: "bg-amber-500/15 text-amber-800 border-amber-500/30",
+                                                    dot: "bg-amber-500 animate-pulse",
+                                                    stepIndex: 0
+                                                };
+                                        }
+                                    };
+
+                                    const stInfo = getStatusInfo(statusLower);
+                                    const formattedDate = ord.placedAt
+                                        ? new Date(ord.placedAt).toLocaleDateString("en-PK", {
+                                              day: "numeric",
+                                              month: "short",
+                                              year: "numeric",
+                                              hour: "numeric",
+                                              minute: "2-digit",
+                                              hour12: true
+                                          })
+                                        : "Recent Order";
+
+                                    const waInquiryUrl = `https://wa.me/${store.phone ? store.phone.replace(/[^\d]/g, "") : ""}?text=${encodeURIComponent(
+                                        `Assalam-o-Alaikum! Mere order #${ord.orderNumber} (Rs. ${ord.total.toLocaleString("en-PK")}) ka status kya hai?`
+                                    )}`;
+
+                                    return (
+                                        <div
+                                            key={ord.orderNumber}
+                                            className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:shadow-md"
+                                        >
+                                            {/* Order Card Top Bar */}
+                                            <div
+                                                onClick={() => setExpandedOrderNum(isExpanded ? null : ord.orderNumber)}
+                                                className="p-3.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-3 cursor-pointer select-none"
+                                            >
+                                                <div className="space-y-0.5 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-mono font-black text-sm text-slate-900">
+                                                            #{ord.orderNumber}
+                                                        </span>
+                                                        <span
+                                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${stInfo.bg}`}
+                                                        >
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${stInfo.dot}`} />
+                                                            <span>{stInfo.label}</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                                        <Calendar className="w-3 h-3 text-slate-400" />
+                                                        <span>{formattedDate}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <div className="text-right">
+                                                        <div className="font-black text-sm text-emerald-700">
+                                                            {store.currencySymbol} {ord.total.toLocaleString("en-PK")}
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 font-medium">
+                                                            {ord.items?.length || 0} items
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 transition"
+                                                    >
+                                                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Progress Stepper Bar */}
+                                            {statusLower !== "CANCELLED" && (
+                                                <div className="px-4 py-3 bg-white border-b border-slate-100">
+                                                    <div className="flex items-center justify-between relative">
+                                                        <div className="absolute top-1/2 left-3 right-3 -translate-y-1/2 h-0.5 bg-slate-200 z-0" />
+                                                        <div
+                                                            className="absolute top-1/2 left-3 -translate-y-1/2 h-0.5 bg-emerald-500 transition-all duration-500 z-0"
+                                                            style={{
+                                                                width:
+                                                                    stInfo.stepIndex === 0
+                                                                        ? "15%"
+                                                                        : stInfo.stepIndex === 1
+                                                                        ? "48%"
+                                                                        : stInfo.stepIndex === 2
+                                                                        ? "80%"
+                                                                        : "100%"
+                                                            }}
+                                                        />
+                                                        {[
+                                                            { step: 0, title: "Booked" },
+                                                            { step: 1, title: "Confirmed" },
+                                                            { step: 2, title: "On The Way" },
+                                                            { step: 3, title: "Delivered" }
+                                                        ].map(st => {
+                                                            const isDone = stInfo.stepIndex >= st.step;
+                                                            return (
+                                                                <div key={st.step} className="flex flex-col items-center relative z-10">
+                                                                    <div
+                                                                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                                                            isDone
+                                                                                ? "bg-emerald-600 text-white shadow-xs"
+                                                                                : "bg-slate-200 text-slate-500"
+                                                                        }`}
+                                                                    >
+                                                                        {isDone ? "✓" : st.step + 1}
+                                                                    </div>
+                                                                    <span
+                                                                        className={`text-[9px] mt-1 font-semibold ${
+                                                                            isDone ? "text-emerald-700" : "text-slate-400"
+                                                                        }`}
+                                                                    >
+                                                                        {st.title}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Expanded Order Details */}
+                                            {isExpanded && (
+                                                <div className="p-4 space-y-3 bg-white">
+                                                    {/* Items List */}
+                                                    <div className="space-y-2">
+                                                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                                                            Order Items
+                                                        </span>
+                                                        <div className="divide-y divide-slate-100 bg-slate-50/60 rounded-xl p-2.5 border border-slate-100">
+                                                            {ord.items && ord.items.length > 0 ? (
+                                                                ord.items.map((it, idx) => (
+                                                                    <div key={idx} className="py-1.5 flex items-center justify-between text-xs gap-2">
+                                                                        <div className="flex items-center gap-2 min-w-0">
+                                                                            {it.productImage && (
+                                                                                <img
+                                                                                    src={it.productImage}
+                                                                                    alt={it.productName}
+                                                                                    className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0"
+                                                                                />
+                                                                            )}
+                                                                            <span className="font-semibold text-slate-800 truncate">
+                                                                                {it.productName}
+                                                                            </span>
+                                                                            <span className="text-[11px] text-slate-500 shrink-0">
+                                                                                × {it.quantity}
+                                                                            </span>
+                                                                        </div>
+                                                                        <span className="font-bold text-slate-900 shrink-0">
+                                                                            {store.currencySymbol} {it.totalPrice?.toLocaleString("en-PK") || (it.unitPrice * it.quantity).toLocaleString("en-PK")}
+                                                                        </span>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <p className="text-xs text-slate-500">Items summary not available</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Delivery & Payment Info */}
+                                                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                        <div>
+                                                            <span className="text-slate-400 font-bold block">Delivery Address:</span>
+                                                            <p className="text-slate-700 font-medium truncate mt-0.5">
+                                                                {ord.customerAddress}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-slate-400 font-bold block">Payment Mode:</span>
+                                                            <p className="text-slate-700 font-medium mt-0.5">
+                                                                {ord.paymentMethod === "COD" ? "Cash On Delivery (COD)" : ord.paymentMethod}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Price Breakdown */}
+                                                    <div className="space-y-1 text-xs text-slate-600 border-t border-slate-100 pt-2">
+                                                        <div className="flex justify-between">
+                                                            <span>Subtotal:</span>
+                                                            <span>{store.currencySymbol} {(ord.subtotal || 0).toLocaleString("en-PK")}</span>
+                                                        </div>
+                                                        {ord.discount > 0 && (
+                                                            <div className="flex justify-between text-emerald-700 font-semibold">
+                                                                <span>Discount:</span>
+                                                                <span>-{store.currencySymbol} {ord.discount.toLocaleString("en-PK")}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-between">
+                                                            <span>Delivery Charges:</span>
+                                                            <span>{ord.deliveryFee === 0 ? "FREE" : `${store.currencySymbol} ${ord.deliveryFee.toLocaleString("en-PK")}`}</span>
+                                                        </div>
+                                                        <div className="flex justify-between font-black text-sm text-slate-900 pt-1 border-t border-slate-100">
+                                                            <span>Total Bill:</span>
+                                                            <span className="text-emerald-700">
+                                                                {store.currencySymbol} {ord.total.toLocaleString("en-PK")}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Action Buttons */}
+                                                    <div className="pt-2 grid grid-cols-2 gap-2">
+                                                        <a
+                                                            href={waInquiryUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                                                        >
+                                                            <Phone className="w-3.5 h-3.5" />
+                                                            <span>WhatsApp Chat</span>
+                                                        </a>
+                                                        <a
+                                                            href={`/s/${store.slug}/track?query=${encodeURIComponent(ord.orderNumber)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                                                        >
+                                                            <Truck className="w-3.5 h-3.5 text-blue-600" />
+                                                            <span>Live Track ↗</span>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* Drawer Footer */}
+                        <div className="p-4 border-t border-slate-200 bg-white flex items-center justify-between gap-3">
+                            <a
+                                href={`https://wa.me/${store.phone ? store.phone.replace(/[^\d]/g, "") : ""}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5"
+                            >
+                                <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Dukaan Helpline</span>
+                            </a>
+                            <button
+                                type="button"
+                                onClick={() => setIsOrderHistoryOpen(false)}
+                                className="py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>

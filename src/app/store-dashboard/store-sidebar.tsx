@@ -103,7 +103,7 @@ export default function StoreSidebar({
             title: "Growth & Retention",
             items: [
                 { id: "abandoned", label: "Abandoned Carts", icon: ShoppingCart, badge: "WhatsApp" },
-                { id: "slider", label: "Storefront Slider", icon: ImageIcon }
+                { id: "slider", label: "Storefront Slider", icon: ImageIcon, badge: "Packs 🎨" }
             ]
         },
         {

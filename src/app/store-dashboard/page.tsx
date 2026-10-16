@@ -50,6 +50,7 @@ import { toast } from "sonner";
 import { useSocket } from "@/components/chat/socket-context";
 import { PRESET_CATALOG_PRODUCTS, PRESET_HERO_BANNERS, PresetBanner } from "@/lib/catalog-presets";
 import StoreSlider from "./store-slider";
+import SliderManager from "./slider-manager";
 import StoreSetupWizardModal from "@/app/dashboard/store/store-setup-wizard-modal";
 import CounterQrModal from "@/app/dashboard/store/counter-qr-modal";
 import ShippingLabelModal from "@/app/dashboard/store/shipping-label-modal";
@@ -1821,46 +1822,18 @@ function StoreDashboardContent() {
                         )}
 
                         {/* TAB 6: SLIDER / HERO BANNERS */}
-                        {currentTab === "slider" && (
-                            <div className="space-y-6">
-                                <div className="glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md p-5 sm:p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-2 bg-primary/10 text-primary rounded-xl border border-primary/20">
-                                                <ImageIcon className="w-5 h-5" />
-                                            </div>
-                                            <h3 className="font-extrabold text-base sm:text-lg text-foreground">
-                                                Storefront Hero Slider & Banners
-                                            </h3>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            Apni dukaan ke promotional banner slides manage karein ya default slider ko band karein
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        onClick={() => setIsSliderEnabled(!isSliderEnabled)}
-                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs ${
-                                            isSliderEnabled
-                                                ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-                                                : "bg-rose-500/15 hover:bg-rose-500/25 text-rose-800 dark:text-rose-300 border border-rose-500/30"
-                                        }`}
-                                    >
-                                        {isSliderEnabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                        <span>{isSliderEnabled ? "Slider Active Hai" : "Slider Band Hai"}</span>
-                                    </button>
-                                </div>
-
-                                <div className="flex justify-end">
-                                    <button
-                                        onClick={handleSaveBanners}
-                                        disabled={isSavingBanners}
-                                        className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm rounded-xl shadow-xs transition cursor-pointer"
-                                    >
-                                        {isSavingBanners ? "Saving..." : "Save Slider Changes"}
-                                    </button>
-                                </div>
-                            </div>
+                        {currentTab === "slider" && activeStore && (
+                            <SliderManager
+                                activeStore={{
+                                    id: activeStore.id,
+                                    name: activeStore.name,
+                                    slug: activeStore.slug,
+                                    bannerUrl: activeStore.bannerUrl
+                                }}
+                                onUpdated={() => {
+                                    fetchStores();
+                                }}
+                            />
                         )}
 
                         {/* TAB 7: DELIVERY & TIMINGS */}

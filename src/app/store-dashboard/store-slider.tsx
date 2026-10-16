@@ -99,6 +99,21 @@ export default function StoreSlider({
             secondaryBtnAction: () => onSwitchTab("overview"),
             metric: "Barcode Packaging",
             metricSub: "Thermal & Flyer Print Ready"
+        },
+        {
+            id: "slider-packs",
+            badge: "🖼️ PRE-INSTALLED STORE SLIDERS",
+            badgeColor: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30",
+            title: "1-Click Storefront Slider Packs & Deals",
+            subtitle: "Super Mart Ration, Bakery & Nashta, Ramadan Deals, Weekend Flash Sale ke ready-made banners apne storefront par 1-click se active karein.",
+            gradient: "from-purple-950 via-fuchsia-950 to-slate-950",
+            accentColor: "text-fuchsia-300",
+            primaryBtnText: "Slider Packs Active Karein 🎨",
+            primaryBtnAction: () => onSwitchTab("slider"),
+            secondaryBtnText: "Live Storefront ↗",
+            secondaryBtnAction: () => window.open(liveStoreUrl, "_blank"),
+            metric: "5 Ready Packs",
+            metricSub: "1-Click Theme Activation"
         }
     ];
 

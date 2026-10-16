@@ -80,6 +80,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         if (body.autoNotifyCustomer !== undefined) updateData.autoNotifyCustomer = Boolean(body.autoNotifyCustomer);
         if (body.sessionId !== undefined) updateData.sessionId = body.sessionId || null;
         if (body.logoUrl !== undefined) updateData.logoUrl = body.logoUrl || null;
+        if (body.bannerUrl !== undefined) updateData.bannerUrl = body.bannerUrl || null;
 
         // Custom domain update
         if (body.customDomain !== undefined) {
