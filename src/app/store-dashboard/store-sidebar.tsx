@@ -86,6 +86,12 @@ export default function StoreSidebar({
             items: [
                 { id: "products", label: "Products Catalog", icon: Package },
                 {
+                    id: "ai-products",
+                    label: "✨ AI Magic Add",
+                    icon: Sparkles,
+                    badge: "Dukaan AI ⚡"
+                },
+                {
                     id: "new-product",
                     label: "+ Add Product",
                     icon: Plus,

@@ -55,6 +55,7 @@ import CounterQrModal from "@/app/dashboard/store/counter-qr-modal";
 import ShippingLabelModal from "@/app/dashboard/store/shipping-label-modal";
 import BulkImportModal from "@/app/dashboard/store/bulk-import-modal";
 import POSModal from "@/app/dashboard/store/pos-modal";
+import AiProductCreator from "./ai-product-creator";
 
 // Synthesise a pleasant double-bell order chime via standard Web Audio API
 function playOrderChime() {
@@ -1601,6 +1602,14 @@ function StoreDashboardContent() {
                                             <span>{isImportingPresets ? "Import Ho Raha Hai..." : "Pakistani Grocery (1-Click)"}</span>
                                         </button>
 
+                                        <button
+                                            onClick={() => handleSwitchTab("ai-products")}
+                                            className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition shadow-sm hover:shadow-md cursor-pointer animate-pulse"
+                                        >
+                                            <Sparkles className="w-4 h-4 text-amber-300" />
+                                            <span>✨ AI Magic Add</span>
+                                        </button>
+
                                         <Link
                                             href={`/store-dashboard/products/new${activeStore ? `?storeId=${activeStore.id}` : ""}`}
                                             className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs rounded-xl flex items-center gap-1.5 transition shadow-xs cursor-pointer"
@@ -1681,6 +1690,22 @@ function StoreDashboardContent() {
                                     </div>
                                 )}
                             </div>
+                        )}
+
+                        {/* TAB: AI PRODUCT CREATOR */}
+                        {currentTab === "ai-products" && (
+                            <AiProductCreator
+                                activeStore={{
+                                    id: activeStore.id,
+                                    name: activeStore.name,
+                                    currencySymbol: activeStore.currencySymbol,
+                                    slug: activeStore.slug
+                                }}
+                                onComplete={() => {
+                                    fetchProducts(activeStore.id);
+                                    handleSwitchTab("products");
+                                }}
+                            />
                         )}
 
                         {/* TAB 5: ABANDONED CARTS */}
