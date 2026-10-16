@@ -169,6 +169,8 @@ export async function PATCH(request: NextRequest) {
                 : now;
             updateData.subscriptionStatus = "ACTIVE";
             updateData.subscriptionExpiresAt = new Date(currentExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+            updateData.isActive = true;
+            updateData.isOpen = true;
         } else if (action === "extend_3_months") {
             const now = new Date();
             const currentExpiry = existingStore.subscriptionExpiresAt && new Date(existingStore.subscriptionExpiresAt) > now
@@ -176,15 +178,23 @@ export async function PATCH(request: NextRequest) {
                 : now;
             updateData.subscriptionStatus = "ACTIVE";
             updateData.subscriptionExpiresAt = new Date(currentExpiry.getTime() + 90 * 24 * 60 * 60 * 1000);
+            updateData.isActive = true;
+            updateData.isOpen = true;
         } else if (action === "grant_lifetime") {
             updateData.subscriptionStatus = "LIFETIME";
             updateData.subscriptionExpiresAt = new Date("2099-12-31T23:59:59.000Z");
+            updateData.isActive = true;
+            updateData.isOpen = true;
         } else if (action === "lock_expired") {
             updateData.subscriptionStatus = "EXPIRED";
             updateData.subscriptionExpiresAt = new Date();
+            updateData.isActive = false; // Immediately deactivate store
+            updateData.isOpen = false;   // Mark shop closed
         } else if (action === "reset_trial") {
             updateData.subscriptionStatus = "TRIAL";
             updateData.subscriptionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            updateData.isActive = true;
+            updateData.isOpen = true;
         }
 
         if (subscriptionStatus !== undefined && !action) updateData.subscriptionStatus = subscriptionStatus;

@@ -45,7 +45,7 @@ export default async function StoreDashboardLayout({
 
                 {/* Monthly Store Subscription Paywall Modal (Blocks dashboard if expired) */}
                 <SubscriptionPaywallModal
-                    enabled={Boolean(systemConfig?.enableSubscriptionSystem)}
+                    enabled={true}
                     isSuperAdmin={session?.user?.role === "SUPERADMIN"}
                 />
 

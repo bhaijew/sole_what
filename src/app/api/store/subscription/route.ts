@@ -20,35 +20,16 @@ export async function GET(request: NextRequest) {
 
         const isEnabled = config?.enableSubscriptionSystem || false;
 
-        // If user is SuperAdmin, subscription is always unlocked
-        if (user.role === "SUPERADMIN") {
-            return NextResponse.json({
-                success: true,
-                enabled: isEnabled,
-                isSuperAdmin: true,
-                isLocked: false,
-                config: {
-                    price: config?.subscriptionPriceMonthly || 1500,
-                    trialDays: config?.subscriptionTrialDays || 7,
-                    jazzcash: config?.subscriptionJazzcashNumber || "",
-                    easypaisa: config?.subscriptionEasypaisaNumber || "",
-                    bankDetails: config?.subscriptionBankDetails || "",
-                    supportPhone: config?.subscriptionSupportPhone || "",
-                },
-                store: null
-            });
-        }
-
-        // Get query storeId or default to user's first store
+        // Get query storeId or default to user's first store (or any store if superadmin)
         const { searchParams } = new URL(request.url);
         const queryStoreId = searchParams.get("storeId");
 
         const store = queryStoreId
             ? await prisma.store.findFirst({
-                where: { id: queryStoreId, userId: user.id }
+                where: user.role === "SUPERADMIN" ? { id: queryStoreId } : { id: queryStoreId, userId: user.id }
             })
             : await prisma.store.findFirst({
-                where: { userId: user.id },
+                where: user.role === "SUPERADMIN" ? {} : { userId: user.id },
                 orderBy: { createdAt: "asc" }
             });
 
@@ -56,7 +37,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({
                 success: true,
                 enabled: isEnabled,
-                isSuperAdmin: false,
+                isSuperAdmin: user.role === "SUPERADMIN",
                 isLocked: false,
                 store: null
             });
@@ -66,14 +47,13 @@ export async function GET(request: NextRequest) {
         let isLocked = false;
         const now = new Date();
 
-        if (isEnabled) {
-            if (store.subscriptionStatus === "EXPIRED") {
-                isLocked = true;
-            } else if (store.subscriptionStatus === "LIFETIME") {
+        if (store.subscriptionStatus === "EXPIRED" || !store.isActive) {
+            isLocked = true;
+        } else if (store.subscriptionStatus === "PENDING_APPROVAL") {
+            isLocked = true;
+        } else if (isEnabled) {
+            if (store.subscriptionStatus === "LIFETIME") {
                 isLocked = false;
-            } else if (store.subscriptionStatus === "PENDING_APPROVAL") {
-                // If awaiting approval, we still show the paywall screen with "Pending Verification" notice
-                isLocked = true;
             } else if (store.subscriptionExpiresAt && new Date(store.subscriptionExpiresAt) < now) {
                 isLocked = true;
             }
@@ -82,7 +62,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             success: true,
             enabled: isEnabled,
-            isSuperAdmin: false,
+            isSuperAdmin: user.role === "SUPERADMIN",
             isLocked,
             config: {
                 price: config?.subscriptionPriceMonthly || 1500,
@@ -96,6 +76,7 @@ export async function GET(request: NextRequest) {
                 id: store.id,
                 name: store.name,
                 slug: store.slug,
+                isActive: store.isActive,
                 subscriptionStatus: store.subscriptionStatus,
                 subscriptionExpiresAt: store.subscriptionExpiresAt,
                 subscriptionPlan: store.subscriptionPlan,
@@ -126,8 +107,12 @@ export async function POST(request: NextRequest) {
         }
 
         const store = storeId
-            ? await prisma.store.findFirst({ where: { id: storeId, userId: user.id } })
-            : await prisma.store.findFirst({ where: { userId: user.id } });
+            ? await prisma.store.findFirst({
+                where: user.role === "SUPERADMIN" ? { id: storeId } : { id: storeId, userId: user.id }
+            })
+            : await prisma.store.findFirst({
+                where: user.role === "SUPERADMIN" ? {} : { userId: user.id }
+            });
 
         if (!store) {
             return NextResponse.json({ error: "Dukaan nahi mili" }, { status: 404 });

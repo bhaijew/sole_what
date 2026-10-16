@@ -114,6 +114,9 @@ interface StoreData {
     openingHours?: string | null;
     noticeMessage?: string | null;
     isOpen: boolean;
+    isActive?: boolean;
+    subscriptionStatus?: string;
+    subscriptionExpiresAt?: string | null;
     autoNotifyOwner: boolean;
     autoNotifyCustomer: boolean;
     sessionId?: string | null;
@@ -779,6 +782,14 @@ function StoreDashboardContent() {
                                     <span className="w-2 h-2 rounded-full animate-pulse bg-current" />
                                     <span>{activeStore.isOpen ? "Online" : "Closed"}</span>
                                 </button>
+                            )}
+
+                            {/* Subscription Status Indicator */}
+                            {activeStore && (activeStore.subscriptionStatus === "EXPIRED" || activeStore.isActive === false) && (
+                                <div className="px-3 py-1 rounded-full text-xs font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/35 flex items-center gap-1.5 shadow-2xs">
+                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                                    <span>Subscription Expired (Locked 🔒)</span>
+                                </div>
                             )}
 
                             {/* Real-Time Live Sync Indicator */}

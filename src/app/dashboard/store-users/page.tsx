@@ -179,6 +179,19 @@ export default function StoreUsersAdminPage() {
                 setStores(prev =>
                     prev.map(s => (s.id === storeId ? { ...s, ...data.store } : s))
                 );
+                if (action === "lock_expired") {
+                    setStats(prev => ({
+                        ...prev,
+                        activeStores: Math.max(0, prev.activeStores - 1),
+                        inactiveStores: prev.inactiveStores + 1
+                    }));
+                } else if (action === "approve_month" || action === "extend_3_months" || action === "grant_lifetime") {
+                    setStats(prev => ({
+                        ...prev,
+                        activeStores: prev.activeStores + 1,
+                        inactiveStores: Math.max(0, prev.inactiveStores - 1)
+                    }));
+                }
                 if (proofTarget && proofTarget.id === storeId) {
                     setProofTarget(null);
                 }
@@ -823,15 +836,15 @@ export default function StoreUsersAdminPage() {
                                         {/* BAN / ACTIVE CONTROL (KEY USER REQUEST) */}
                                         <td className="py-3.5 px-4 align-middle text-center">
                                             <div className="flex flex-col items-center gap-1">
-                                                {store.isActive ? (
+                                                {store.subscriptionStatus === "EXPIRED" || !store.isActive ? (
+                                                    <Badge className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30 text-[10px] font-bold px-2 py-0.5">
+                                                        <ShieldAlert className="h-3 w-3 mr-1 text-rose-500" />
+                                                        {store.subscriptionStatus === "EXPIRED" ? "Expired (Locked)" : "Banned / Inactive"}
+                                                    </Badge>
+                                                ) : (
                                                     <Badge className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-bold px-2 py-0.5">
                                                         <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-500" />
                                                         Active
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30 text-[10px] font-bold px-2 py-0.5">
-                                                        <ShieldAlert className="h-3 w-3 mr-1 text-rose-500" />
-                                                        Banned / Inactive
                                                     </Badge>
                                                 )}
 
@@ -840,12 +853,12 @@ export default function StoreUsersAdminPage() {
                                                     variant="ghost"
                                                     onClick={() => setBanTarget(store)}
                                                     className={`h-7 px-2 text-[10px] font-bold rounded-lg ${
-                                                        store.isActive
+                                                        store.isActive && store.subscriptionStatus !== "EXPIRED"
                                                             ? "text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
                                                             : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
                                                     }`}
                                                 >
-                                                    {store.isActive ? "Ban Store" : "Unban & Activate"}
+                                                    {store.isActive && store.subscriptionStatus !== "EXPIRED" ? "Ban Store" : "Unban & Activate"}
                                                 </Button>
                                             </div>
                                         </td>
