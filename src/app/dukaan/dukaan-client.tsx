@@ -79,58 +79,6 @@ const PAKISTANI_CITIES = [
     "Quetta"
 ];
 
-const POPULAR_AREAS_BY_CITY: Record<string, string[]> = {
-    Lahore: [
-        "Johar Town",
-        "Gulberg III",
-        "DHA Phase 5",
-        "Model Town",
-        "Faisal Town",
-        "Bahria Town",
-        "Iqbal Town",
-        "Wapda Town",
-        "Cavalry Ground",
-        "Cantt"
-    ],
-    Karachi: [
-        "Gulshan-e-Iqbal",
-        "DHA Phase 5",
-        "Clifton",
-        "North Nazimabad",
-        "PECHS",
-        "Gulistan-e-Jauhar",
-        "Bahadurabad",
-        "Malir Cantt"
-    ],
-    Islamabad: [
-        "F-10 Markaz",
-        "F-7 Markaz",
-        "F-6 Super Market",
-        "G-11 Markaz",
-        "I-8 Markaz",
-        "Bahria Town Islamabad",
-        "DHA Phase 2"
-    ],
-    Rawalpindi: [
-        "Bahria Town Phase 4",
-        "Saddar",
-        "Satellite Town",
-        "Westridge",
-        "Commercial Market"
-    ],
-    Faisalabad: [
-        "D Ground",
-        "People's Colony",
-        "Madina Town",
-        "Kohinoor City"
-    ],
-    Multan: [
-        "Gulgasht Colony",
-        "Cantt",
-        "Bosan Road",
-        "Shah Rukn-e-Alam"
-    ]
-};
 
 const CATEGORIES = [
     { id: "all", label: "Sab Dukaanein", icon: "🏪" },
@@ -241,13 +189,19 @@ export default function DukaanClient({
         });
     }, [stores, selectedCity, selectedArea, searchQuery, selectedCategory, onlyOpen, sortBy]);
 
-    // Available mohallas for the currently chosen city
+    // Available mohallas extracted dynamically from real stores in the database
     const currentCityAreas = useMemo(() => {
-        if (selectedCity === "All") {
-            return ["Johar Town", "Gulberg", "DHA", "Gulshan-e-Iqbal", "F-10 Markaz", "Bahria Town"];
-        }
-        return POPULAR_AREAS_BY_CITY[selectedCity] || [];
-    }, [selectedCity]);
+        const areasSet = new Set<string>();
+        stores.forEach((store) => {
+            if (selectedCity === "All" || (store.city || "").toLowerCase() === selectedCity.toLowerCase()) {
+                if (store.area && store.area.trim()) {
+                    areasSet.add(store.area.trim());
+                }
+            }
+        });
+        return Array.from(areasSet);
+    }, [stores, selectedCity]);
+
 
     // Geolocation detection handler
     const handleDetectLocation = () => {
@@ -518,7 +472,7 @@ export default function DukaanClient({
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Dukaan ka naam ya item search karein (e.g. Bismillah Store, Milk, Atta, Dawn Bread, Gosht)..."
+                                placeholder="Dukaan ka naam ya item search karein (e.g. Milk, Atta, Bread, Chai)..."
                                 className="h-11 pl-10 pr-9 rounded-full bg-card/60 backdrop-blur-md border-border/70 text-sm shadow-sm focus-visible:ring-emerald-500"
                             />
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -638,14 +592,17 @@ export default function DukaanClient({
                                 {/* Top Banner Image */}
                                 <div>
                                     <div className="relative h-40 w-full overflow-hidden bg-muted">
-                                        <img
-                                            src={
-                                                store.bannerUrl ||
-                                                "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=800&auto=format&fit=crop&q=80"
-                                            }
-                                            alt={store.name}
-                                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                        />
+                                        {store.bannerUrl ? (
+                                            <img
+                                                src={store.bannerUrl}
+                                                alt={store.name}
+                                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            />
+                                        ) : (
+                                            <div className="h-full w-full bg-gradient-to-br from-emerald-950 via-slate-900 to-teal-950 flex items-center justify-center">
+                                                <Store className="h-12 w-12 text-emerald-400/25" />
+                                            </div>
+                                        )}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
 
                                         {/* Status Badges on Banner */}
@@ -670,15 +627,18 @@ export default function DukaanClient({
                                         </div>
 
                                         {/* Store Logo overlapping banner bottom */}
-                                        <div className="absolute -bottom-4 left-4 h-14 w-14 rounded-2xl bg-card p-1 shadow-lg border-2 border-emerald-500/40 overflow-hidden">
-                                            <img
-                                                src={
-                                                    store.logoUrl ||
-                                                    "https://images.unsplash.com/photo-1588964895597-cfccd6e2dbf9?w=200&auto=format&fit=crop&q=80"
-                                                }
-                                                alt={store.name}
-                                                className="h-full w-full object-cover rounded-xl"
-                                            />
+                                        <div className="absolute -bottom-4 left-4 h-14 w-14 rounded-2xl bg-card p-1 shadow-lg border-2 border-emerald-500/40 overflow-hidden flex items-center justify-center">
+                                            {store.logoUrl ? (
+                                                <img
+                                                    src={store.logoUrl}
+                                                    alt={store.name}
+                                                    className="h-full w-full object-cover rounded-xl"
+                                                />
+                                            ) : (
+                                                <div className="h-full w-full rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-black text-sm flex items-center justify-center shadow-inner">
+                                                    {store.name.slice(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="absolute bottom-2 right-3 text-[11px] font-bold text-emerald-300 flex items-center gap-1">
