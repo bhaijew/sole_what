@@ -30,8 +30,13 @@ export const authConfig = {
                 return true;
             } else if (isLoggedIn && nextUrl.pathname === '/auth/login') {
                 const targetUrl = nextUrl.clone();
+                const configuredUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL;
+                let configuredHost = "";
+                if (configuredUrl) {
+                    try { configuredHost = new URL(configuredUrl).hostname; } catch {}
+                }
                 if (targetUrl.hostname.includes("0.0.0.0") || (targetUrl.hostname.includes("localhost") && process.env.NODE_ENV === "production")) {
-                    targetUrl.hostname = process.env.RAILWAY_PUBLIC_DOMAIN || "solewhat-production.up.railway.app";
+                    targetUrl.hostname = process.env.RAILWAY_PUBLIC_DOMAIN || configuredHost || "solewhat-production.up.railway.app";
                     targetUrl.port = "";
                     targetUrl.protocol = "https:";
                 }
@@ -42,7 +47,12 @@ export const authConfig = {
             return true;
         },
         async redirect({ url, baseUrl }) {
-            const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN || "solewhat-production.up.railway.app";
+            const configuredUrl = process.env.NEXTAUTH_URL || process.env.BASE_URL;
+            let configuredHost = "";
+            if (configuredUrl) {
+                try { configuredHost = new URL(configuredUrl).host; } catch {}
+            }
+            const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN || configuredHost || "solewhat-production.up.railway.app";
             const productionBase = process.env.NEXTAUTH_URL || `https://${publicDomain}`;
             const safeBaseUrl = (baseUrl.includes("0.0.0.0") || (baseUrl.includes("localhost") && process.env.NODE_ENV === "production"))
                 ? productionBase

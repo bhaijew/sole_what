@@ -34,8 +34,6 @@ COPY --from=builder /app/scripts ./scripts
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ENV NEXTAUTH_URL="https://solewhat-production.up.railway.app"
-ENV AUTH_URL="https://solewhat-production.up.railway.app"
 EXPOSE 3000
 
 CMD ["sh", "-c", "node scripts/sync-db-provider.js && npx prisma generate && npx prisma db push && node scripts/setup-admin.js && node node_modules/tsx/dist/cli.mjs src/server/index.ts"]

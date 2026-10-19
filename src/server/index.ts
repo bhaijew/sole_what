@@ -47,7 +47,10 @@ app.prepare().then(() => {
       if (forwardedHost && !forwardedHost.includes("0.0.0.0")) {
         req.headers.host = forwardedHost;
       } else if (!host || host.includes("0.0.0.0") || (host.includes("localhost") && !dev)) {
-        req.headers.host = process.env.RAILWAY_PUBLIC_DOMAIN || "solewhat-production.up.railway.app";
+        let baseHost = "";
+        const u = process.env.BASE_URL || process.env.NEXTAUTH_URL;
+        if (u) { try { baseHost = new URL(u).host; } catch {} }
+        req.headers.host = process.env.RAILWAY_PUBLIC_DOMAIN || baseHost || "solewhat-production.up.railway.app";
       }
 
       if (!req.headers["x-forwarded-proto"]) {
