@@ -13,7 +13,7 @@ import pkg from "../../package.json";
 
 // Ensure production base URL is properly set for NextAuth and redirects
 const defaultPublicUrl = process.env.BASE_URL ||
-  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "https://solewhat-production.up.railway.app");
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "https://solewhat-production-33f6.up.railway.app");
 
 if (!process.env.NEXTAUTH_URL) {
   process.env.NEXTAUTH_URL = defaultPublicUrl;
@@ -50,7 +50,7 @@ app.prepare().then(() => {
         let baseHost = "";
         const u = process.env.BASE_URL || process.env.NEXTAUTH_URL;
         if (u) { try { baseHost = new URL(u).host; } catch {} }
-        req.headers.host = process.env.RAILWAY_PUBLIC_DOMAIN || baseHost || "solewhat-production.up.railway.app";
+        req.headers.host = process.env.RAILWAY_PUBLIC_DOMAIN || baseHost || "solewhat-production-33f6.up.railway.app";
       }
 
       if (!req.headers["x-forwarded-proto"]) {

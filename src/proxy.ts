@@ -85,7 +85,10 @@ function getSafeRedirectUrl(targetPath: string, request: NextRequest): URL {
     let host = forwardedHost || request.headers.get("host") || "";
 
     if (!host || host.includes("0.0.0.0") || (host.includes("localhost") && process.env.NODE_ENV === "production")) {
-        host = process.env.RAILWAY_PUBLIC_DOMAIN || "solewhat-production.up.railway.app";
+        let baseHost = "";
+        const u = process.env.BASE_URL || process.env.NEXTAUTH_URL;
+        if (u) { try { baseHost = new URL(u).host; } catch {} }
+        host = process.env.RAILWAY_PUBLIC_DOMAIN || baseHost || "solewhat-production-33f6.up.railway.app";
     }
 
     const proto = (host.includes("localhost") || host.includes("127.0.0.1"))

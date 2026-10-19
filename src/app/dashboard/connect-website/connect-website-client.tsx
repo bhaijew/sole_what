@@ -63,7 +63,7 @@ export function ConnectWebsiteClient({ sessions, userApiKey }: ConnectWebsiteCli
     const [generatingKey, setGeneratingKey] = useState(false);
 
     // Host Origin for API calls
-    const [baseUrl, setBaseUrl] = useState<string>("https://solewhat-production.up.railway.app");
+    const [baseUrl, setBaseUrl] = useState<string>("https://solewhat-production-33f6.up.railway.app");
 
     // Copy states
     const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
