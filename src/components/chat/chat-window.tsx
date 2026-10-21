@@ -215,6 +215,7 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
     // Handover (Human Takeover) State
     const [handoverActive, setHandoverActive] = useState(false);
     const [handoverLoading, setHandoverLoading] = useState(false);
+    const [isGoldRatesEnabled, setIsGoldRatesEnabled] = useState(false);
 
     // Quotation PDF State
     const [quotationOpen, setQuotationOpen] = useState(false);
@@ -233,6 +234,16 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
             .then(data => {
                 if (data.success) {
                     setHandoverActive(!!data.active);
+                }
+            })
+            .catch(() => {});
+
+        // Fetch session AI Config to check if Gold Rates are enabled for this store
+        fetch(`/api/sessions/${sessionId}/ai-config`)
+            .then(res => res.json())
+            .then(data => {
+                if (data?.status && data?.data) {
+                    setIsGoldRatesEnabled(Boolean(data.data.enableGoldRates));
                 }
             })
             .catch(() => {});
@@ -435,10 +446,28 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
 
     const handleSend = async () => {
         if (!input.trim()) return;
+        const msgText = input;
         try {
-            await sendChatMessage(sessionId, jid, input, replyingTo?.keyId);
+            await sendChatMessage(sessionId, jid, msgText, replyingTo?.keyId);
             setInput("");
             setReplyingTo(null);
+
+            // Automatically pause AI in real-time when the owner/staff messages
+            if (!handoverActive) {
+                setHandoverActive(true);
+                fetch("/api/handover", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sessionId,
+                        jid,
+                        action: "pause",
+                        minutes: 120,
+                        reason: "Owner manually messaged from dashboard"
+                    })
+                }).catch(() => {});
+            }
+
             setTimeout(() => fetchMessages(), 800);
         } catch (e: any) { toast.error(e.message || "Failed to send"); }
     };
@@ -724,17 +753,19 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
 
                 {/* Handover & Quotation Action Buttons */}
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    {/* Quotation PDF Dialog Trigger */}
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 sm:h-8 text-xs border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 gap-1.5 px-2 sm:px-2.5"
-                        onClick={() => setQuotationOpen(true)}
-                        title="Generate & Send PDF Quotation"
-                    >
-                        <FileText className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Quotation</span>
-                    </Button>
+                    {/* Quotation PDF Dialog Trigger (Only for Gold / Jewellery shops) */}
+                    {isGoldRatesEnabled && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 sm:h-8 text-xs border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 gap-1.5 px-2 sm:px-2.5"
+                            onClick={() => setQuotationOpen(true)}
+                            title="Generate & Send PDF Quotation"
+                        >
+                            <FileText className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Quotation</span>
+                        </Button>
+                    )}
 
                     {/* Human Takeover / Bot Pause Toggle */}
                     <Button
@@ -915,6 +946,29 @@ export function ChatWindow({ sessionId, jid, name, onBack }: ChatWindowProps) {
 
             {/* Input */}
             <div className="shrink-0 px-3 py-2.5 bg-background/80 backdrop-blur-sm border-t">
+                {/* Real-time Human Takeover Active Banner */}
+                {handoverActive && (
+                    <div className="max-w-3xl mx-auto mb-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between gap-2 shadow-2xs animate-in fade-in">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="relative flex h-2 w-2 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                            </span>
+                            <span className="font-medium truncate">
+                                👤 <strong>Owner in Chat (AI Paused):</strong> Real-time AI bot pause hai taake aapki conversation disturb na ho.
+                            </span>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-[11px] px-2.5 font-bold border-amber-500/40 hover:bg-amber-500/20 text-amber-900 dark:text-amber-100 shrink-0 cursor-pointer"
+                            onClick={handleToggleHandover}
+                            disabled={handoverLoading}
+                        >
+                            ▶️ Resume AI Bot
+                        </Button>
+                    </div>
+                )}
                 <div className="flex items-center gap-2 max-w-3xl mx-auto">
                     <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                     <Popover>

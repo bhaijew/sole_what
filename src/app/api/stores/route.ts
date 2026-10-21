@@ -27,7 +27,13 @@ export async function GET(request: NextRequest) {
                         id: true,
                         sessionId: true,
                         name: true,
-                        status: true
+                        status: true,
+                        aiConfig: {
+                            select: {
+                                aiRequestsCount: true,
+                                enabled: true
+                            }
+                        }
                     }
                 }
             },

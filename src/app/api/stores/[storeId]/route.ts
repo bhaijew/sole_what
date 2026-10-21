@@ -24,7 +24,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
                 categories: { orderBy: { order: "asc" } },
                 products: { orderBy: { createdAt: "desc" } },
                 _count: { select: { orders: true } },
-                session: { select: { id: true, sessionId: true, name: true, status: true } }
+                session: {
+                    select: {
+                        id: true,
+                        sessionId: true,
+                        name: true,
+                        status: true,
+                        aiConfig: {
+                            select: {
+                                aiRequestsCount: true,
+                                enabled: true,
+                                menuUrl: true,
+                                enableGoldRates: true
+                            }
+                        }
+                    }
+                }
             }
         });
 

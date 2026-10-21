@@ -128,6 +128,12 @@ interface StoreData {
         sessionId: string;
         name: string;
         status: string;
+        aiConfig?: {
+            aiRequestsCount?: number;
+            enabled?: boolean;
+            menuUrl?: string | null;
+            enableGoldRates?: boolean;
+        } | null;
     } | null;
     _count?: {
         products: number;
@@ -1042,7 +1048,7 @@ function StoreDashboardContent() {
                         {currentTab === "overview" && (
                             <div className="space-y-6 animate-in fade-in duration-150">
                                 {/* EXECUTIVE KPI METRIC CARDS */}
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                                     {/* Card 1: Total Orders */}
                                     <div className="relative overflow-hidden group p-4 sm:p-5 rounded-2xl glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 space-y-2">
                                         <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -1116,6 +1122,31 @@ function StoreDashboardContent() {
                                             </span>
                                         </div>
                                         <p className="text-[11px] text-muted-foreground">Customer aur dukaan dar ko foran auto bill</p>
+                                    </div>
+
+                                    {/* Card 5: AI Requests Used */}
+                                    <div className="relative overflow-hidden group p-4 sm:p-5 rounded-2xl glass-panel border border-border/60 bg-card/90 dark:bg-card/80 backdrop-blur-md shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 space-y-2 col-span-2 sm:col-span-1">
+                                        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-500 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                        <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold">
+                                            <span>AI Requests Used</span>
+                                            <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl border border-purple-500/20">
+                                                <Sparkles className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                                                {activeStore.session?.aiConfig?.aiRequestsCount || 0}
+                                            </span>
+                                            <span className="text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-full border border-purple-500/30">
+                                                Used
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-0.5">
+                                            <p className="text-[11px] text-muted-foreground">AI replies generated</p>
+                                            <Link href="/dashboard/ai-bot" className="text-[10px] font-bold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5">
+                                                AI Bot ↗
+                                            </Link>
+                                        </div>
                                     </div>
                                 </div>
 

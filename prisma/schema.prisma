@@ -412,11 +412,14 @@ model AiConfig {
   id              String   @id @default(cuid())
   sessionId       String   @unique
   enabled         Boolean  @default(true)
-  provider        String   @default("openrouter") // openrouter, openai, gemini
+  provider        String   @default("openrouter") // openrouter, openai, gemini, groq
   apiKey          String?  @db.Text
   modelName       String   @default("meta-llama/llama-3.1-8b-instruct:free")
   systemPrompt    String?  @db.Text
   knowledgeBase   String?  @db.Text
+  menuUrl         String?  @db.Text // Live digital menu or catalog link
+  enableGoldRates Boolean  @default(false) // Toggle ON/OFF for Gold & Jewellery rates (default: false)
+  aiRequestsCount Int      @default(0) // Total AI requests used by this session / store
   temperature     Float    @default(0.7)
   maxTokens       Int      @default(800)
   triggerInGroups Boolean  @default(false)

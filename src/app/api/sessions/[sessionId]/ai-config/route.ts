@@ -38,19 +38,47 @@ export async function GET(
         }
 
         // @ts-ignore
-        const aiConfig = await (prisma as any).aiConfig.findUnique({
+        let aiConfig = await (prisma as any).aiConfig.findUnique({
             where: { sessionId: session.id }
         });
 
+        // If no menuUrl is set yet, check if there is an associated store for this session
+        let defaultMenuUrl = "";
+        try {
+            const store = await prisma.store.findFirst({
+                where: { OR: [{ sessionId: session.id }, { sessionId }] },
+                select: { slug: true, customDomain: true }
+            });
+            if (store) {
+                defaultMenuUrl = store.customDomain ? `https://${store.customDomain}` : `/s/${store.slug}`;
+            }
+        } catch (_) {}
+
         return NextResponse.json({
             status: true,
-            data: aiConfig || {
+            data: aiConfig ? {
+                ...aiConfig,
+                menuUrl: aiConfig.menuUrl || defaultMenuUrl,
+                enableGoldRates: Boolean(aiConfig.enableGoldRates),
+                aiRequestsCount: aiConfig.aiRequestsCount || 0
+            } : {
                 enabled: true,
                 provider: "openrouter",
                 apiKey: "",
                 modelName: "meta-llama/llama-3.1-8b-instruct:free",
-                systemPrompt: `You are a polite, helpful customer support assistant for a business. Answer customer questions accurately based ONLY on the provided Knowledge Base. Keep responses concise, friendly, and easy to read on WhatsApp.`,
+                systemPrompt: `You are a polite, natural, and helpful WhatsApp customer service assistant for this business.
+Speak naturally in polite Roman Urdu (or English if the customer speaks English).
+
+COMMUNICATION RULES:
+1. Be concise, direct, and human. Answer EXACTLY what the customer asked without robotic filler.
+2. If greeting (salam, kay hal ha), reply warmly and politely as a real human representative.
+3. Answer questions strictly based on the provided Business Knowledge Base, products, and prices.
+4. If asked about the menu or catalog, provide the live menu link or images as specified.
+5. If something is not known, politely tell them our team will assist them shortly.`,
                 knowledgeBase: "",
+                menuUrl: defaultMenuUrl,
+                enableGoldRates: false,
+                aiRequestsCount: 0,
                 temperature: 0.7,
                 maxTokens: 800,
                 triggerInGroups: false,
@@ -106,6 +134,8 @@ export async function POST(
             modelName,
             systemPrompt,
             knowledgeBase,
+            menuUrl,
+            enableGoldRates,
             temperature,
             maxTokens,
             triggerInGroups,
@@ -123,6 +153,8 @@ export async function POST(
                 modelName: modelName || "meta-llama/llama-3.1-8b-instruct:free",
                 systemPrompt: systemPrompt || null,
                 knowledgeBase: knowledgeBase || null,
+                menuUrl: menuUrl || null,
+                enableGoldRates: Boolean(enableGoldRates),
                 temperature: typeof temperature === "number" ? temperature : 0.7,
                 maxTokens: typeof maxTokens === "number" ? maxTokens : 800,
                 triggerInGroups: Boolean(triggerInGroups),
@@ -136,6 +168,9 @@ export async function POST(
                 modelName: modelName || "meta-llama/llama-3.1-8b-instruct:free",
                 systemPrompt: systemPrompt || null,
                 knowledgeBase: knowledgeBase || null,
+                menuUrl: menuUrl || null,
+                enableGoldRates: Boolean(enableGoldRates),
+                aiRequestsCount: 0,
                 temperature: typeof temperature === "number" ? temperature : 0.7,
                 maxTokens: typeof maxTokens === "number" ? maxTokens : 800,
                 triggerInGroups: Boolean(triggerInGroups),

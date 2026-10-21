@@ -11,7 +11,7 @@ import { generateAiResponse } from "./ai-service";
 import { ChatService } from "@/modules/whatsapp/chat.service";
 import { cancelDripOnCustomerReply } from "@/modules/whatsapp/drip-engine";
 import { hasMatchingKeywordRule } from "@/modules/whatsapp/store/autoreply";
-import { isHandoverActive, enableHandover, checkIfHandoverRequested } from "./handover-service";
+import { isHandoverActive, enableHandover, checkIfHandoverRequested, registerAiSentMessage, isAiSentMessage } from "./handover-service";
 import { sendQuotationViaWhatsApp } from "./quotation-service";
 
 // Event types that can trigger webhooks
@@ -636,9 +636,10 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                     if (isKeywordMatched) {
                         logger.info("AI-Bot", `Skipping AI response for ${normalizedFrom} because Keyword Rule matched (Fallback Mode ON).`);
                     } else {
-                        // 1. Check for Quotation generation command / request (#quote 1.5 tola 22k Ring)
+                        // 1. Check for Quotation generation command (ONLY if enableGoldRates is ON)
+                        const isGoldRatesEnabled = Boolean((aiConfig as any)?.enableGoldRates);
                         const senderPushName = (message as any)?.pushName || undefined;
-                        const quoteMatch = normalized.content.match(/^#(?:quote|quotation)\s+([\d.]+)\s*(tola|gram|g)?\s*(24k|22k|21k|18k)?\s*(.*)$/i);
+                        const quoteMatch = isGoldRatesEnabled ? normalized.content.match(/^#(?:quote|quotation)\s+([\d.]+)\s*(tola|gram|g)?\s*(24k|22k|21k|18k)?\s*(.*)$/i) : null;
                         if (quoteMatch) {
                             try {
                                 const weight = parseFloat(quoteMatch[1]);
@@ -738,52 +739,60 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                             if (imageMatches.length === 1) {
                                                 // Single image dispatch
                                                 if (cleanText.length <= 1000) {
-                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                    const res = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: imageMatches[0] },
                                                         caption: cleanText || undefined
                                                     });
+                                                    if (res?.key?.id) registerAiSentMessage(res.key.id);
                                                 } else {
-                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
-                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                    const r1 = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                    if (r1?.key?.id) registerAiSentMessage(r1.key.id);
+                                                    const r2 = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: imageMatches[0] }
                                                     });
+                                                    if (r2?.key?.id) registerAiSentMessage(r2.key.id);
                                                 }
                                             } else {
                                                 // Multiple images (e.g. Menu Page 1 & Page 2)
                                                 if (cleanText.length > 0 && cleanText.length <= 1000) {
-                                                    // Send Image 1 with main AI response text caption
-                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                    const res = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: imageMatches[0] },
                                                         caption: cleanText
                                                     });
+                                                    if (res?.key?.id) registerAiSentMessage(res.key.id);
                                                 } else {
                                                     if (cleanText.length > 1000) {
-                                                        await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                        const r1 = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                        if (r1?.key?.id) registerAiSentMessage(r1.key.id);
                                                         await new Promise((r) => setTimeout(r, 400));
                                                     }
-                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                    const r2 = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: imageMatches[0] },
                                                         caption: "📄 Menu (Page 1)"
                                                     });
+                                                    if (r2?.key?.id) registerAiSentMessage(r2.key.id);
                                                 }
 
                                                 // Small delay (600ms) before sending subsequent images to preserve WhatsApp order
                                                 for (let i = 1; i < imageMatches.length; i++) {
                                                     await new Promise((r) => setTimeout(r, 600));
                                                     const pageLabel = i === 1 ? "📄 Menu (Page 2)" : `📄 Image ${i + 1}`;
-                                                    await ChatService.sendTextMessage(sessionId, normalizedFrom, {
+                                                    const rNext = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: imageMatches[i] },
                                                         caption: pageLabel
                                                     });
+                                                    if (rNext?.key?.id) registerAiSentMessage(rNext.key.id);
                                                 }
                                             }
                                             logger.success("AI-Bot", `Successfully sent ${imageMatches.length} image attachment(s) via AI to ${normalizedFrom}`);
                                         } catch (imgError) {
                                             logger.error("AI-Bot", "Failed to send image attachment(s), falling back to text:", imgError);
-                                            await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText || aiReply.trim());
+                                            const rFallback = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText || aiReply.trim());
+                                            if (rFallback?.key?.id) registerAiSentMessage(rFallback.key.id);
                                         }
                                     } else {
-                                        await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+                                        const rText = await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
+                                        if (rText?.key?.id) registerAiSentMessage(rText.key.id);
                                     }
                                 }
                             })
@@ -819,6 +828,18 @@ export async function onMessageSent(sessionId: string, message: any, existingFil
 
     // --- Consistent JID Normalization (same as onMessageReceived) ---
     const normalizedFrom = await resolveToPhoneJid(remoteJid, sessionId, remoteJidAlt);
+
+    // =========================================================================
+    // REAL-TIME OWNER TAKEOVER DETECTION
+    // If the owner/staff sends an outgoing message to a customer (from phone or dashboard)
+    // and it was NOT generated by the automated AI bot:
+    // AI MUST IMMEDIATELY STOP in real-time so it does not interfere!
+    // =========================================================================
+    const msgKeyId = message.key?.id;
+    if (!isGroup && msgKeyId && !isAiSentMessage(msgKeyId)) {
+        logger.warn("HandoverService", `[Owner Intervened] Store owner sent message to ${normalizedFrom}. Automatically pausing AI bot in real time...`);
+        enableHandover(sessionId, normalizedFrom, 120, "Store owner manually replied in chat", "Owner");
+    }
 
     // For sent messages, sender is "ME" (self)
     // But we still normalize the participant JID if in a group

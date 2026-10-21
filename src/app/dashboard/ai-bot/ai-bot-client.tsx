@@ -42,6 +42,9 @@ interface AiConfigData {
     modelName: string;
     systemPrompt: string;
     knowledgeBase: string;
+    menuUrl?: string;
+    enableGoldRates?: boolean;
+    aiRequestsCount?: number;
     temperature: number;
     maxTokens: number;
     triggerInGroups: boolean;
@@ -90,44 +93,48 @@ const OPENROUTER_MODELS = [
 
 const PRESETS = [
     {
-        name: "Restaurant & Cafe (Menu Bot)",
-        systemPrompt: `You are a polite, natural, and helpful Pakistani customer support assistant for "Royal Spice Restaurant & Cafe".
-Communicate warmly in polite Pakistani Roman Urdu (or English if customer speaks English).
+        name: "General Store / Digital Dukaan (Clean Start)",
+        systemPrompt: `You are a polite, natural, and helpful WhatsApp customer service assistant for this business.
+Communicate naturally in polite Pakistani Roman Urdu (or English if the customer speaks English).
 
+COMMUNICATION GUIDELINES:
 1. GREETINGS & CASUAL CHAT (Natural Roman Urdu):
-- Agar customer "aoa", "salam", ya "assalam o alaikum" likhay:
-  "Walaikum Assalam! Royal Spice Cafe mein khushamdeed. Main aapki kya madad kar sakta hoon?"
+- Agar customer "aoa", "salam", "assalam o alaikum", "hi", "hello" likhay:
+  "Walaikum Assalam! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon?"
 - Agar customer "kay hal ha", "kia hal ha", "kaise ho" likhay:
-  "Alhamdulillah main bilkul theek hoon! Aap sunayein aap kaise hain? Aaj khane mein kya pasand karein ge?"
-- Agar customer dono poochay (e.g. "aoa kay hal ha"):
-  "Walaikum Assalam! Alhamdulillah main theek hoon, aap sunayein kaise hain? Main aapki kya khidmat kar sakta hoon?"
+  "Alhamdulillah main bilkul theek hoon! Aap sunayein aap kaise hain? Main aapki kya khidmat kar sakta hoon?"
 
-2. MENU & FOOD REQUESTS (Even for single word "menu"):
-- Agar customer sirf "menu", "Menu", "deals", "khana", "rate list" bhi likhay ya maangay:
-  Foran polite jawab dein: "G zaroor! Yeh lijiye hamara complete menu aur special deals:" aur message ke end mein dono images attach karein: [SEND_IMAGE: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800] [SEND_IMAGE: https://images.unsplash.com/photo-1544025162-d76694265947?w=800]
-- Agar customer "aoa menu" likhay to pehle salam ka jawab dein phr menu aur images dein.
+2. PRODUCTS, CATALOG & PRICES:
+- Customer ke sawal ka bilkul seedha aur mukhtasar jawab dein.
+- Jab customer menu, rate list, ya catalog maangay to unko live catalog link dein aur images attach karein.
 
-3. KNOWLEDGE BASE & ACCURACY:
-- Customer ke sawalat ka jawab neeche di gayi details ke mutabiq concise aur asaan alfaaz mein dein.`,
-        knowledgeBase: `RESTAURANT NAME: Royal Spice Cafe & Grill
-MENU IMAGE 1: https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800
-MENU IMAGE 2: https://images.unsplash.com/photo-1544025162-d76694265947?w=800
+3. ACCURACY & KNOWLEDGE BASE:
+- Har sawal ka jawab strictly neeche di gayi details ke mutabiq dein.
+- Agar koi baat maloom na ho to kahein: "Main staff se confirm kar ke aapko foran update karta hoon."`,
+        knowledgeBase: `BUSINESS NAME: My Store
+TIMINGS: 10:00 AM to 10:00 PM Daily
+DELIVERY: Delivery available all over Pakistan. Cash on Delivery (COD) available.
+CONTACT: Contact us on WhatsApp anytime for orders and inquiries.`
+    },
+    {
+        name: "Restaurant & Cafe (Food Menu Bot)",
+        systemPrompt: `You are a polite, natural, and helpful Pakistani customer support assistant for a restaurant & cafe.
+Communicate warmly in polite Pakistani Roman Urdu.
+
+1. GREETINGS:
+- Agar customer "aoa", "salam" likhay: "Walaikum Assalam! Hamare restaurant mein khushamdeed. Main aapki kya madad kar sakta hoon?"
+
+2. MENU REQUESTS:
+- Agar customer menu ya khana maangay: Foran live menu link dein aur menu images attach karein: [SEND_IMAGE: <url>].`,
+        knowledgeBase: `RESTAURANT NAME: My Cafe & Grill
 TIMINGS: 12:00 PM to 1:00 AM Daily
 HOME DELIVERY: Free delivery on orders above Rs. 1,000. Delivery time: 30-45 minutes.
 PHONE / WHATSAPP: +92-300-1234567
 
-POPULAR MENU ITEMS & PRICES:
+POPULAR ITEMS & PRICES:
 - Chicken Special Biryani: Rs. 450
-- Chicken Karahi (Full / Half): Rs. 1,800 / Rs. 950
-- Chicken Malai Boti (Plate): Rs. 650
-- Beef Seekh Kabab (4 pcs): Rs. 600
-- Crispy Zinger Burger + Fries: Rs. 550
-- Large Pizza (13 inch): Rs. 1,450
-- Cold Drinks & Shakes: Rs. 150 - Rs. 350
-
-SPECIAL DEALS:
-- Deal 1 (Family Deal): 1 Full Karahi + 4 Naan + 1.5L Drink = Rs. 2,100
-- Deal 2 (Zinger Combo): 2 Zingers + 2 Fries + 2 Cold Drinks = Rs. 1,250`
+- Chicken Karahi (Full): Rs. 1,800
+- Crispy Zinger Burger: Rs. 550`
     },
     {
         name: "Jeweller & Gold Shop",
@@ -196,7 +203,10 @@ export default function AiBotClient() {
         apiKey: "",
         modelName: "meta-llama/llama-3.1-8b-instruct:free",
         systemPrompt: PRESETS[0].systemPrompt,
-        knowledgeBase: PRESETS[0].knowledgeBase,
+        knowledgeBase: "",
+        menuUrl: "",
+        enableGoldRates: false,
+        aiRequestsCount: 0,
         temperature: 0.7,
         maxTokens: 800,
         triggerInGroups: false,
@@ -508,12 +518,15 @@ export default function AiBotClient() {
                         "openrouter/free";
 
                     setConfig({
-                        enabled: res.data.enabled ?? false,
+                        enabled: res.data.enabled !== undefined ? res.data.enabled : false,
                         provider: fetchedProvider,
                         apiKey: res.data.apiKey || "",
                         modelName: res.data.modelName || defaultModel,
-                        systemPrompt: res.data.systemPrompt !== null && res.data.systemPrompt !== undefined ? res.data.systemPrompt : PRESETS[0].systemPrompt,
-                        knowledgeBase: res.data.knowledgeBase !== null && res.data.knowledgeBase !== undefined ? res.data.knowledgeBase : PRESETS[0].knowledgeBase,
+                        systemPrompt: res.data.systemPrompt || PRESETS[0].systemPrompt,
+                        knowledgeBase: res.data.knowledgeBase ?? "",
+                        menuUrl: res.data.menuUrl || "",
+                        enableGoldRates: Boolean(res.data.enableGoldRates),
+                        aiRequestsCount: res.data.aiRequestsCount || 0,
                         temperature: res.data.temperature ?? 0.7,
                         maxTokens: res.data.maxTokens ?? 800,
                         triggerInGroups: res.data.triggerInGroups ?? false,
@@ -669,7 +682,12 @@ export default function AiBotClient() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <div className="px-3 py-1 rounded-full text-xs font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30 flex items-center gap-1.5 shadow-2xs">
+                        <Sparkles size={13} className="text-purple-500 animate-pulse" />
+                        <span>AI Requests Used: {config.aiRequestsCount || 0}</span>
+                    </div>
+
                     <Switch
                         checked={config.enabled}
                         onCheckedChange={(val) => setConfig((prev) => ({ ...prev, enabled: val }))}
@@ -715,45 +733,67 @@ export default function AiBotClient() {
                 />
             </div>
 
-            {/* Live Daily Gold Rates Manager Card (Bhai Jewellers) */}
+            {/* Live Daily Gold Rates Manager Card (Toggle ON/OFF for Jewellers) */}
             <div className="p-5 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-card to-amber-500/5 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-sm">
+                        <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-sm shrink-0">
                             <Coins size={20} />
                         </div>
                         <div>
-                            <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
-                                Live Daily Gold & Metal Rates (Bhai Jewellers)
-                                <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold px-2 py-0.5 rounded-full border border-amber-500/20">
-                                    Auto-Synced (11:30 AM PKT)
+                            <h4 className="font-bold text-sm text-foreground flex items-center gap-2 flex-wrap">
+                                Gold & Jewellery Rate Engine
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.enableGoldRates ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" : "bg-muted text-muted-foreground border-border/50"}`}>
+                                    {config.enableGoldRates ? "ON (Jewellery Shop Mode)" : "OFF (Disabled for other businesses)"}
                                 </span>
                             </h4>
                             <p className="text-xs text-muted-foreground">
-                                These verified rates are dynamically injected into AI responses so customers on WhatsApp always get exact today&apos;s rates.
+                                Har business alag hota hai. Agar aapki jewellery ya gold shop hai to isay <b>ON</b> karein, warna <b>OFF</b> rakhein taake AI gold rate na bolay.
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleSyncGold}
-                            disabled={syncingGold}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-border/60 hover:bg-muted text-foreground transition-all disabled:opacity-50 cursor-pointer"
-                        >
-                            <RefreshCw size={13} className={syncingGold ? "animate-spin" : ""} />
-                            <span>{syncingGold ? "Syncing..." : "Sync Live Rate"}</span>
-                        </button>
-                        <button
-                            onClick={handleSaveGold}
-                            disabled={savingGold}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all disabled:opacity-50 cursor-pointer"
-                        >
-                            <Save size={13} />
-                            <span>{savingGold ? "Saving..." : "Save Overrides"}</span>
-                        </button>
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <Switch
+                            checked={Boolean(config.enableGoldRates)}
+                            onCheckedChange={(val) => setConfig((prev) => ({ ...prev, enableGoldRates: val }))}
+                            className="data-[state=checked]:bg-amber-500"
+                        />
+                        {config.enableGoldRates && (
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={handleSyncGold}
+                                    disabled={syncingGold}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium border border-border/60 hover:bg-muted text-foreground transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                    <RefreshCw size={12} className={syncingGold ? "animate-spin" : ""} />
+                                    <span>Sync</span>
+                                </button>
+                                <button
+                                    onClick={handleSaveGold}
+                                    disabled={savingGold}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                    <Save size={12} />
+                                    <span>Save</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
+
+                {!config.enableGoldRates && (
+                    <div className="p-3 rounded-xl bg-background/60 border border-border/40 text-xs text-muted-foreground flex items-center justify-between gap-3">
+                        <span>⚠️ Gold rates engine is currently <b>OFF</b>. Customer inquiries par gold/bullion rates send nahi kiye jayein ge.</span>
+                        <button
+                            type="button"
+                            onClick={() => setConfig(prev => ({ ...prev, enableGoldRates: true }))}
+                            className="text-amber-600 dark:text-amber-400 font-bold hover:underline text-xs shrink-0 cursor-pointer"
+                        >
+                            Turn ON ↗
+                        </button>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                     <div className="p-3 rounded-xl bg-background border border-border/50 space-y-1.5">
@@ -904,12 +944,53 @@ export default function AiBotClient() {
                             </div>
                         </div>
 
+                        {/* LIVE DIGITAL MENU / CATALOG LINK */}
+                        <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                    <Globe size={14} className="text-primary" />
+                                    Live Digital Menu / Catalog Link (URL)
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        try {
+                                            const stRes = await fetch("/api/stores");
+                                            const stData = await stRes.json();
+                                            if (stData?.stores?.[0]) {
+                                                const s = stData.stores[0];
+                                                const origin = window.location.origin;
+                                                const autoUrl = s.customDomain ? `https://${s.customDomain}` : `${origin}/s/${s.slug}`;
+                                                setConfig(prev => ({ ...prev, menuUrl: autoUrl }));
+                                                toast.success("Digital Dukaan storefront link set!");
+                                            } else {
+                                                toast.info("No store found to auto-fill link");
+                                            }
+                                        } catch (_) {}
+                                    }}
+                                    className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                    <Sparkles size={11} /> Auto-Fill Store Link
+                                </button>
+                            </div>
+                            <input
+                                type="url"
+                                placeholder="e.g. https://solewhat.com/s/my-store or https://mybrand.pk/menu"
+                                value={config.menuUrl || ""}
+                                onChange={(e) => setConfig(prev => ({ ...prev, menuUrl: e.target.value }))}
+                                className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-xs font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                Jab customer menu, rate list ya online catalog maangay ga, AI yeh live link send kare ga. Agar customer pictures/images maangay ga ya pictures available hon gi to neeche di gayi images bhi dispatch kare ga.
+                            </p>
+                        </div>
+
                         {/* Dual Menu Image Uploader (Slot 1 & Slot 2) */}
                         <div className="space-y-2.5">
                             <div className="flex items-center justify-between">
                                 <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
                                     <ImageIcon size={15} className="text-primary" />
-                                    <span>Menu & Media Images (2 Upload Slots)</span>
+                                    <span>Menu & Media Images (Picture Option)</span>
                                 </label>
                                 <span className="text-[10px] text-muted-foreground">
                                     {currentMenuImage1 && currentMenuImage2 ? "2 Images Active" : currentMenuImage1 || currentMenuImage2 ? "1 Image Active" : "No Images Uploaded"}
