@@ -732,15 +732,23 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                         .replace(/!\[.*?\]\((?:https?:\/\/|\/api\/uploads\/|\/uploads\/)[^\s\)]+\)/gi, "")
                                         .trim();
 
-                                    if (imageMatches.length > 0) {
-                                        logger.info("AI-Bot", `AI triggered ${imageMatches.length} image(s) send for ${normalizedFrom}: ${imageMatches.join(", ")}`);
+                                    // Resolve relative image URLs (e.g. /api/uploads/...) to absolute URLs for Baileys WhatsApp client
+                                    const resolvedImageMatches = imageMatches.map((u) => {
+                                        if (u.startsWith("http://") || u.startsWith("https://")) return u;
+                                        const base = process.env.NEXTAUTH_URL || process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "https://solewhat-production-33f6.up.railway.app");
+                                        const cleanBase = base.replace(/\/+$/, "");
+                                        return `${cleanBase}${u.startsWith("/") ? "" : "/"}${u}`;
+                                    });
+
+                                    if (resolvedImageMatches.length > 0) {
+                                        logger.info("AI-Bot", `AI triggered ${resolvedImageMatches.length} image(s) send for ${normalizedFrom}: ${resolvedImageMatches.join(", ")}`);
 
                                         try {
-                                            if (imageMatches.length === 1) {
+                                            if (resolvedImageMatches.length === 1) {
                                                 // Single image dispatch
                                                 if (cleanText.length <= 1000) {
                                                     const res = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
-                                                        image: { url: imageMatches[0] },
+                                                        image: { url: resolvedImageMatches[0] },
                                                         caption: cleanText || undefined
                                                     });
                                                     if (res?.key?.id) registerAiSentMessage(res.key.id);
@@ -748,7 +756,7 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                                     const r1 = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
                                                     if (r1?.key?.id) registerAiSentMessage(r1.key.id);
                                                     const r2 = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
-                                                        image: { url: imageMatches[0] }
+                                                        image: { url: resolvedImageMatches[0] }
                                                     });
                                                     if (r2?.key?.id) registerAiSentMessage(r2.key.id);
                                                 }
@@ -756,7 +764,7 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                                 // Multiple images (e.g. Menu Page 1 & Page 2)
                                                 if (cleanText.length > 0 && cleanText.length <= 1000) {
                                                     const res = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
-                                                        image: { url: imageMatches[0] },
+                                                        image: { url: resolvedImageMatches[0] },
                                                         caption: cleanText
                                                     });
                                                     if (res?.key?.id) registerAiSentMessage(res.key.id);
@@ -767,24 +775,24 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                                         await new Promise((r) => setTimeout(r, 400));
                                                     }
                                                     const r2 = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
-                                                        image: { url: imageMatches[0] },
+                                                        image: { url: resolvedImageMatches[0] },
                                                         caption: "📄 Menu (Page 1)"
                                                     });
                                                     if (r2?.key?.id) registerAiSentMessage(r2.key.id);
                                                 }
 
                                                 // Small delay (600ms) before sending subsequent images to preserve WhatsApp order
-                                                for (let i = 1; i < imageMatches.length; i++) {
+                                                for (let i = 1; i < resolvedImageMatches.length; i++) {
                                                     await new Promise((r) => setTimeout(r, 600));
                                                     const pageLabel = i === 1 ? "📄 Menu (Page 2)" : `📄 Image ${i + 1}`;
                                                     const rNext = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
-                                                        image: { url: imageMatches[i] },
+                                                        image: { url: resolvedImageMatches[i] },
                                                         caption: pageLabel
                                                     });
                                                     if (rNext?.key?.id) registerAiSentMessage(rNext.key.id);
                                                 }
                                             }
-                                            logger.success("AI-Bot", `Successfully sent ${imageMatches.length} image attachment(s) via AI to ${normalizedFrom}`);
+                                            logger.success("AI-Bot", `Successfully sent ${resolvedImageMatches.length} image attachment(s) via AI to ${normalizedFrom}`);
                                         } catch (imgError) {
                                             logger.error("AI-Bot", "Failed to send image attachment(s), falling back to text:", imgError);
                                             const rFallback = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText || aiReply.trim());

@@ -28,11 +28,17 @@ CORE COMMUNICATION RULES:
 - Agar customer "kay hal ha", "kia hal ha", "kaise ho", "how are you" likhay:
   "Alhamdulillah, main theek hoon! Aap sunayein aap kaise hain? Main aapki kya khidmat kar sakta hoon?"
 
-3. MENU, CATALOG & PRODUCT INQUIRIES:
-- Agar customer menu, catalog, rate list, ya items maangay:
-  Polite jawab dein, unko live digital catalog / menu link dein (agar mojood ho), aur available images attach karein: [SEND_IMAGE: <url>].
-- Agar customer specific item ka poochay:
-  Sirf us item ka rate, availability aur details batayein.
+3. MENU, RATES, PRICES, DEALS & LINK INQUIRIES:
+- AGAR CUSTOMER 'MENU', 'RATES', 'PRICES', 'DEALS', 'ITEMS LIST', 'CATALOG' MAANGAY:
+  • Live digital menu link zaroor share karein (agar available ho): "Aap hamara live digital menu aur deals is link par dekh sakte hain: <link>".
+  • Aur available menu pictures (Front aur Back dono images) zaroor attach karein: [SEND_IMAGE: <url1>] [SEND_IMAGE: <url2>].
+- AGAR CUSTOMER 'MENU LINK', 'LINK', 'WEBSITE', 'URL' MAANGAY:
+  • Unhein foran hamara live digital menu / catalog ka direct link dein.
+- AGAR CUSTOMER 'PIC', 'PHOTO', 'IMAGE', 'CARD', 'PICTURES' MAANGAY YA KAHE 'LINK NAHI CHAHIYE PIC BHEJO':
+  • Unhein specifically Front aur Back dono menu pictures attach karein: [SEND_IMAGE: <url1>] [SEND_IMAGE: <url2>].
+- AGAR CUSTOMER SPECIFIC ITEM KA POOCHAY:
+  • Sirf us item ka rate, availability aur details batayein.
+- STRICT RULE: Agar live menu link mojood hai, to KABHI BHI yeh mat kahein ke "We don't have a direct menu link" ya "hamare paas link nahi hai".
 
 4. ACCURACY & KNOWLEDGE BASE:
 - Strictly answer based on the provided Business Profile, Knowledge Base, and Products list.
@@ -301,20 +307,26 @@ export async function callAiApi(params: {
 
     let mediaInstruction = "";
     if (detectedImages.length >= 2) {
-        mediaInstruction = `\n\nAVAILABLE MEDIA / IMAGES TO SEND (2 IMAGES READY):
-- Menu / Catalog Image 1: ${detectedImages[0]}
-- Menu / Catalog Image 2: ${detectedImages[1]}
-INSTRUCTION: Jab bhi customer menu, items list, catalogue, rates ya picture maangay, text jawab ke end mein images attach karein: [SEND_IMAGE: ${detectedImages[0]}] [SEND_IMAGE: ${detectedImages[1]}]`;
+        mediaInstruction = `\n\nAVAILABLE 2-PAGE MENU CARDS (FRONT & BACK IMAGES READY):
+- Menu Image 1 (Front Page): ${detectedImages[0]}
+- Menu Image 2 (Back Page / Deals): ${detectedImages[1]}
+MENU MEDIA RULES:
+1. Agar customer 'pic', 'photo', 'image', 'picture', 'card', 'front and back' maangay ya kahe 'link nahi chahiye pic bhejo':
+   • Foran Front aur Back dono images attach karein: [SEND_IMAGE: ${detectedImages[0]}] [SEND_IMAGE: ${detectedImages[1]}]
+2. Agar customer general 'menu', 'deals', 'rates', 'prices', 'list' maangay:
+   • Live menu link ke sath sath yeh dono front & back images bhi attach karein taake customer ke paas visuals aur link dono hon: [SEND_IMAGE: ${detectedImages[0]}] [SEND_IMAGE: ${detectedImages[1]}]`;
     } else if (detectedImages.length === 1) {
-        mediaInstruction = `\n\nAVAILABLE MEDIA / IMAGE TO SEND:
-- Menu / Catalog Image 1: ${detectedImages[0]}
-INSTRUCTION: Jab bhi customer menu, items list, catalogue ya photo maangay, text ke end mein image attach karein: [SEND_IMAGE: ${detectedImages[0]}]`;
+        mediaInstruction = `\n\nAVAILABLE MENU CARD IMAGE:
+- Menu Image 1: ${detectedImages[0]}
+INSTRUCTION: Jab bhi customer menu, photo, deals ya picture maangay, image attach karein: [SEND_IMAGE: ${detectedImages[0]}]`;
     }
 
     let menuUrlInstruction = "";
     if (menuUrl) {
         menuUrlInstruction = `\n\nLIVE DIGITAL STOREFRONT / MENU LINK: ${menuUrl}
-INSTRUCTION: Jab bhi customer menu, digital dukaan link ya online catalog maangay, unko yeh live link dein: ${menuUrl}`;
+LIVE MENU LINK RULES:
+1. Jab customer 'menu', 'menu link', 'link', 'rates', 'prices', 'deals', 'online catalog' ya 'website' maangay, unko yeh live link zaroor dein: ${menuUrl}
+2. STRICT PROHIBITION: Kabhi bhi yeh mat kahein ke "We don't have a direct menu link" ya "hamare paas link nahi hai". Hamara direct live link yeh hai: ${menuUrl}`;
     }
 
     // ONLY inject gold rate prompt IF enableGoldRates is explicitly TRUE
@@ -514,8 +526,10 @@ function finalizeAiReply(
     menuUrl?: string
 ): string {
     const trimmedPrompt = (userPrompt || "").trim().toLowerCase();
-    const isMenuQuery = /\b(menu|catalog|catalogue|rate|rates|price|prices|card|list|items)\b/i.test(trimmedPrompt) ||
-        /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu)/i.test(trimmedPrompt);
+    const asksForLink = /\b(link|website|url|web)\b/i.test(trimmedPrompt);
+    const asksForPicOnly = /(?:link\s*na|nhi|nahi).*?(?:pic|photo|image)|(?:pic|photo|image|picture|tasweer|front\s*and\s*back).*?(?:bhejo|send|dikhao|chahiye)/i.test(trimmedPrompt);
+    const isMenuQuery = /\b(menu|catalog|catalogue|rate|rates|price|prices|deal|deals|card|list|items)\b/i.test(trimmedPrompt) ||
+        /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu|catalog\s*bhejo)/i.test(trimmedPrompt);
 
     if (!rawReply || rawReply.trim().length === 0) {
         return getNaturalFallbackReply(userPrompt, detectedImages, { menuUrl });
@@ -523,8 +537,16 @@ function finalizeAiReply(
 
     let processed = rawReply.trim();
 
-    // If customer asked for menu / catalog, ensure image tags or menu link are attached if not already in text
-    if (isMenuQuery) {
+    // Prevent LLM hallucination: if menuUrl exists, eliminate any "don't have a direct menu link" or similar negation
+    if (menuUrl) {
+        processed = processed.replace(
+            /(?:we\s+don['’]?t\s+have\s+a\s+direct\s+menu\s+link[^\.\n]*[\.\n]?|hamare\s+paas\s+(?:direct\s+)?menu\s+link\s+nahi\s+hai[^\.\n]*[\.\n]?)/gi,
+            `Aap hamara live digital menu aur prices is link par check kar sakte hain: ${menuUrl}\n`
+        );
+    }
+
+    if (asksForPicOnly) {
+        // Customer specifically requested photos, NOT link
         if (detectedImages.length > 0) {
             const hasImageTag = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*[^\]]+\]/i.test(processed);
             if (!hasImageTag) {
@@ -532,8 +554,22 @@ function finalizeAiReply(
                 processed = `${processed}\n\n${tags}`;
             }
         }
+    } else if (asksForLink && !asksForPicOnly) {
+        // Customer specifically asked for link
         if (menuUrl && !processed.includes(menuUrl)) {
-            processed = `${processed}\n\n🔗 Live Digital Catalog: ${menuUrl}`;
+            processed = `${processed}\n\n🌐 Live Menu Link: ${menuUrl}`;
+        }
+    } else if (isMenuQuery) {
+        // General menu / rates / deals query: Include BOTH link and front/back images!
+        if (menuUrl && !processed.includes(menuUrl)) {
+            processed = `${processed}\n\n🌐 Live Digital Menu & Deals: ${menuUrl}`;
+        }
+        if (detectedImages.length > 0) {
+            const hasImageTag = /\[(?:SEND_IMAGE|IMAGE|SEND_MEDIA|MEDIA):\s*[^\]]+\]/i.test(processed);
+            if (!hasImageTag) {
+                const tags = detectedImages.map((u) => `[SEND_IMAGE: ${u}]`).join(" ");
+                processed = `${processed}\n\n${tags}`;
+            }
         }
     }
 
@@ -569,23 +605,38 @@ export function getNaturalFallbackReply(
         }
     }
 
-    // 1. Menu / Catalog / Price list query
-    const isMenuQuery = /\b(menu|catalog|catalogue|rate\s*list|price\s*list|rates|prices|items|products)\b/i.test(p) ||
+    // 1. Menu / Catalog / Price / Deals query
+    const asksForLink = /\b(link|website|url|web)\b/i.test(p);
+    const asksForPicOnly = /(?:link\s*na|nhi|nahi).*?(?:pic|photo|image)|(?:pic|photo|image|picture|tasweer|front\s*and\s*back).*?(?:bhejo|send|dikhao|chahiye)/i.test(p);
+    const isMenuQuery = /\b(menu|catalog|catalogue|rate\s*list|price\s*list|rates|prices|deal|deals|items|products|list)\b/i.test(p) ||
         /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu|catalog\s*bhejo)/i.test(p);
 
-    if (isMenuQuery) {
+    if (isMenuQuery || asksForLink || asksForPicOnly) {
         const isGreetingPresent = /\b(aoa|salam|assalam|hi|hello)\b/i.test(p);
         const greetingPrefix = isGreetingPresent ? "Walaikum Assalam! " : "G bilkul! ";
 
-        if (detectedImages.length >= 2) {
-            return `${greetingPrefix}Yeh lijiye hamara complete menu aur catalog:\n[SEND_IMAGE: ${detectedImages[0]}] [SEND_IMAGE: ${detectedImages[1]}]${menuUrl ? `\n\n🌐 Live digital menu link: ${menuUrl}` : ""}`;
-        } else if (detectedImages.length === 1) {
-            return `${greetingPrefix}Yeh lijiye hamara complete menu aur catalog:\n[SEND_IMAGE: ${detectedImages[0]}]${menuUrl ? `\n\n🌐 Live digital menu link: ${menuUrl}` : ""}`;
-        } else if (menuUrl) {
-            return `${greetingPrefix}Yeh lijiye hamara complete live digital menu aur products list:\n🌐 ${menuUrl}\n\nAap kisi bhi item, deal ya order ke bare mein yahan pooch sakte hain!`;
-        } else {
-            return `${greetingPrefix}${businessName} par rabta karne ka shukriya. Aap yahan kisi bhi item, rate ya order ke bare mein pooch sakte hain, hamara staff aapki mukammal rehnumai kare ga!`;
+        // Case A: Customer specifically asks for pictures (not link)
+        if (asksForPicOnly && detectedImages.length > 0) {
+            const tags = detectedImages.map(u => `[SEND_IMAGE: ${u}]`).join(" ");
+            return `${greetingPrefix}Yeh lijiye hamara complete menu card (Front aur Back dono pictures):\n${tags}`;
         }
+
+        // Case B: Customer specifically asks for link
+        if (asksForLink && !asksForPicOnly && menuUrl) {
+            return `${greetingPrefix}Yeh lijiye hamara live digital menu link jahan aap tamam deals aur rates dekh sakte hain:\n🌐 ${menuUrl}`;
+        }
+
+        // Case C: General menu / deals / rates query (Send link AND images if available!)
+        const linkPart = menuUrl ? `\n🌐 Live digital menu aur deals: ${menuUrl}` : "";
+        const imgPart = detectedImages.length > 0
+            ? `\n\nYeh lijiye hamara complete 2-page menu card (Front aur Back):\n${detectedImages.map(u => `[SEND_IMAGE: ${u}]`).join(" ")}`
+            : "";
+
+        if (linkPart || imgPart) {
+            return `${greetingPrefix}Aap hamari tamam deals, items aur rates yahan check kar sakte hain:${linkPart}${imgPart}`;
+        }
+
+        return `${greetingPrefix}${businessName} par rabta karne ka shukriya. Aap yahan kisi bhi item, deal, rate ya order ke bare mein pooch sakte hain, hamara staff aapki mukammal rehnumai kare ga!`;
     }
 
     // 2. Greetings + How are you combined

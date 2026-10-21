@@ -583,6 +583,8 @@ export default function AiBotClient() {
                     modelName: config.modelName,
                     systemPrompt: config.systemPrompt,
                     knowledgeBase: config.knowledgeBase,
+                    menuUrl: config.menuUrl,
+                    enableGoldRates: config.enableGoldRates,
                     userPrompt: userMsg
                 })
             });

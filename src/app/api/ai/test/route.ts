@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt } = body;
+        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, menuUrl, enableGoldRates } = body;
 
         if (!userPrompt) {
             return NextResponse.json({ status: false, message: "userPrompt is required" }, { status: 400 });
@@ -26,7 +26,9 @@ export async function POST(request: NextRequest) {
             modelName: modelName || "meta-llama/llama-3.1-8b-instruct:free",
             systemPrompt,
             knowledgeBase,
-            userPrompt
+            userPrompt,
+            menuUrl,
+            enableGoldRates: Boolean(enableGoldRates)
         });
 
         if (!replyText) {
