@@ -703,7 +703,7 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                         }
 
                         logger.info("AI-Bot", `Incoming message from ${normalizedFrom}: "${normalized.content}"`);
-                        generateAiResponse(sessionId, normalized.content, isGroup)
+                        generateAiResponse(sessionId, normalized.content, isGroup, normalizedFrom, senderPushName)
                             .then(async (aiReply) => {
                                 if (aiReply && aiReply.trim().length > 0) {
                                     logger.info("AI-Bot", `Auto replying to ${normalizedFrom} via AI...`);

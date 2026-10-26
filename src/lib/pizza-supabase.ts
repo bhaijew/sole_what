@@ -229,3 +229,107 @@ ${menuText || "No menu products found."}
         return "";
     }
 }
+
+export interface CreateOrderPayload {
+    shopId: number;
+    customerName: string;
+    customerPhone: string;
+    deliveryAddress: string;
+    items: Array<{
+        name: string;
+        price: number;
+        qty?: number;
+        quantity?: number;
+        selected_variation?: any;
+    }>;
+    total: number;
+    notes?: string;
+}
+
+/**
+ * Creates an order directly in Supabase orders table for POS instant pickup & printing
+ */
+export async function createPizzaOrderInSupabase(input: CreateOrderPayload): Promise<{
+    success: boolean;
+    orderNumber?: string;
+    error?: string;
+}> {
+    try {
+        const shopId = input.shopId || 7;
+        const customerName = (input.customerName || "WhatsApp Customer").trim();
+        const customerPhone = (input.customerPhone || "").trim();
+        const deliveryAddress = (input.deliveryAddress || "Home Delivery").trim();
+
+        // 1. Generate sequential order number
+        let seq = Math.floor(100 + Math.random() * 900);
+        try {
+            const latest = await fetchSupabase(`orders?shop_id=eq.${shopId}&select=order_number,id&order=id.desc&limit=1`);
+            if (latest && latest.length > 0 && latest[0].order_number) {
+                const match = String(latest[0].order_number).match(/(\d+)$/);
+                if (match) seq = parseInt(match[1], 10) + 1;
+            }
+        } catch (_) {}
+
+        const seqStr = String(seq).padStart(3, "0");
+        const orderNumber = `ORD-${shopId}-${seqStr}`;
+
+        const formattedItems = (input.items || []).map((it, idx) => ({
+            id: idx + 1,
+            name: it.name,
+            price: Number(it.price) || 0,
+            qty: Number(it.qty || it.quantity || 1),
+            selected_variation: it.selected_variation || null
+        }));
+
+        const subtotal = formattedItems.reduce((acc, it) => acc + (it.price * it.qty), 0);
+        const finalTotal = Number(input.total) > 0 ? Number(input.total) : subtotal;
+
+        const enrichedNotes = `[DELIVERY: Address: ${deliveryAddress} | Phone: ${customerPhone} | Source: WhatsApp AI] ${input.notes || ""}`.trim();
+
+        const payload = {
+            order_number: orderNumber,
+            status: "pending",
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            delivery_address: deliveryAddress,
+            order_type: "delivery",
+            shop_id: shopId,
+            items: formattedItems,
+            total: finalTotal,
+            delivery_fee: 0,
+            payment_status: "unpaid",
+            payment_method: "cash",
+            notes: enrichedNotes
+        };
+
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+            method: "POST",
+            headers: {
+                "apikey": SUPABASE_KEY,
+                "Authorization": `Bearer ${SUPABASE_KEY}`,
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            logger.error("Pizza-Supabase", "Failed to insert order: " + errText);
+            return { success: false, error: errText };
+        }
+
+        const created = await res.json();
+        const createdOrderNum = created?.[0]?.order_number || orderNumber;
+        logger.info("Pizza-Supabase", `[ORDER CREATED] Placed order ${createdOrderNum} for shop #${shopId} (Customer: ${customerName})`);
+
+        return {
+            success: true,
+            orderNumber: createdOrderNum
+        };
+    } catch (e: any) {
+        logger.error("Pizza-Supabase", "createPizzaOrder error: " + (e?.message || e));
+        return { success: false, error: e?.message || "Failed to create order" };
+    }
+}
+

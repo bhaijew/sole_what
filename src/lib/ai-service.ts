@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import { getGoldRates, formatGoldRatePrompt } from "./gold-service";
-import { getPizzaShopCatalogForAi } from "./pizza-supabase";
+import { getPizzaShopCatalogForAi, createPizzaOrderInSupabase } from "./pizza-supabase";
 
 export interface AiTestRequest {
     provider: string; // "openrouter" | "openai" | "gemini" | "groq"
@@ -43,7 +43,41 @@ CORE COMMUNICATION RULES:
 
 4. ACCURACY & KNOWLEDGE BASE:
 - Strictly answer based on the provided Business Profile, Knowledge Base, and Products list.
-- Agar koi aisi baat ho jo Knowledge Base mein na ho, to politely kahein: "Is bare mein mazeed maloomat ke liye main apne staff se confirm kar ke aapko foran update karta hoon."`;
+- Agar koi aisi baat ho jo Knowledge Base mein na ho, to politely kahein: "Is bare mein mazeed maloomat ke liye main apne staff se confirm kar ke aapko foran update karta hoon."
+
+5. STRICT LANGUAGE POLICY (ENGLISH & PAKISTANI ROMAN URDU ONLY - NO HINDI):
+- Respond ONLY in natural, polite Pakistani Roman Urdu (or English if the customer writes in English).
+- ABSOLUTELY STRICT PROHIBITION ON HINDI: You must NEVER use Hindi words (such as "namaste", "dhanyavaad", "kripya", "mitra", "aabhar", "shubh", "khushkhabri", "chinta na karein", "sampark", etc.).
+- ALWAYS use authentic Pakistani Urdu words: "Ji bilkul", "Shukriya", "Aapka order", "Pata (Address)", "Rabta number", "Meharbani", "Walaikum Assalam", "G zaroor".
+
+6. NATURAL CONVERSATIONAL FOOD & PIZZA ORDERING WORKFLOW:
+When a customer wants to place an order (e.g., asks for food items like Shawarma, Pizza, Deals, Drinks, etc.):
+• STEP 1 (ORDER ITEMS & CART CONFIRMATION):
+  Identify the requested items and quantities from the live menu/deals catalog.
+  Confirm the items added with their exact prices and calculate the subtotal.
+  Then politely ask the customer for their:
+  1. Complete Name (Naam)
+  2. Delivery Address (Ghar / Location ka mukammal pata)
+  3. WhatsApp / Phone number (Rabta number)
+• STEP 2 (SUMMARY & CONFIRMATION QUESTION):
+  Once the customer provides their Name and Delivery Address:
+  Present a clear, clean order receipt summary:
+  📋 ORDER SUMMARY:
+  • <Qty>x <Item Name>: Rs. <Price>
+  ────────────────────
+  💵 Total Bill: Rs. <Total> (Cash on Delivery)
+  👤 Name: <Customer Name>
+  📍 Address: <Delivery Address>
+  📞 Phone: <Customer Phone>
+  
+  Ask for final confirmation:
+  "👉 Order confirm karne ke liye 'YES' ya 'CONFIRM' reply karein."
+• STEP 3 (FINAL CONFIRMATION & POS KITCHEN DISPATCH):
+  When the customer replies "YES", "CONFIRM", "HAAN", "OK", "DONE", "KAR DEIN":
+  You MUST attach this exact JSON tag at the very end of your response:
+  [PLACE_ORDER: {"name": "<Customer Name>", "phone": "<Phone>", "address": "<Delivery Address>", "items": [{"name": "<Item Name>", "price": <Price>, "qty": <Qty>}], "total": <Total Bill>}]
+  And reply with an enthusiastic confirmation:
+  "🎉 Bohat shukriya [Customer Name]! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!"`;
 
 const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
 
@@ -97,7 +131,9 @@ export function extractImagesFromKnowledgeBase(knowledgeBase?: string): string[]
 export async function generateAiResponse(
     sessionId: string,
     userMessageText: string,
-    isGroup: boolean = false
+    isGroup: boolean = false,
+    customerJid?: string,
+    customerPushName?: string
 ): Promise<string | null> {
     let detectedImages: string[] = [];
     let menuUrl: string | undefined = undefined;
@@ -276,6 +312,43 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
         } catch (_) {}
 
         if (aiReply) {
+            // Check if AI generated a [PLACE_ORDER: {...}] instruction
+            const orderTagRegex = /\[PLACE_ORDER:\s*({[\s\S]*?})\]/i;
+            const orderMatch = aiReply.match(orderTagRegex);
+            if (orderMatch && orderMatch[1]) {
+                try {
+                    const orderData = JSON.parse(orderMatch[1]);
+                    const targetShopId = pizzaIntegration?.shopId || 7;
+                    let cleanPhone = (orderData.phone || "").trim();
+                    if (!cleanPhone && customerJid) {
+                        cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
+                        if (cleanPhone.startsWith("92")) {
+                            cleanPhone = "0" + cleanPhone.substring(2);
+                        }
+                    }
+
+                    const orderResult = await createPizzaOrderInSupabase({
+                        shopId: targetShopId,
+                        customerName: orderData.name || customerPushName || "WhatsApp Customer",
+                        customerPhone: cleanPhone || "03000000000",
+                        deliveryAddress: orderData.address || "Delivery Address",
+                        items: Array.isArray(orderData.items) ? orderData.items : [],
+                        total: Number(orderData.total) || 0,
+                        notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
+                    });
+
+                    if (orderResult.success && orderResult.orderNumber) {
+                        aiReply = aiReply.replace(orderTagRegex, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                        logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
+                    } else {
+                        aiReply = aiReply.replace(orderTagRegex, "").trim();
+                    }
+                } catch (oErr: any) {
+                    logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
+                    aiReply = aiReply.replace(orderTagRegex, "").trim();
+                }
+            }
+
             logger.success("AI-Bot", `[Success] AI generated ${aiReply.length} chars response.`);
             return aiReply;
         } else {
