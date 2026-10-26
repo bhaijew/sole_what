@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import { getGoldRates, formatGoldRatePrompt } from "./gold-service";
+import { getPizzaShopCatalogForAi } from "./pizza-supabase";
 
 export interface AiTestRequest {
     provider: string; // "openrouter" | "openai" | "gemini" | "groq"
@@ -114,7 +115,7 @@ export async function generateAiResponse(
                     { id: sessionId }
                 ]
             },
-            select: { id: true, sessionId: true, userId: true }
+            select: { id: true, sessionId: true, userId: true, config: true }
         });
 
         if (!session) {
@@ -203,6 +204,22 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
             }
         } catch (storeErr: any) {
             logger.warn("AI-Bot", "Could not fetch dynamic store profile: " + storeErr?.message);
+        }
+
+        // Live Pizza Management System (Supabase Multi-Shop Sync)
+        const sessionConfig = (session.config as any) || {};
+        const pizzaIntegration = sessionConfig.pizzaIntegration;
+        if (pizzaIntegration?.enabled && pizzaIntegration?.shopId) {
+            try {
+                const pizzaCatalog = await getPizzaShopCatalogForAi(pizzaIntegration.shopId);
+                if (pizzaCatalog) {
+                    dynamicStoreContext = [dynamicStoreContext, pizzaCatalog].filter(Boolean).join("\n\n");
+                    businessName = pizzaIntegration.shopName || businessName;
+                    logger.info("AI-Bot", `[Pizza-Supabase] Injected live deals & products for shop #${pizzaIntegration.shopId} (${pizzaIntegration.shopName})`);
+                }
+            } catch (pErr: any) {
+                logger.warn("AI-Bot", "Failed to load live pizza catalog: " + pErr?.message);
+            }
         }
 
         menuUrl = aiConfig?.menuUrl || menuUrl;

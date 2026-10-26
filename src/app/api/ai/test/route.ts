@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
 import { callAiApi } from "@/lib/ai-service";
+import { getPizzaShopCatalogForAi } from "@/lib/pizza-supabase";
 
 export async function POST(request: NextRequest) {
     try {
@@ -14,10 +15,20 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, menuUrl, enableGoldRates } = body;
+        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, menuUrl, enableGoldRates, pizzaShopId } = body;
 
         if (!userPrompt) {
             return NextResponse.json({ status: false, message: "userPrompt is required" }, { status: 400 });
+        }
+
+        let combinedKb = knowledgeBase || "";
+        if (pizzaShopId) {
+            try {
+                const pizzaCatalog = await getPizzaShopCatalogForAi(Number(pizzaShopId));
+                if (pizzaCatalog) {
+                    combinedKb = [combinedKb, pizzaCatalog].filter(Boolean).join("\n\n");
+                }
+            } catch (_) {}
         }
 
         const replyText = await callAiApi({
@@ -25,7 +36,7 @@ export async function POST(request: NextRequest) {
             apiKey: apiKey || "",
             modelName: modelName || "meta-llama/llama-3.1-8b-instruct:free",
             systemPrompt,
-            knowledgeBase,
+            knowledgeBase: combinedKb,
             userPrompt,
             menuUrl,
             enableGoldRates: Boolean(enableGoldRates)

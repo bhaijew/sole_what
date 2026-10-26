@@ -23,7 +23,8 @@ import {
     Image as ImageIcon,
     Upload,
     Trash2,
-    Coins
+    Coins,
+    UtensilsCrossed
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -244,9 +245,119 @@ export default function AiBotClient() {
         } catch (e) {}
     };
 
+    // Pizza Management System (Supabase) Integration State
+    const [pizzaConfig, setPizzaConfig] = useState<{
+        enabled: boolean;
+        shopId: number | null;
+        shopName: string | null;
+        shopSlug: string | null;
+        code: string;
+        totalProducts?: number;
+        totalDeals?: number;
+        connectedAt?: string;
+    }>({
+        enabled: false,
+        shopId: null,
+        shopName: null,
+        shopSlug: null,
+        code: ""
+    });
+    const [pizzaCodeInput, setPizzaCodeInput] = useState("");
+    const [verifyingPizza, setVerifyingPizza] = useState(false);
+    const [togglingPizza, setTogglingPizza] = useState(false);
+
+    const fetchPizzaIntegration = async () => {
+        if (!selectedSessionId) return;
+        try {
+            const res = await fetch(`/api/sessions/${selectedSessionId}/pizza-integration`);
+            const data = await res.json();
+            if (data.status && data.data) {
+                setPizzaConfig(data.data);
+                if (data.data.code) setPizzaCodeInput(data.data.code);
+            }
+        } catch (_) {}
+    };
+
     useEffect(() => {
         fetchGoldRates();
     }, []);
+
+    useEffect(() => {
+        fetchPizzaIntegration();
+    }, [selectedSessionId]);
+
+    const handleConnectPizza = async () => {
+        if (!selectedSessionId) {
+            toast.error("Please select a session first");
+            return;
+        }
+        if (!pizzaCodeInput.trim()) {
+            toast.error("Please enter a Shop Pairing Code (e.g. PZ-7)");
+            return;
+        }
+
+        setVerifyingPizza(true);
+        try {
+            const res = await fetch(`/api/sessions/${selectedSessionId}/pizza-integration`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "connect", code: pizzaCodeInput.trim() })
+            });
+            const data = await res.json();
+            if (data.status && data.data) {
+                setPizzaConfig(data.data);
+                toast.success(data.message || "Connected to Pizza Management System!");
+            } else {
+                toast.error(data.message || "Failed to verify shop code");
+            }
+        } catch (e: any) {
+            toast.error("Error: " + (e.message || "Could not connect to Supabase"));
+        } finally {
+            setVerifyingPizza(false);
+        }
+    };
+
+    const handleTogglePizza = async (val: boolean) => {
+        if (!selectedSessionId) return;
+        setTogglingPizza(true);
+        try {
+            const res = await fetch(`/api/sessions/${selectedSessionId}/pizza-integration`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "toggle", enabled: val })
+            });
+            const data = await res.json();
+            if (data.status && data.data) {
+                setPizzaConfig(data.data);
+                toast.success(data.message);
+            }
+        } catch (_) {
+            toast.error("Failed to update status");
+        } finally {
+            setTogglingPizza(false);
+        }
+    };
+
+    const handleDisconnectPizza = async () => {
+        if (!selectedSessionId) return;
+        if (!confirm("Are you sure you want to disconnect this Pizza shop?")) return;
+
+        try {
+            const res = await fetch(`/api/sessions/${selectedSessionId}/pizza-integration`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "disconnect" })
+            });
+            const data = await res.json();
+            if (data.status && data.data) {
+                setPizzaConfig(data.data);
+                setPizzaCodeInput("");
+                toast.success("Disconnected successfully");
+            }
+        } catch (_) {
+            toast.error("Failed to disconnect");
+        }
+    };
 
     const handleSyncGold = async () => {
         setSyncingGold(true);
@@ -585,6 +696,7 @@ export default function AiBotClient() {
                     knowledgeBase: config.knowledgeBase,
                     menuUrl: config.menuUrl,
                     enableGoldRates: config.enableGoldRates,
+                    pizzaShopId: (pizzaConfig.enabled && pizzaConfig.shopId) ? pizzaConfig.shopId : undefined,
                     userPrompt: userMsg
                 })
             });
@@ -733,6 +845,146 @@ export default function AiBotClient() {
                     onCheckedChange={(val) => setConfig((prev) => ({ ...prev, fallbackOnly: val }))}
                     className="data-[state=checked]:bg-amber-500"
                 />
+            </div>
+
+            {/* Pizza Management System (Supabase Multi-Shop Live Sync) Card */}
+            <div className="p-5 rounded-2xl border border-orange-500/30 bg-gradient-to-r from-orange-500/5 via-card to-amber-500/5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-orange-500 text-white shadow-sm shrink-0 text-lg flex items-center justify-center">
+                            🍕
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-sm text-foreground flex items-center gap-2 flex-wrap">
+                                Pizza Management System (Supabase Live Sync)
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${pizzaConfig.enabled && pizzaConfig.shopId ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-muted text-muted-foreground border-border/50"}`}>
+                                    {pizzaConfig.enabled && pizzaConfig.shopId ? `ON (Connected: ${pizzaConfig.shopName || `Shop #${pizzaConfig.shopId}`})` : "OFF (Sync Paused)"}
+                                </span>
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                                Pizza Management System (Supabase) se deals, menu items aur real-time prices automatically WhatsApp AI mein live inject honge.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 self-end sm:flex-row">
+                        <span className="text-xs font-semibold text-muted-foreground hidden sm:inline">
+                            {pizzaConfig.enabled ? "Sync Active" : "Sync Disabled"}
+                        </span>
+                        <Switch
+                            checked={Boolean(pizzaConfig.enabled)}
+                            disabled={!pizzaConfig.shopId || togglingPizza}
+                            onCheckedChange={handleTogglePizza}
+                            className="data-[state=checked]:bg-orange-500"
+                        />
+                    </div>
+                </div>
+
+                {pizzaConfig.shopId ? (
+                    <div className="p-4 rounded-xl bg-background border border-orange-500/30 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-bold text-foreground">
+                                        {pizzaConfig.shopName || `Shop #${pizzaConfig.shopId}`}
+                                    </span>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold border border-orange-500/20">
+                                        Shop ID: #{pizzaConfig.shopId}
+                                    </span>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                                        Code: {pizzaConfig.code}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Status: <b>{pizzaConfig.enabled ? "🟢 Live Active" : "🟡 Paused"}</b> &bull; Customer jab WhatsApp par &quot;deal&quot; ya kisi pizza ka rate poochega, AI live Supabase se answer karega.
+                                </p>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleDisconnectPizza}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 transition-all cursor-pointer"
+                                >
+                                    <Trash2 size={13} />
+                                    <span>Disconnect</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Stats pill */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                            <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-center">
+                                <div className="text-[10px] text-muted-foreground uppercase font-bold">Active Deals</div>
+                                <div className="text-sm font-extrabold text-orange-600 dark:text-orange-400">
+                                    {pizzaConfig.totalDeals ?? "16"} Deals
+                                </div>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-center">
+                                <div className="text-[10px] text-muted-foreground uppercase font-bold">Total Products</div>
+                                <div className="text-sm font-extrabold text-foreground">
+                                    {pizzaConfig.totalProducts ?? "85+"} Items
+                                </div>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-center">
+                                <div className="text-[10px] text-muted-foreground uppercase font-bold">Database</div>
+                                <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                    Supabase Cloud
+                                </div>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-center">
+                                <div className="text-[10px] text-muted-foreground uppercase font-bold">Multi-Shop Isolation</div>
+                                <div className="text-sm font-bold text-primary">
+                                    Shop-ID #{pizzaConfig.shopId}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="p-4 rounded-xl bg-background border border-border/50 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                                <div className="text-xs font-bold text-foreground">
+                                    Pizza Management System Pairing Code Enter Karein
+                                </div>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Pizza System ke Admin Settings se apna Shop Pairing Code (e.g. <code>PZ-7</code>) copy karein aur yahan paste kar ke <b>Verify &amp; Connect</b> karein.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                            <div className="relative w-full sm:w-80">
+                                <input
+                                    type="text"
+                                    placeholder="Enter Code (e.g. PZ-7 or 7)"
+                                    value={pizzaCodeInput}
+                                    onChange={(e) => setPizzaCodeInput(e.target.value.toUpperCase())}
+                                    className="w-full bg-muted/30 border border-border/60 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-foreground outline-none focus:border-orange-500 tracking-wider uppercase"
+                                />
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleConnectPizza}
+                                disabled={verifyingPizza || !pizzaCodeInput.trim()}
+                                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                            >
+                                {verifyingPizza ? (
+                                    <>
+                                        <RefreshCw size={13} className="animate-spin" />
+                                        <span>Connecting to Supabase...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 size={13} />
+                                        <span>Verify &amp; Connect Shop</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Live Daily Gold Rates Manager Card (Toggle ON/OFF for Jewellers) */}
