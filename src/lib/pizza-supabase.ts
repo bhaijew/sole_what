@@ -260,26 +260,39 @@ export async function createPizzaOrderInSupabase(input: CreateOrderPayload): Pro
         const customerPhone = (input.customerPhone || "").trim();
         const deliveryAddress = (input.deliveryAddress || "Home Delivery").trim();
 
-        // 1. Generate sequential order number
+        // 1. Generate standard date-stamped order number and sequential token
+        const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
         let seq = Math.floor(100 + Math.random() * 900);
         try {
-            const latest = await fetchSupabase(`orders?shop_id=eq.${shopId}&select=order_number,id&order=id.desc&limit=1`);
-            if (latest && latest.length > 0 && latest[0].order_number) {
-                const match = String(latest[0].order_number).match(/(\d+)$/);
-                if (match) seq = parseInt(match[1], 10) + 1;
+            const latest = await fetchSupabase(`orders?shop_id=eq.${shopId}&select=order_number,token_number,id&order=id.desc&limit=1`);
+            if (latest && latest.length > 0) {
+                if (latest[0].token_number) {
+                    const match = String(latest[0].token_number).match(/(\d+)$/);
+                    if (match) seq = parseInt(match[1], 10) + 1;
+                } else if (latest[0].order_number) {
+                    const match = String(latest[0].order_number).match(/(\d+)$/);
+                    if (match) seq = parseInt(match[1], 10) + 1;
+                }
             }
         } catch (_) {}
 
-        const seqStr = String(seq).padStart(3, "0");
-        const orderNumber = `ORD-${shopId}-${seqStr}`;
+        const tokenNumber = String(seq).padStart(4, "0");
+        const orderNumber = `ORD-${todayStr}-${tokenNumber}`;
 
-        const formattedItems = (input.items || []).map((it, idx) => ({
-            id: idx + 1,
-            name: it.name,
-            price: Number(it.price) || 0,
-            qty: Number(it.qty || it.quantity || 1),
-            selected_variation: it.selected_variation || null
-        }));
+        const formattedItems = (input.items || []).map((it, idx) => {
+            const price = Number(it.price) || 0;
+            const qty = Number(it.qty || it.quantity || 1);
+            return {
+                id: idx + 1,
+                name: it.name,
+                price: price,
+                qty: qty,
+                quantity: qty,
+                subtotal: price * qty,
+                selectedVariation: it.selected_variation || null,
+                selected_variation: it.selected_variation || null
+            };
+        });
 
         const subtotal = formattedItems.reduce((acc, it) => acc + (it.price * it.qty), 0);
         const finalTotal = Number(input.total) > 0 ? Number(input.total) : subtotal;
@@ -288,6 +301,7 @@ export async function createPizzaOrderInSupabase(input: CreateOrderPayload): Pro
 
         const payload = {
             order_number: orderNumber,
+            token_number: tokenNumber,
             status: "pending",
             customer_name: customerName,
             customer_phone: customerPhone,
@@ -297,6 +311,7 @@ export async function createPizzaOrderInSupabase(input: CreateOrderPayload): Pro
             items: formattedItems,
             total: finalTotal,
             delivery_fee: 0,
+            discount_amount: 0,
             payment_status: "unpaid",
             payment_method: "cash",
             notes: enrichedNotes
@@ -321,7 +336,7 @@ export async function createPizzaOrderInSupabase(input: CreateOrderPayload): Pro
 
         const created = await res.json();
         const createdOrderNum = created?.[0]?.order_number || orderNumber;
-        logger.info("Pizza-Supabase", `[ORDER CREATED] Placed order ${createdOrderNum} for shop #${shopId} (Customer: ${customerName})`);
+        logger.info("Pizza-Supabase", `[ORDER CREATED] Placed order ${createdOrderNum} (Token: ${tokenNumber}) for shop #${shopId} (Customer: ${customerName})`);
 
         return {
             success: true,

@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
-import { callAiApi } from "@/lib/ai-service";
-import { getPizzaShopCatalogForAi } from "@/lib/pizza-supabase";
+import { callAiApi, extractPlaceOrderPayload } from "@/lib/ai-service";
+import { getPizzaShopCatalogForAi, createPizzaOrderInSupabase } from "@/lib/pizza-supabase";
 
 export async function POST(request: NextRequest) {
     try {
@@ -22,9 +22,11 @@ export async function POST(request: NextRequest) {
         }
 
         let combinedKb = knowledgeBase || "";
-        if (pizzaShopId) {
+        const targetShopId = pizzaShopId ? Number(pizzaShopId) : 7;
+
+        if (targetShopId) {
             try {
-                const pizzaCatalog = await getPizzaShopCatalogForAi(Number(pizzaShopId));
+                const pizzaCatalog = await getPizzaShopCatalogForAi(targetShopId);
                 if (pizzaCatalog) {
                     combinedKb = [combinedKb, pizzaCatalog].filter(Boolean).join("\n\n");
                 }
@@ -47,10 +49,29 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ status: false, message: "No response generated from AI" }, { status: 500 });
         }
 
-        // Playground preview for [PLACE_ORDER: {...}]
-        const orderTagRegex = /\[PLACE_ORDER:\s*({[\s\S]*?})\]/i;
-        if (orderTagRegex.test(replyText)) {
-            replyText = replyText.replace(orderTagRegex, `\n\n🧾 *[TEST SIMULATION] Order Verified & Ready for Kitchen!* (Order Tag Generated Successfully)`).trim();
+        // Check if an order tag was produced
+        const extracted = extractPlaceOrderPayload(replyText);
+        if (extracted && extracted.orderData) {
+            try {
+                const orderData = extracted.orderData;
+                const orderRes = await createPizzaOrderInSupabase({
+                    shopId: targetShopId,
+                    customerName: orderData.name || "Playground Test Customer",
+                    customerPhone: orderData.phone || "03001234567",
+                    deliveryAddress: orderData.address || "Street 4 Sohawa",
+                    items: Array.isArray(orderData.items) ? orderData.items : [],
+                    total: Number(orderData.total) || 0,
+                    notes: `[Dashboard Playground Test | Contact: ${orderData.phone || "03001234567"}]`
+                });
+
+                if (orderRes.success && orderRes.orderNumber) {
+                    replyText = replyText.replace(extracted.fullTag, `\n\n🧾 *Order Number:* ${orderRes.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                } else {
+                    replyText = replyText.replace(extracted.fullTag, `\n\n⚠️ (Order creation warning: ${orderRes.error || "failed to save"})\n`).trim();
+                }
+            } catch (err: any) {
+                replyText = replyText.replace(extracted.fullTag, "").trim();
+            }
         }
 
         return NextResponse.json({

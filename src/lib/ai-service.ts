@@ -143,6 +143,74 @@ const customerChatMemory = new Map<string, ChatMemoryTurn[]>();
 const MEMORY_TTL_MS = 60 * 60 * 1000; // 1 hour memory per customer
 
 /**
+ * Safely parse JSON even with unquoted keys, single quotes, or trailing commas
+ */
+function safeJsonParse(str: string): any {
+    try {
+        return JSON.parse(str);
+    } catch (_) {
+        try {
+            const cleaned = str
+                .replace(/'/g, '"')
+                .replace(/,\s*([\]}])/g, "$1")
+                .replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+            return JSON.parse(cleaned);
+        } catch (e) {
+            return null;
+        }
+    }
+}
+
+/**
+ * Robustly extract [PLACE_ORDER: {...}] without breaking on nested brackets or markdown fences
+ */
+export function extractPlaceOrderPayload(rawText: string): { fullTag: string; orderData: any } | null {
+    if (!rawText) return null;
+    const marker = "[PLACE_ORDER:";
+    const idx = rawText.toUpperCase().indexOf(marker);
+    if (idx === -1) return null;
+
+    let depth = 0;
+    let endTag = -1;
+
+    for (let i = idx; i < rawText.length; i++) {
+        const char = rawText[i];
+        if (char === "[") {
+            depth++;
+        } else if (char === "]") {
+            depth--;
+            if (depth === 0) {
+                endTag = i;
+                break;
+            }
+        }
+    }
+
+    if (endTag === -1) {
+        const lastBracket = rawText.lastIndexOf("]");
+        endTag = lastBracket > idx ? lastBracket : rawText.length - 1;
+    }
+
+    const fullTag = rawText.substring(idx, endTag + 1);
+    let inner = fullTag.substring(marker.length, fullTag.length - (fullTag.endsWith("]") ? 1 : 0)).trim();
+
+    // Strip markdown code fences if wrapped in ```json ... ```
+    inner = inner.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+
+    const firstBrace = inner.indexOf("{");
+    const lastBrace = inner.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+        return null;
+    }
+
+    const jsonStr = inner.substring(firstBrace, lastBrace + 1).trim();
+    const orderData = safeJsonParse(jsonStr);
+    if (!orderData) return null;
+
+    return { fullTag, orderData };
+}
+
+/**
  * Clear customer memory (used when order is placed or manually reset)
  */
 export function clearCustomerChatMemory(sessionId: string, customerJid: string) {
@@ -391,14 +459,13 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
 
         if (aiReply) {
             // Check if AI generated a [PLACE_ORDER: {...}] instruction
-            const orderTagRegex = /\[PLACE_ORDER:\s*({[\s\S]*?})\]/i;
-            const orderMatch = aiReply.match(orderTagRegex);
+            const extracted = extractPlaceOrderPayload(aiReply);
             let orderCompletedSuccess = false;
 
-            if (orderMatch && orderMatch[1]) {
+            if (extracted && extracted.orderData) {
+                const { fullTag, orderData } = extracted;
                 try {
-                    const orderData = JSON.parse(orderMatch[1]);
-                    const targetShopId = pizzaIntegration?.shopId || 7;
+                    const targetShopId = pizzaIntegration?.shopId ? Number(pizzaIntegration.shopId) : 7;
                     let cleanPhone = (orderData.phone || "").trim();
                     if (!cleanPhone && customerJid) {
                         cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
@@ -419,14 +486,14 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
 
                     if (orderResult.success && orderResult.orderNumber) {
                         orderCompletedSuccess = true;
-                        aiReply = aiReply.replace(orderTagRegex, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                        aiReply = aiReply.replace(fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
                         logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
                     } else {
-                        aiReply = aiReply.replace(orderTagRegex, "").trim();
+                        aiReply = aiReply.replace(fullTag, "").trim();
                     }
                 } catch (oErr: any) {
                     logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
-                    aiReply = aiReply.replace(orderTagRegex, "").trim();
+                    aiReply = aiReply.replace(fullTag, "").trim();
                 }
             }
 
