@@ -285,7 +285,7 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
 
         logger.info("AI-Bot", `[Generating] Calling AI API (provider: ${provider}, model: ${modelName}, goldRates: ${enableGoldRates}, images: ${detectedImages.length})...`);
 
-        const aiReply = await callAiApi({
+        let aiReply = await callAiApi({
             provider,
             apiKey,
             modelName,
