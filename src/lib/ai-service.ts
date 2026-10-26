@@ -46,10 +46,19 @@ CORE COMMUNICATION RULES:
 - Strictly answer based on the provided Business Profile, Knowledge Base, and Products list.
 - Agar koi aisi baat ho jo Knowledge Base mein na ho, to politely kahein: "Is bare mein mazeed maloomat ke liye main apne staff se confirm kar ke aapko foran update karta hoon."
 
-5. STRICT LANGUAGE POLICY (ENGLISH & PAKISTANI ROMAN URDU ONLY - NO HINDI):
-- Respond ONLY in natural, polite Pakistani Roman Urdu (or English if the customer writes in English).
-- ABSOLUTELY STRICT PROHIBITION ON HINDI: You must NEVER use Hindi words (such as "namaste", "dhanyavaad", "kripya", "mitra", "aabhar", "shubh", "khushkhabri", "chinta na karein", "sampark", etc.).
-- ALWAYS use authentic Pakistani Urdu words: "Ji bilkul", "Shukriya", "Aapka order", "Pata (Address)", "Rabta number", "Meharbani", "Walaikum Assalam", "G zaroor".
+5. STRICT LANGUAGE POLICY (AUTHENTIC PAKISTANI ROMAN URDU OR ENGLISH ONLY - ABSOLUTELY ZERO HINDI):
+- Respond ONLY in natural, polite Pakistani Roman Urdu (or standard English if the customer writes in English).
+- ABSOLUTELY ZERO TOLERANCE FOR HINDI: You must NEVER use Indian Hindi words, Hindi vocabulary, or Hindi phrasing.
+  STRICTLY PROHIBITED WORDS: "namaste", "namaskar", "dhanyavaad", "dhanyavad", "dhanyawad", "kripya", "kripaya", "chinta", "sahayata", "swagat", "mitra", "aabhar", "shubh", "khushkhabri", "sampark", "aapka swagat hai", "grahak", "vistar", "kijiye", "bataiye".
+- ABSOLUTE PROHIBITION ON DEVANAGARI SCRIPT: NEVER output Indian Hindi alphabet / Devanagari characters. Always use the standard English alphabet for Roman Urdu.
+- ALWAYS use authentic Pakistani Urdu words:
+  • "Assalam-o-Alaikum" / "Walaikum Assalam" (NEVER namaste)
+  • "Shukriya" / "Bohat shukriya" (NEVER dhanyavad)
+  • "Bara-e-meharbani" / "Kindly" / "Please" (NEVER kripya)
+  • "Fikar na karein" (NEVER chinta na karein)
+  • "Madad" / "Khidmat" (NEVER sahayata)
+  • "Khush-amdeed" (NEVER swagat)
+  • "Ji bilkul", "G zaroor", "Aapka order", "Mukammal delivery pata", "Rabta number".
 
 6. NATURAL CONVERSATIONAL FOOD & PIZZA ORDERING WORKFLOW:
 When a customer wants to place an order (e.g., asks for food items like Shawarma, Pizza, Deals, Drinks, etc.):
@@ -143,6 +152,97 @@ const customerChatMemory = new Map<string, ChatMemoryTurn[]>();
 const MEMORY_TTL_MS = 60 * 60 * 1000; // 1 hour memory per customer
 
 /**
+ * Normalizes obsolete or retired model names to active, zero-downtime model endpoints
+ */
+export function normalizeModelName(provider: string, modelName?: string): string {
+    const m = (modelName || "").trim().toLowerCase();
+    if (provider === "gemini") {
+        if (!m || m.includes("2.5") || m.includes("2.0") || m.includes("1.5")) return "gemini-3.5-flash";
+        return modelName!;
+    }
+    if (provider === "openrouter") {
+        if (!m || m.includes("llama-3.1") || m.includes("llama-3.3") || m.includes("qwen") || m.includes("gemini")) return "openrouter/free";
+        return modelName!;
+    }
+    if (provider === "groq") {
+        if (!m || m.includes("llama-3.1") || m.includes("llama-3.3") || m.includes("mixtral") || m.includes("gemma")) return "openai/gpt-oss-120b";
+        return modelName!;
+    }
+    return modelName || "openai/gpt-oss-120b";
+}
+
+/**
+ * Rigorously removes Hindi words, Hindi vocabulary, and Devanagari script,
+ * transforming them into authentic Pakistani Roman Urdu or English.
+ */
+export function sanitizePakistaniRomanUrdu(text: string): string {
+    if (!text) return text;
+
+    let s = text;
+
+    // 1. Devanagari Unicode detection & replacement
+    const hasDevanagari = /[\u0900-\u097F]/.test(s);
+    if (hasDevanagari) {
+        const devanagariMap: Array<[RegExp, string]> = [
+            [/नमस्ते|नमस्कार/g, "Assalam-o-Alaikum"],
+            [/धन्यवाद|शुक्रिया/g, "Shukriya"],
+            [/कृपया/g, "Bara-e-meharbani"],
+            [/ऑर्डर/g, "Order"],
+            [/पिज्जा/g, "Pizza"],
+            [/पता/g, "Delivery Address"],
+            [/नाम/g, "Naam"],
+            [/फोन|नंबर/g, "Phone"],
+            [/स्वागत/g, "Khush-amdeed"],
+            [/मदद|सहायता/g, "Madad"],
+            [/चिंता\s*ना\s*करें/g, "Fikar na karein"],
+            [/हाँ/g, "Ji haan"],
+            [/नहीं/g, "Nahi"],
+            [/[\u0900-\u097F]+/g, ""] // Strip any leftover Devanagari glyphs
+        ];
+
+        for (const [pattern, repl] of devanagariMap) {
+            s = s.replace(pattern, repl);
+        }
+    }
+
+    // 2. Comprehensive Roman Hindi -> Authentic Pakistani Roman Urdu dictionary replacement
+    const hindiToUrduReplacements: Array<[RegExp, string]> = [
+        [/\b(?:namaste|namaskar)\b/gi, "Assalam-o-Alaikum"],
+        [/\b(?:dhanyavaad|dhanyavad|dhanyawad)\b/gi, "Shukriya"],
+        [/\b(?:kripya|kripaya)\b/gi, "Bara-e-meharbani"],
+        [/\bchinta\s+(?:mat|na)\s+karein?\b/gi, "Fikar na karein"],
+        [/\bchinta\b/gi, "fikar"],
+        [/\bsahayata\b/gi, "madad"],
+        [/\baapka\s+swagat\s+hai\b/gi, "Khush-amdeed"],
+        [/\bswagat\b/gi, "Khush-amdeed"],
+        [/\baabhar\b/gi, "Shukriya"],
+        [/\bmitra\b/gi, "dost"],
+        [/\bshubh\b/gi, "acha"],
+        [/\bsampark\b/gi, "rabta"],
+        [/\bgrahak\b/gi, "customer"],
+        [/\bvistar\b/gi, "tafseelat"],
+        [/\bprasanna\b/gi, "khushi"],
+        [/\bkshama\b/gi, "maazrat"],
+        [/\bsuvidha\b/gi, "sahoolat"],
+        [/\bupalabdha?\b/gi, "dastiyab"],
+        [/\bmukhyatah?\b/gi, "khaas tor par"],
+        [/\bkhushkhabri\b/gi, "achi khabar"],
+        [/\bapna\s+pata\s+bataiye\b/gi, "apna delivery address batayein"],
+        [/\bbataiye\b/gi, "batayein"],
+        [/\bkijiye\b/gi, "karein"]
+    ];
+
+    for (const [reg, replacement] of hindiToUrduReplacements) {
+        s = s.replace(reg, replacement);
+    }
+
+    // Clean up excessive whitespace
+    s = s.replace(/[ \t]{2,}/g, " ").trim();
+
+    return s;
+}
+
+/**
  * Safely parse JSON even with unquoted keys, single quotes, or trailing commas
  */
 function safeJsonParse(str: string): any {
@@ -232,6 +332,7 @@ export async function generateAiResponse(
     let menuUrl: string | undefined = undefined;
     let enableGoldRates = false;
     let businessName = "Business";
+    let targetShopId = 7;
 
     // Build memory key (for 1-on-1 private customer chats, not noisy groups)
     const normalizedCustomerJid = (customerJid || "").trim().toLowerCase();
@@ -267,13 +368,19 @@ export async function generateAiResponse(
             if (cached.length === 0) {
                 try {
                     const sessionIds = [session.id, session.sessionId].filter(Boolean) as string[];
+                    const cleanPhone = normalizedCustomerJid.replace(/@.*$/, "").replace(/\D/g, "");
+                    const targetJids = [normalizedCustomerJid, customerJid].filter(Boolean) as string[];
+
                     const pastMessages = await prisma.message.findMany({
                         where: {
                             sessionId: { in: sessionIds },
-                            remoteJid: { in: [normalizedCustomerJid, customerJid!].filter(Boolean) as string[] }
+                            OR: [
+                                { remoteJid: { in: targetJids } },
+                                ...(cleanPhone.length >= 7 ? [{ remoteJid: { contains: cleanPhone } }] : [])
+                            ]
                         },
                         orderBy: { timestamp: "desc" },
-                        take: 10,
+                        take: 12,
                         select: { fromMe: true, content: true, timestamp: true }
                     });
 
@@ -385,6 +492,9 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
         // Live Pizza Management System (Supabase Multi-Shop Sync)
         const sessionConfig = (session.config as any) || {};
         const pizzaIntegration = sessionConfig.pizzaIntegration;
+        if (pizzaIntegration?.shopId) {
+            targetShopId = Number(pizzaIntegration.shopId);
+        }
         if (pizzaIntegration?.enabled && pizzaIntegration?.shopId) {
             try {
                 const pizzaCatalog = await getPizzaShopCatalogForAi(pizzaIntegration.shopId);
@@ -407,12 +517,7 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
                     provider === "groq" ? (process.env.GROQ_API_KEY || "") :
                         (process.env.OPENROUTER_API_KEY || "");
         const apiKey = aiConfig?.apiKey?.trim() || envApiKey;
-        const modelName = aiConfig?.modelName || (
-            provider === "gemini" ? "gemini-2.5-flash" :
-                provider === "openai" ? "gpt-4o-mini" :
-                    provider === "groq" ? "openai/gpt-oss-120b" :
-                        "meta-llama/llama-3.1-8b-instruct:free"
-        );
+        const modelName = normalizeModelName(provider, aiConfig?.modelName);
 
         let systemPrompt = aiConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
         // Ensure pizza ordering workflow & strict Pakistani Roman Urdu rules are always active if Pizza integration is enabled
@@ -457,82 +562,106 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
             });
         } catch (_) {}
 
-        if (aiReply) {
-            // Check if AI generated a [PLACE_ORDER: {...}] instruction
-            const extracted = extractPlaceOrderPayload(aiReply);
-            let orderCompletedSuccess = false;
+        // If primary and secondary AI engines yielded an empty response, seamlessly engage Smart Fallback
+        let finalReply = aiReply;
+        if (!finalReply || finalReply.trim().length === 0) {
+            logger.warn("AI-Bot", `AI generated empty response. Using natural Pakistani Roman Urdu fallback.`);
+            finalReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName }, conversationHistory);
+        }
 
-            if (extracted && extracted.orderData) {
-                const { fullTag, orderData } = extracted;
-                try {
-                    const targetShopId = pizzaIntegration?.shopId ? Number(pizzaIntegration.shopId) : 7;
-                    let cleanPhone = (orderData.phone || "").trim();
-                    if (!cleanPhone && customerJid) {
-                        cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
-                        if (cleanPhone.startsWith("92")) {
-                            cleanPhone = "0" + cleanPhone.substring(2);
-                        }
+        // Apply strict Pakistani Roman Urdu sanitization layer (strips any Devanagari or Hindi)
+        finalReply = sanitizePakistaniRomanUrdu(finalReply);
+
+        // Check if AI or Fallback generated a [PLACE_ORDER: {...}] instruction
+        const extracted = extractPlaceOrderPayload(finalReply);
+        let orderCompletedSuccess = false;
+
+        if (extracted && extracted.orderData) {
+            const { fullTag, orderData } = extracted;
+            try {
+                const targetShopId = pizzaIntegration?.shopId ? Number(pizzaIntegration.shopId) : 7;
+                let cleanPhone = (orderData.phone || "").trim();
+                if (!cleanPhone && customerJid) {
+                    cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
+                    if (cleanPhone.startsWith("92")) {
+                        cleanPhone = "0" + cleanPhone.substring(2);
                     }
-
-                    const orderResult = await createPizzaOrderInSupabase({
-                        shopId: targetShopId,
-                        customerName: orderData.name || customerPushName || "WhatsApp Customer",
-                        customerPhone: cleanPhone || "03000000000",
-                        deliveryAddress: orderData.address || "Delivery Address",
-                        items: Array.isArray(orderData.items) ? orderData.items : [],
-                        total: Number(orderData.total) || 0,
-                        notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
-                    });
-
-                    if (orderResult.success && orderResult.orderNumber) {
-                        orderCompletedSuccess = true;
-                        aiReply = aiReply.replace(fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
-                        logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
-                    } else {
-                        aiReply = aiReply.replace(fullTag, "").trim();
-                    }
-                } catch (oErr: any) {
-                    logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
-                    aiReply = aiReply.replace(fullTag, "").trim();
                 }
-            }
 
-            // Save conversation turn into memory
-            if (memoryKey) {
-                if (orderCompletedSuccess) {
-                    // Order successfully placed! Clear active ordering cart memory so next order starts fresh
-                    customerChatMemory.delete(memoryKey);
+                const orderResult = await createPizzaOrderInSupabase({
+                    shopId: targetShopId,
+                    customerName: orderData.name || customerPushName || "WhatsApp Customer",
+                    customerPhone: cleanPhone || "03000000000",
+                    deliveryAddress: orderData.address || "Delivery Address",
+                    items: Array.isArray(orderData.items) ? orderData.items : [],
+                    total: Number(orderData.total) || 0,
+                    notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
+                });
+
+                if (orderResult.success && orderResult.orderNumber) {
+                    orderCompletedSuccess = true;
+                    finalReply = finalReply.replace(fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                    logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
                 } else {
-                    const currentMem = customerChatMemory.get(memoryKey) || [];
-                    currentMem.push(
-                        { role: "user", content: userMessageText, timestamp: Date.now() },
-                        { role: "assistant", content: aiReply, timestamp: Date.now() }
-                    );
-                    if (currentMem.length > 14) currentMem.splice(0, currentMem.length - 14);
-                    customerChatMemory.set(memoryKey, currentMem);
+                    finalReply = finalReply.replace(fullTag, "").trim();
                 }
+            } catch (oErr: any) {
+                logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
+                finalReply = finalReply.replace(fullTag, "").trim();
             }
+        }
 
-            logger.success("AI-Bot", `[Success] AI generated ${aiReply.length} chars response.`);
-            return aiReply;
-        } else {
-            logger.warn("AI-Bot", `AI generated empty response. Using natural fallback.`);
-            const fallbackReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName });
-            if (memoryKey) {
+        // Save conversation turn into memory
+        if (memoryKey) {
+            if (orderCompletedSuccess) {
+                // Order successfully placed! Clear active ordering cart memory so next order starts fresh
+                customerChatMemory.delete(memoryKey);
+            } else {
                 const currentMem = customerChatMemory.get(memoryKey) || [];
                 currentMem.push(
                     { role: "user", content: userMessageText, timestamp: Date.now() },
-                    { role: "assistant", content: fallbackReply, timestamp: Date.now() }
+                    { role: "assistant", content: finalReply, timestamp: Date.now() }
                 );
                 if (currentMem.length > 14) currentMem.splice(0, currentMem.length - 14);
                 customerChatMemory.set(memoryKey, currentMem);
             }
-            return fallbackReply;
         }
+
+        logger.success("AI-Bot", `[Success] Bot generated ${finalReply.length} chars response.`);
+        return finalReply;
 
     } catch (error: any) {
         logger.error("AI-Service", `Error generating AI response: ${error?.message || error}`);
-        const fallbackReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName });
+        let fallbackReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName }, conversationHistory);
+        fallbackReply = sanitizePakistaniRomanUrdu(fallbackReply);
+
+        // Also check if fallback in error handler generated order tag
+        const extracted = extractPlaceOrderPayload(fallbackReply);
+        if (extracted && extracted.orderData) {
+            try {
+                let cleanPhone = (extracted.orderData.phone || "").trim();
+                if (!cleanPhone && customerJid) {
+                    cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
+                    if (cleanPhone.startsWith("92")) cleanPhone = "0" + cleanPhone.substring(2);
+                }
+                const orderResult = await createPizzaOrderInSupabase({
+                    shopId: targetShopId,
+                    customerName: extracted.orderData.name || customerPushName || "WhatsApp Customer",
+                    customerPhone: cleanPhone || "03000000000",
+                    deliveryAddress: extracted.orderData.address || "Delivery Address",
+                    items: Array.isArray(extracted.orderData.items) ? extracted.orderData.items : [],
+                    total: Number(extracted.orderData.total) || 0,
+                    notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
+                });
+                if (orderResult.success && orderResult.orderNumber) {
+                    fallbackReply = fallbackReply.replace(extracted.fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                    if (memoryKey) customerChatMemory.delete(memoryKey);
+                    return fallbackReply;
+                }
+            } catch (_) {}
+            fallbackReply = fallbackReply.replace(extracted.fullTag, "").trim();
+        }
+
         if (memoryKey) {
             const currentMem = customerChatMemory.get(memoryKey) || [];
             currentMem.push(
@@ -614,15 +743,21 @@ LIVE MENU LINK RULES:
         const formattedTurns = conversationHistory
             .map((h) => `${h.role === "assistant" ? "Assistant (You)" : "Customer"}: ${h.content}`)
             .join("\n");
-        historyPromptBlock = `\n\n==================================================\nRECENT CONVERSATION HISTORY (REMEMBER WHAT CUSTOMER ALREADY ASKED / ORDERED IN THIS CHAT):\n${formattedTurns}\n==================================================`;
+        historyPromptBlock = `ACTIVE CONVERSATION HISTORY (REMEMBER WHAT CUSTOMER ALREADY ASKED / ORDERED IN THIS CHAT):\n${formattedTurns}`;
     }
 
-    // Construct full system instruction
-    const fullSystemMessage = `${systemPrompt || DEFAULT_SYSTEM_PROMPT}
+    // Construct full system instruction with anti-Hindi directive & recent history at the VERY TOP
+    const fullSystemMessage = `🚨 STRICT OPERATING DIRECTIVE:
+- Location: Pakistan
+- Language: AUTHENTIC PAKISTANI ROMAN URDU OR STANDARD ENGLISH ONLY.
+- ABSOLUTELY ZERO HINDI: NEVER use Indian Hindi words, Hindi vocabulary, or Devanagari script (NO: namaste, namaskar, dhanyavad, dhanyavaad, kripya, chinta, sahayata, swagat, mitra, grahak, sampark, bataiye, kijiye).
+- Always use Pakistani Urdu: Assalam-o-Alaikum, Walaikum Assalam, Shukriya, Ji bilkul, Fikar na karein, Madad, Rabta number, Mukammal delivery pata.
+
+${historyPromptBlock ? `==================================================\n${historyPromptBlock}\n==================================================\n\n` : ""}${systemPrompt || DEFAULT_SYSTEM_PROMPT}
 
 ==================================================
 BUSINESS KNOWLEDGE BASE & FAQS:
-${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific details provided. Answer politely and concisely."}${mediaInstruction}${menuUrlInstruction}${goldPrompt}${historyPromptBlock}
+${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific details provided. Answer politely and concisely."}${mediaInstruction}${menuUrlInstruction}${goldPrompt}
 ==================================================`;
 
     // Multi-turn message array for OpenAI-compatible gateways (Groq, OpenRouter, Together AI)
@@ -635,30 +770,35 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
         { role: "user", content: userPrompt }
     ];
 
-    // Multi-turn contents array for Google Gemini (ensuring first turn is 'user' as required by Gemini)
+    // Multi-turn contents array for Google Gemini (ensuring strict alternating turns required by Gemini)
     const geminiContents: Array<{ role: "user" | "model"; parts: [{ text: string }] }> = [];
-    let geminiStarted = false;
     for (const h of conversationHistory || []) {
-        if (!geminiStarted) {
-            if (h.role === "user") {
-                geminiStarted = true;
+        const role = h.role === "assistant" ? "model" : "user";
+        if (geminiContents.length === 0) {
+            if (role === "user") {
                 geminiContents.push({ role: "user", parts: [{ text: h.content }] });
             }
         } else {
-            geminiContents.push({
-                role: h.role === "assistant" ? "model" : "user",
-                parts: [{ text: h.content }]
-            });
+            const last = geminiContents[geminiContents.length - 1];
+            if (last.role === role) {
+                last.parts[0].text += `\n${h.content}`;
+            } else {
+                geminiContents.push({ role, parts: [{ text: h.content }] });
+            }
         }
     }
-    geminiContents.push({ role: "user", parts: [{ text: userPrompt }] });
+    if (geminiContents.length > 0 && geminiContents[geminiContents.length - 1].role === "user") {
+        geminiContents[geminiContents.length - 1].parts[0].text += `\n${userPrompt}`;
+    } else {
+        geminiContents.push({ role: "user", parts: [{ text: userPrompt }] });
+    }
 
     // =========================================================================
     // 1. GROQ LPU ENGINE (Priority 1: Ultra Fast ~0.2s Latency)
     // =========================================================================
     const groqKey = process.env.GROQ_API_KEY?.trim() || (provider === "groq" ? apiKey?.trim() : "") || BUILTIN_KEYS.groq;
     if (groqKey) {
-        const groqModels = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "allam-2-7b"];
+        const groqModels = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "allam-2-7b"];
         for (const model of groqModels) {
             try {
                 logger.info("AI-Gateway", `[1/4] Trying Groq LPU (${model}, historyTurns: ${conversationHistory.length})...`);
@@ -681,8 +821,13 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                     const data = await res.json();
                     const content = data?.choices?.[0]?.message?.content;
                     if (content && content.trim().length > 0) {
+                        const devanagariCount = (content.match(/[\u0900-\u097F]/g) || []).length;
+                        if (devanagariCount > 8) {
+                            logger.warn("AI-Gateway", `[Rejected Hindi Response] Groq model ${model} produced ${devanagariCount} Devanagari chars. Moving to next provider.`);
+                            continue;
+                        }
                         logger.success("AI-Gateway", `[Success via Groq: ${model}] Generated ${content.length} chars`);
-                        return finalizeAiReply(content, userPrompt, detectedImages, menuUrl);
+                        return finalizeAiReply(content, userPrompt, detectedImages, menuUrl, conversationHistory);
                     }
                 } else {
                     const err = await res.text();
@@ -699,7 +844,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     // =========================================================================
     const geminiKey = process.env.GEMINI_API_KEY?.trim() || (provider === "gemini" ? apiKey?.trim() : "") || BUILTIN_KEYS.gemini;
     if (geminiKey) {
-        const geminiModels = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-3.8-flash"];
+        const geminiModels = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
         for (const model of geminiModels) {
             try {
                 logger.info("AI-Gateway", `[2/4] Trying Gemini (${model}, historyTurns: ${conversationHistory.length})...`);
@@ -718,8 +863,13 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                     const data = await res.json();
                     const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (content && content.trim().length > 0) {
+                        const devanagariCount = (content.match(/[\u0900-\u097F]/g) || []).length;
+                        if (devanagariCount > 8) {
+                            logger.warn("AI-Gateway", `[Rejected Hindi Response] Gemini ${model} produced ${devanagariCount} Devanagari chars. Moving to next provider.`);
+                            continue;
+                        }
                         logger.success("AI-Gateway", `[Success via Gemini: ${model}] Generated ${content.length} chars`);
-                        return finalizeAiReply(content, userPrompt, detectedImages, menuUrl);
+                        return finalizeAiReply(content, userPrompt, detectedImages, menuUrl, conversationHistory);
                     }
                 } else {
                     const err = await res.text();
@@ -736,13 +886,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     // =========================================================================
     const openrouterKey = process.env.OPENROUTER_API_KEY?.trim() || (provider === "openrouter" ? apiKey?.trim() : "") || BUILTIN_KEYS.openrouter;
     if (openrouterKey) {
-        const openrouterModels = [
-            "google/gemini-2.0-flash-exp:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-            "meta-llama/llama-3.1-8b-instruct:free",
-            "qwen/qwen-2.5-7b-instruct:free",
-            "mistralai/mistral-7b-instruct:free"
-        ];
+        const openrouterModels = ["openrouter/free"];
 
         for (const model of openrouterModels) {
             try {
@@ -768,8 +912,13 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                     const data = await res.json();
                     const content = data?.choices?.[0]?.message?.content;
                     if (content && content.trim().length > 0) {
+                        const devanagariCount = (content.match(/[\u0900-\u097F]/g) || []).length;
+                        if (devanagariCount > 8) {
+                            logger.warn("AI-Gateway", `[Rejected Hindi Response] OpenRouter ${model} produced ${devanagariCount} Devanagari chars. Moving to next provider.`);
+                            continue;
+                        }
                         logger.success("AI-Gateway", `[Success via OpenRouter: ${model}] Generated ${content.length} chars`);
-                        return finalizeAiReply(content, userPrompt, detectedImages, menuUrl);
+                        return finalizeAiReply(content, userPrompt, detectedImages, menuUrl, conversationHistory);
                     }
                 }
             } catch (err: any) {
@@ -804,7 +953,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                 const content = data?.choices?.[0]?.message?.content;
                 if (content && content.trim().length > 0) {
                     logger.success("AI-Gateway", `[Success via Together AI] Generated ${content.length} chars`);
-                    return finalizeAiReply(content, userPrompt, detectedImages, menuUrl);
+                    return finalizeAiReply(content, userPrompt, detectedImages, menuUrl, conversationHistory);
                 }
             }
         } catch (err: any) {
@@ -816,18 +965,20 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     // 5. NATURAL ROMAN URDU FALLBACK ENGINE (100% Guaranteed Always-On)
     // =========================================================================
     logger.info("AI-Gateway", `[5/5] Using Smart Natural Fallback for: "${userPrompt}"`);
-    return getNaturalFallbackReply(userPrompt, detectedImages, { enableGoldRates, menuUrl, businessName });
+    return getNaturalFallbackReply(userPrompt, detectedImages, { enableGoldRates, menuUrl, businessName }, conversationHistory);
 }
 
 /**
  * Post-processes AI reply:
+ * - Sanitizes against Hindi and Devanagari script
  * - If user asked for menu / catalogue, ensures image tags or live links are cleanly present.
  */
 function finalizeAiReply(
     rawReply: string | null,
     userPrompt: string,
     detectedImages: string[],
-    menuUrl?: string
+    menuUrl?: string,
+    conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
 ): string {
     const trimmedPrompt = (userPrompt || "").trim().toLowerCase();
     const asksForLink = /\b(link|website|url|web)\b/i.test(trimmedPrompt);
@@ -836,10 +987,11 @@ function finalizeAiReply(
         /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu|catalog\s*bhejo)/i.test(trimmedPrompt);
 
     if (!rawReply || rawReply.trim().length === 0) {
-        return getNaturalFallbackReply(userPrompt, detectedImages, { menuUrl });
+        return getNaturalFallbackReply(userPrompt, detectedImages, { menuUrl }, conversationHistory);
     }
 
-    let processed = rawReply.trim();
+    // 1. Rigorously sanitize against any Hindi words or Devanagari Unicode
+    let processed = sanitizePakistaniRomanUrdu(rawReply.trim());
 
     // Prevent LLM hallucination: if menuUrl exists, eliminate any "don't have a direct menu link" or similar negation
     if (menuUrl) {
@@ -877,12 +1029,12 @@ function finalizeAiReply(
         }
     }
 
-    return processed;
+    return sanitizePakistaniRomanUrdu(processed);
 }
 
 /**
  * Natural Pakistani Roman Urdu conversational fallback
- * NEVER returns hardcoded fake cafe/restaurant data!
+ * Retains multi-turn ordering memory even during full cloud LLM outages.
  */
 export function getNaturalFallbackReply(
     userPrompt: string,
@@ -891,12 +1043,52 @@ export function getNaturalFallbackReply(
         enableGoldRates?: boolean;
         menuUrl?: string;
         businessName?: string;
-    }
+    },
+    conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
 ): string {
     const p = (userPrompt || "").trim().toLowerCase();
-    const { enableGoldRates = false, menuUrl, businessName = "hamari dukaan" } = options || {};
+    const { enableGoldRates = false, menuUrl, businessName = "Pizza Mafia" } = options || {};
 
-    // 0. Gold & Jewellery Rate queries (ONLY when enableGoldRates is ON)
+    // =========================================================================
+    // 0. CHECK MULTI-TURN ORDERING CONTINUITY IN CONVERSATION HISTORY
+    // =========================================================================
+    const isConfirmation = /^(?:yes|yep|confirm|confirmed|ok|okay|theek\s*hai|done|haan|ji\s*haan|kar\s*dein|bhej\s*dein|book\s*kar\s*dein|jee|haa)\b/i.test(p);
+    const hasAddressKeywords = /(?:street|gali|road|mohallah|house|makan|flat|block|phase|near|chowk|sohawa|islamabad|rawalpindi|lahore|karachi|gujranwala|peshawar|faisalabad|address|pata|rabta|phone|03\d{9})/i.test(p);
+
+    const pastUserMessages = (conversationHistory || []).filter(m => m.role === "user").map(m => m.content);
+    const combinedHistory = [...pastUserMessages, userPrompt].join(" ");
+    const foodItemsMatch = combinedHistory.match(/\b(?:\d+\s*(?:x\s*)?)?(?:grilled\s+)?(?:shawarma|pizza|burger|deal|deal\s*\d+|drink|pepsi|7up|coke|sprite|fries|wings|pasta|garlic\s*bread|paratha\s*roll|roll)\b/gi);
+
+    if (isConfirmation && conversationHistory.length > 0) {
+        // Customer is confirming an order! Extract address and items from history
+        const addressMatch = combinedHistory.match(/(?:address|pata|location|gali|street|house|near|mohallah|sohawa)[^,\.\n]*(?:,\s*[^,\.\n]*)*/i);
+        const phoneMatch = combinedHistory.match(/\b(?:03\d{9}|923\d{9})\b/);
+        const nameMatch = combinedHistory.match(/(?:naam|name|customer)\s*[:=]?\s*([a-zA-Z\s]{3,25})/i);
+
+        const customerName = nameMatch ? nameMatch[1].trim() : "Valued Customer";
+        const customerAddress = addressMatch ? addressMatch[0].trim() : "Customer Address (Confirmed on WhatsApp)";
+        const customerPhone = phoneMatch ? phoneMatch[0].trim() : "";
+
+        const itemsList = foodItemsMatch && foodItemsMatch.length > 0
+            ? Array.from(new Set(foodItemsMatch)).map(it => ({ name: it.trim(), qty: 1, price: 500 }))
+            : [{ name: "Food Order", qty: 1, price: 500 }];
+
+        const total = itemsList.reduce((sum, it) => sum + it.price * it.qty, 0);
+
+        return sanitizePakistaniRomanUrdu(
+            `🎉 Bohat shukriya ${customerName}! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!\n\n[PLACE_ORDER: {"name": "${customerName}", "phone": "${customerPhone}", "address": "${customerAddress}", "items": ${JSON.stringify(itemsList)}, "total": ${total}}]`
+        );
+    }
+
+    if (hasAddressKeywords && foodItemsMatch && foodItemsMatch.length > 0) {
+        // Customer provided their delivery address, items already in memory!
+        const uniqueItems = Array.from(new Set(foodItemsMatch)).join(", ");
+        return sanitizePakistaniRomanUrdu(
+            `Bohat khoob! Aapki delivery details note kar li hain:\n\n📋 *ORDER SUMMARY:*\n• Items: ${uniqueItems}\n📍 Delivery Address: ${userPrompt}\n\n👉 Order confirm karne ke liye kindly *'YES'* ya *'CONFIRM'* reply karein.`
+        );
+    }
+
+    // 1. Gold & Jewellery Rate queries (ONLY when enableGoldRates is ON)
     if (enableGoldRates) {
         const isGoldRateQuery = /\b(gold|sonar?|sona|chandi|silver|24k|22k|21k|18k|tola|per\s*tola)\b/i.test(p) ||
             (/(?:rate|bhao|bhav|keemat|price|rates)/i.test(p) && /(?:aaj|today|gold|sona|chandi)/i.test(p));
@@ -905,11 +1097,11 @@ export function getNaturalFallbackReply(
             const rates = getGoldRates();
             const isGreetingPresent = /\b(aoa|salam|assalam|hi|hello)\b/i.test(p);
             const greetingPrefix = isGreetingPresent ? "Walaikum Assalam! " : "Assalam-o-Alaikum! ";
-            return `${greetingPrefix}Aaj ke official gold aur silver rates:\n• 24K Gold: PKR ${rates.rate24k.toLocaleString()} per tola\n• 22K Jewellery Gold: PKR ${rates.rate22k.toLocaleString()} per tola\n• Silver (Chandi): PKR ${rates.silver.toLocaleString()} per tola\n\nHamari tamam jewellery 100% hallmark guaranteed hoti hai. Kisi bhi design ka quotation banwane ke liye aap item name aur weight bata sakte hain! 💍`;
+            return sanitizePakistaniRomanUrdu(`${greetingPrefix}Aaj ke official gold aur silver rates:\n• 24K Gold: PKR ${rates.rate24k.toLocaleString()} per tola\n• 22K Jewellery Gold: PKR ${rates.rate22k.toLocaleString()} per tola\n• Silver (Chandi): PKR ${rates.silver.toLocaleString()} per tola\n\nHamari tamam jewellery 100% hallmark guaranteed hoti hai. Kisi bhi design ka quotation banwane ke liye aap item name aur weight bata sakte hain! 💍`);
         }
     }
 
-    // 1. Menu / Catalog / Price / Deals query
+    // 2. Menu / Catalog / Price / Deals query
     const asksForLink = /\b(link|website|url|web)\b/i.test(p);
     const asksForPicOnly = /(?:link\s*na|nhi|nahi).*?(?:pic|photo|image)|(?:pic|photo|image|picture|tasweer|front\s*and\s*back).*?(?:bhejo|send|dikhao|chahiye)/i.test(p);
     const isMenuQuery = /\b(menu|catalog|catalogue|rate\s*list|price\s*list|rates|prices|deal|deals|items|products|list)\b/i.test(p) ||
@@ -922,12 +1114,12 @@ export function getNaturalFallbackReply(
         // Case A: Customer specifically asks for pictures (not link)
         if (asksForPicOnly && detectedImages.length > 0) {
             const tags = detectedImages.map(u => `[SEND_IMAGE: ${u}]`).join(" ");
-            return `${greetingPrefix}Yeh lijiye hamara complete menu card (Front aur Back dono pictures):\n${tags}`;
+            return sanitizePakistaniRomanUrdu(`${greetingPrefix}Yeh lijiye hamara complete menu card (Front aur Back dono pictures):\n${tags}`);
         }
 
         // Case B: Customer specifically asks for link
         if (asksForLink && !asksForPicOnly && menuUrl) {
-            return `${greetingPrefix}Yeh lijiye hamara live digital menu link jahan aap tamam deals aur rates dekh sakte hain:\n🌐 ${menuUrl}`;
+            return sanitizePakistaniRomanUrdu(`${greetingPrefix}Yeh lijiye hamara live digital menu link jahan aap tamam deals aur rates dekh sakte hain:\n🌐 ${menuUrl}`);
         }
 
         // Case C: General menu / deals / rates query (Send link AND images if available!)
@@ -937,43 +1129,43 @@ export function getNaturalFallbackReply(
             : "";
 
         if (linkPart || imgPart) {
-            return `${greetingPrefix}Aap hamari tamam deals, items aur rates yahan check kar sakte hain:${linkPart}${imgPart}`;
+            return sanitizePakistaniRomanUrdu(`${greetingPrefix}Aap hamari tamam deals, items aur rates yahan check kar sakte hain:${linkPart}${imgPart}`);
         }
 
-        return `${greetingPrefix}${businessName} par rabta karne ka shukriya. Aap yahan kisi bhi item, deal, rate ya order ke bare mein pooch sakte hain, hamara staff aapki mukammal rehnumai kare ga!`;
+        return sanitizePakistaniRomanUrdu(`${greetingPrefix}${businessName} par rabta karne ka shukriya. Aap yahan kisi bhi item, deal, rate ya order ke bare mein pooch sakte hain, hamara staff aapki mukammal rehnumai kare ga!`);
     }
 
-    // 2. Greetings + How are you combined
+    // 3. Greetings + How are you combined
     if (/(?:aoa|salam|assalam).*?(?:kay|kia|kya).*?(?:hal|haal)|(?:kay|kia|kya).*?(?:hal|haal).*?(?:aoa|salam)/i.test(p) ||
         /(?:aoa|salam|assalam).*?(?:kaise\s*ho|how\s*are\s*you)/i.test(p)) {
-        return "Walaikum Assalam! Alhamdulillah main bilkul theek hoon. Aap sunayein aap kaise hain? Main aapki kya khidmat kar sakta hoon?";
+        return sanitizePakistaniRomanUrdu("Walaikum Assalam! Alhamdulillah main bilkul theek hoon. Aap sunayein aap kaise hain? Main aapki kya khidmat kar sakta hoon?");
     }
 
-    // 3. Pure Greetings
+    // 4. Pure Greetings
     if (/\b(aoa|salam|assalam\s*o\s*alaikum|asalam\s*u\s*alaikum|aslam\s*o\s*alikum|aslam\s*alikum|hi|hello|hey)\b/i.test(p)) {
-        return "Walaikum Assalam! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon?";
+        return sanitizePakistaniRomanUrdu("Walaikum Assalam! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon?");
     }
 
-    // 4. Pure How are you
+    // 5. Pure How are you
     if (/(?:kay\s*hal\s*ha|kia\s*hal\s*ha|kia\s*hal\s*hai?|kya\s*haal\s*hai?|kaise\s*ho|kese\s*ho|how\s*are\s*you)/i.test(p)) {
-        return "Alhamdulillah main bilkul theek hoon! Aap sunayein aap kaise hain? Main aapki kya madad ya khidmat kar sakta hoon?";
+        return sanitizePakistaniRomanUrdu("Alhamdulillah main bilkul theek hoon! Aap sunayein aap kaise hain? Main aapki kya madad ya khidmat kar sakta hoon?");
     }
 
-    // 5. Timings & Working Hours
+    // 6. Timings & Working Hours
     if (/\b(timing|timings|timing\s*kya|open|close|kab\s*open|waqt)\b/i.test(p)) {
-        return "Hamari timing daily open rehti hai. Aap apna order ya inquiry kisi bhi waqt yahan confirm karwa sakte hain.";
+        return sanitizePakistaniRomanUrdu("Hamari timing daily open rehti hai. Aap apna order ya inquiry kisi bhi waqt yahan confirm karwa sakte hain.");
     }
 
-    // 6. Location & Address
+    // 7. Location & Address
     if (/\b(location|address|kahan\s*hai|kahan\s*par|kider\s*hai|branch)\b/i.test(p)) {
-        return "Aap hamari exact location aur directions ke liye hamare staff se rabta kar sakte hain ya apna area bata dein.";
+        return sanitizePakistaniRomanUrdu("Aap hamari exact location aur directions ke liye hamare staff se rabta kar sakte hain ya apna area bata dein.");
     }
 
-    // 7. Order & Delivery queries
-    if (/\b(order|delivery|home\s*delivery|parcel|book|booking)\b/i.test(p)) {
-        return "G bilkul! Aap apna order items aur delivery address yahan message kar dein, hamari team foran confirm kare gi.";
+    // 8. Order & Delivery queries
+    if (/\b(order|delivery|home\s*delivery|parcel|book|booking)\b/i.test(p) || foodItemsMatch) {
+        return sanitizePakistaniRomanUrdu("G bilkul! Aap apna order items, delivery address aur rabta number yahan message kar dein, hamari team foran confirm kare gi.");
     }
 
-    // 8. Polite General Fallback (ensures bot NEVER goes silent and NEVER gives fake cafe answers)
-    return `Assalam-o-Alaikum! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon? Aap apna sawal, item details ya order yahan message kar sakte hain.`;
+    // 9. Polite General Fallback (ensures bot NEVER goes silent and NEVER speaks Hindi)
+    return sanitizePakistaniRomanUrdu(`Assalam-o-Alaikum! Shukriya rabta karne ka. Main aapki kya madad kar sakta hoon? Aap apna sawal, item details ya order yahan message kar sakte hain.`);
 }
