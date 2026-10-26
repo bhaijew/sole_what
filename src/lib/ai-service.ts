@@ -10,6 +10,7 @@ export interface AiTestRequest {
     systemPrompt?: string;
     knowledgeBase?: string;
     userPrompt: string;
+    conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
     enableGoldRates?: boolean;
     menuUrl?: string;
 }
@@ -77,7 +78,13 @@ When a customer wants to place an order (e.g., asks for food items like Shawarma
   You MUST attach this exact JSON tag at the very end of your response:
   [PLACE_ORDER: {"name": "<Customer Name>", "phone": "<Phone>", "address": "<Delivery Address>", "items": [{"name": "<Item Name>", "price": <Price>, "qty": <Qty>}], "total": <Total Bill>}]
   And reply with an enthusiastic confirmation:
-  "🎉 Bohat shukriya [Customer Name]! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!"`;
+  "🎉 Bohat shukriya [Customer Name]! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!"
+  
+7. CONVERSATIONAL MEMORY & MULTI-TURN CONTINUITY:
+- Always REMEMBER what the customer stated in earlier messages in this chat.
+- If the customer previously named the items they want (e.g. "1 grilled shawarma aur 1 1-litre drink") and now provides their Name and Address (e.g. "Ali Raza, Street 4 Sohawa"), DO NOT ask them what they want to order! You ALREADY KNOW their items.
+- Immediately combine their items with their provided Name, Address, and Phone into STEP 2 (Order Summary) and ask them to reply 'YES' or 'CONFIRM'.
+- Keep items in their ordering cart until the order is finalized and placed.`;
 
 const DEFAULT_OPENROUTER_MODEL = "openrouter/free";
 
@@ -125,6 +132,24 @@ export function extractImagesFromKnowledgeBase(knowledgeBase?: string): string[]
     return detectedImages;
 }
 
+export interface ChatMemoryTurn {
+    role: "user" | "assistant";
+    content: string;
+    timestamp: number;
+}
+
+// In-memory conversation store for instant multi-turn memory (keyed by `${sessionId}:${customerJid}`)
+const customerChatMemory = new Map<string, ChatMemoryTurn[]>();
+const MEMORY_TTL_MS = 60 * 60 * 1000; // 1 hour memory per customer
+
+/**
+ * Clear customer memory (used when order is placed or manually reset)
+ */
+export function clearCustomerChatMemory(sessionId: string, customerJid: string) {
+    const key = `${sessionId}:${customerJid.trim().toLowerCase()}`;
+    customerChatMemory.delete(key);
+}
+
 /**
  * Generate AI response for incoming WhatsApp message
  */
@@ -140,8 +165,13 @@ export async function generateAiResponse(
     let enableGoldRates = false;
     let businessName = "Business";
 
+    // Build memory key (for 1-on-1 private customer chats, not noisy groups)
+    const normalizedCustomerJid = (customerJid || "").trim().toLowerCase();
+    const memoryKey = (!isGroup && normalizedCustomerJid) ? `${sessionId}:${normalizedCustomerJid}` : null;
+    let conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+
     try {
-        logger.info("AI-Bot", `[Check] Evaluating AI response for session ${sessionId} (isGroup: ${isGroup})...`);
+        logger.info("AI-Bot", `[Check] Evaluating AI response for session ${sessionId} (isGroup: ${isGroup}, customer: ${customerJid || "unknown"})...`);
 
         // Resolve session by either string sessionId or cuid id
         const session = await prisma.session.findFirst({
@@ -157,6 +187,48 @@ export async function generateAiResponse(
         if (!session) {
             logger.warn("AI-Bot", `Session ${sessionId} not found in database.`);
             return null;
+        }
+
+        // Hydrate multi-turn conversation memory for this specific customer
+        if (memoryKey) {
+            const now = Date.now();
+            let cached = customerChatMemory.get(memoryKey) || [];
+            cached = cached.filter((item) => now - item.timestamp < MEMORY_TTL_MS);
+
+            // If in-memory cache is empty (e.g. server restart), hydrate from database (Prisma Message table)
+            if (cached.length === 0) {
+                try {
+                    const sessionIds = [session.id, session.sessionId].filter(Boolean) as string[];
+                    const pastMessages = await prisma.message.findMany({
+                        where: {
+                            sessionId: { in: sessionIds },
+                            remoteJid: { in: [normalizedCustomerJid, customerJid!].filter(Boolean) as string[] }
+                        },
+                        orderBy: { timestamp: "desc" },
+                        take: 10,
+                        select: { fromMe: true, content: true, timestamp: true }
+                    });
+
+                    if (pastMessages && pastMessages.length > 0) {
+                        cached = pastMessages
+                            .reverse()
+                            .filter((m) => m.content && m.content.trim().length > 0)
+                            .map((m) => ({
+                                role: (m.fromMe ? "assistant" : "user") as "user" | "assistant",
+                                content: m.content!.trim(),
+                                timestamp: m.timestamp.getTime()
+                            }));
+                    }
+                } catch (dbErr: any) {
+                    logger.warn("AI-Bot", `Could not hydrate chat memory from DB: ${dbErr?.message}`);
+                }
+            }
+
+            customerChatMemory.set(memoryKey, cached);
+            conversationHistory = cached.slice(-10).map((c) => ({ role: c.role, content: c.content }));
+            if (conversationHistory.length > 0) {
+                logger.info("AI-Bot", `[Memory] Loaded ${conversationHistory.length} previous chat turns for ${normalizedCustomerJid}`);
+            }
         }
 
         // Fetch AI Config for this session
@@ -274,7 +346,12 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
                         "meta-llama/llama-3.1-8b-instruct:free"
         );
 
-        const systemPrompt = aiConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+        let systemPrompt = aiConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+        // Ensure pizza ordering workflow & strict Pakistani Roman Urdu rules are always active if Pizza integration is enabled
+        if (pizzaIntegration?.enabled && !systemPrompt.includes("[PLACE_ORDER:")) {
+            systemPrompt = `${systemPrompt}\n\n${DEFAULT_SYSTEM_PROMPT}`;
+        }
+
         const userKb = aiConfig?.knowledgeBase || "";
 
         // Combine dynamic store context with user entered knowledge base
@@ -283,7 +360,7 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
         // Extract detected images immediately so they are available in both success & fallback
         detectedImages = extractImagesFromKnowledgeBase(knowledgeBase);
 
-        logger.info("AI-Bot", `[Generating] Calling AI API (provider: ${provider}, model: ${modelName}, goldRates: ${enableGoldRates}, images: ${detectedImages.length})...`);
+        logger.info("AI-Bot", `[Generating] Calling AI API (provider: ${provider}, model: ${modelName}, memoryTurns: ${conversationHistory.length}, goldRates: ${enableGoldRates}, images: ${detectedImages.length})...`);
 
         let aiReply = await callAiApi({
             provider,
@@ -292,6 +369,7 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
             systemPrompt,
             knowledgeBase,
             userPrompt: userMessageText,
+            conversationHistory,
             temperature: aiConfig?.temperature || 0.7,
             maxTokens: aiConfig?.maxTokens || 800,
             enableGoldRates,
@@ -315,6 +393,8 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
             // Check if AI generated a [PLACE_ORDER: {...}] instruction
             const orderTagRegex = /\[PLACE_ORDER:\s*({[\s\S]*?})\]/i;
             const orderMatch = aiReply.match(orderTagRegex);
+            let orderCompletedSuccess = false;
+
             if (orderMatch && orderMatch[1]) {
                 try {
                     const orderData = JSON.parse(orderMatch[1]);
@@ -338,6 +418,7 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
                     });
 
                     if (orderResult.success && orderResult.orderNumber) {
+                        orderCompletedSuccess = true;
                         aiReply = aiReply.replace(orderTagRegex, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
                         logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
                     } else {
@@ -349,16 +430,52 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
                 }
             }
 
+            // Save conversation turn into memory
+            if (memoryKey) {
+                if (orderCompletedSuccess) {
+                    // Order successfully placed! Clear active ordering cart memory so next order starts fresh
+                    customerChatMemory.delete(memoryKey);
+                } else {
+                    const currentMem = customerChatMemory.get(memoryKey) || [];
+                    currentMem.push(
+                        { role: "user", content: userMessageText, timestamp: Date.now() },
+                        { role: "assistant", content: aiReply, timestamp: Date.now() }
+                    );
+                    if (currentMem.length > 14) currentMem.splice(0, currentMem.length - 14);
+                    customerChatMemory.set(memoryKey, currentMem);
+                }
+            }
+
             logger.success("AI-Bot", `[Success] AI generated ${aiReply.length} chars response.`);
             return aiReply;
         } else {
             logger.warn("AI-Bot", `AI generated empty response. Using natural fallback.`);
-            return getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName });
+            const fallbackReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName });
+            if (memoryKey) {
+                const currentMem = customerChatMemory.get(memoryKey) || [];
+                currentMem.push(
+                    { role: "user", content: userMessageText, timestamp: Date.now() },
+                    { role: "assistant", content: fallbackReply, timestamp: Date.now() }
+                );
+                if (currentMem.length > 14) currentMem.splice(0, currentMem.length - 14);
+                customerChatMemory.set(memoryKey, currentMem);
+            }
+            return fallbackReply;
         }
 
     } catch (error: any) {
         logger.error("AI-Service", `Error generating AI response: ${error?.message || error}`);
-        return getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName });
+        const fallbackReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName });
+        if (memoryKey) {
+            const currentMem = customerChatMemory.get(memoryKey) || [];
+            currentMem.push(
+                { role: "user", content: userMessageText, timestamp: Date.now() },
+                { role: "assistant", content: fallbackReply, timestamp: Date.now() }
+            );
+            if (currentMem.length > 14) currentMem.splice(0, currentMem.length - 14);
+            customerChatMemory.set(memoryKey, currentMem);
+        }
+        return fallbackReply;
     }
 }
 
@@ -378,6 +495,7 @@ export async function callAiApi(params: {
     enableGoldRates?: boolean;
     menuUrl?: string;
     businessName?: string;
+    conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
 }): Promise<string> {
     const {
         systemPrompt,
@@ -389,7 +507,8 @@ export async function callAiApi(params: {
         apiKey,
         enableGoldRates = false,
         menuUrl,
-        businessName
+        businessName,
+        conversationHistory = []
     } = params;
 
     // Detect image URLs in Knowledge Base (Menu Image 1 & 2, Catalog, etc.)
@@ -422,13 +541,50 @@ LIVE MENU LINK RULES:
     // ONLY inject gold rate prompt IF enableGoldRates is explicitly TRUE
     const goldPrompt = enableGoldRates ? `\n\n${formatGoldRatePrompt()}` : "";
 
+    // Format human-readable multi-turn history block directly into system instructions for 100% failover retention
+    let historyPromptBlock = "";
+    if (conversationHistory && conversationHistory.length > 0) {
+        const formattedTurns = conversationHistory
+            .map((h) => `${h.role === "assistant" ? "Assistant (You)" : "Customer"}: ${h.content}`)
+            .join("\n");
+        historyPromptBlock = `\n\n==================================================\nRECENT CONVERSATION HISTORY (REMEMBER WHAT CUSTOMER ALREADY ASKED / ORDERED IN THIS CHAT):\n${formattedTurns}\n==================================================`;
+    }
+
     // Construct full system instruction
     const fullSystemMessage = `${systemPrompt || DEFAULT_SYSTEM_PROMPT}
 
 ==================================================
 BUSINESS KNOWLEDGE BASE & FAQS:
-${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific details provided. Answer politely and concisely."}${mediaInstruction}${menuUrlInstruction}${goldPrompt}
+${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific details provided. Answer politely and concisely."}${mediaInstruction}${menuUrlInstruction}${goldPrompt}${historyPromptBlock}
 ==================================================`;
+
+    // Multi-turn message array for OpenAI-compatible gateways (Groq, OpenRouter, Together AI)
+    const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+        { role: "system", content: fullSystemMessage },
+        ...(conversationHistory || []).map((m) => ({
+            role: (m.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+            content: m.content
+        })),
+        { role: "user", content: userPrompt }
+    ];
+
+    // Multi-turn contents array for Google Gemini (ensuring first turn is 'user' as required by Gemini)
+    const geminiContents: Array<{ role: "user" | "model"; parts: [{ text: string }] }> = [];
+    let geminiStarted = false;
+    for (const h of conversationHistory || []) {
+        if (!geminiStarted) {
+            if (h.role === "user") {
+                geminiStarted = true;
+                geminiContents.push({ role: "user", parts: [{ text: h.content }] });
+            }
+        } else {
+            geminiContents.push({
+                role: h.role === "assistant" ? "model" : "user",
+                parts: [{ text: h.content }]
+            });
+        }
+    }
+    geminiContents.push({ role: "user", parts: [{ text: userPrompt }] });
 
     // =========================================================================
     // 1. GROQ LPU ENGINE (Priority 1: Ultra Fast ~0.2s Latency)
@@ -438,7 +594,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
         const groqModels = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "allam-2-7b"];
         for (const model of groqModels) {
             try {
-                logger.info("AI-Gateway", `[1/4] Trying Groq LPU (${model})...`);
+                logger.info("AI-Gateway", `[1/4] Trying Groq LPU (${model}, historyTurns: ${conversationHistory.length})...`);
                 const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
                     headers: {
@@ -447,10 +603,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                     },
                     body: JSON.stringify({
                         model,
-                        messages: [
-                            { role: "system", content: fullSystemMessage },
-                            { role: "user", content: userPrompt }
-                        ],
+                        messages: chatMessages,
                         temperature,
                         max_tokens: maxTokens
                     }),
@@ -482,13 +635,13 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
         const geminiModels = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest", "gemini-3.8-flash"];
         for (const model of geminiModels) {
             try {
-                logger.info("AI-Gateway", `[2/4] Trying Gemini (${model})...`);
+                logger.info("AI-Gateway", `[2/4] Trying Gemini (${model}, historyTurns: ${conversationHistory.length})...`);
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         systemInstruction: { parts: [{ text: fullSystemMessage }] },
-                        contents: [{ parts: [{ text: userPrompt }] }],
+                        contents: geminiContents,
                         generationConfig: { temperature, maxOutputTokens: maxTokens }
                     }),
                     signal: AbortSignal.timeout(12000)
@@ -526,7 +679,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
 
         for (const model of openrouterModels) {
             try {
-                logger.info("AI-Gateway", `[3/4] Trying OpenRouter (${model})...`);
+                logger.info("AI-Gateway", `[3/4] Trying OpenRouter (${model}, historyTurns: ${conversationHistory.length})...`);
                 const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
                     headers: {
@@ -537,10 +690,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                     },
                     body: JSON.stringify({
                         model,
-                        messages: [
-                            { role: "system", content: fullSystemMessage },
-                            { role: "user", content: userPrompt }
-                        ],
+                        messages: chatMessages,
                         temperature,
                         max_tokens: maxTokens
                     }),
@@ -567,7 +717,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     const togetherKey = process.env.TOGETHER_API_KEY?.trim() || (provider === "together" ? apiKey?.trim() : "") || BUILTIN_KEYS.together;
     if (togetherKey) {
         try {
-            logger.info("AI-Gateway", `[4/4] Trying Together AI...`);
+            logger.info("AI-Gateway", `[4/4] Trying Together AI (historyTurns: ${conversationHistory.length})...`);
             const res = await fetch("https://api.together.xyz/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -576,10 +726,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                 },
                 body: JSON.stringify({
                     model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-                    messages: [
-                        { role: "system", content: fullSystemMessage },
-                        { role: "user", content: userPrompt }
-                    ],
+                    messages: chatMessages,
                     max_tokens: maxTokens
                 }),
                 signal: AbortSignal.timeout(12000)

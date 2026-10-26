@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, menuUrl, enableGoldRates, pizzaShopId } = body;
+        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, conversationHistory, menuUrl, enableGoldRates, pizzaShopId } = body;
 
         if (!userPrompt) {
             return NextResponse.json({ status: false, message: "userPrompt is required" }, { status: 400 });
@@ -31,19 +31,26 @@ export async function POST(request: NextRequest) {
             } catch (_) {}
         }
 
-        const replyText = await callAiApi({
+        let replyText = await callAiApi({
             provider: provider || "openrouter",
             apiKey: apiKey || "",
             modelName: modelName || "meta-llama/llama-3.1-8b-instruct:free",
             systemPrompt,
             knowledgeBase: combinedKb,
             userPrompt,
+            conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : undefined,
             menuUrl,
             enableGoldRates: Boolean(enableGoldRates)
         });
 
         if (!replyText) {
             return NextResponse.json({ status: false, message: "No response generated from AI" }, { status: 500 });
+        }
+
+        // Playground preview for [PLACE_ORDER: {...}]
+        const orderTagRegex = /\[PLACE_ORDER:\s*({[\s\S]*?})\]/i;
+        if (orderTagRegex.test(replyText)) {
+            replyText = replyText.replace(orderTagRegex, `\n\n🧾 *[TEST SIMULATION] Order Verified & Ready for Kitchen!* (Order Tag Generated Successfully)`).trim();
         }
 
         return NextResponse.json({

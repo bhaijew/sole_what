@@ -697,7 +697,8 @@ export default function AiBotClient() {
                     menuUrl: config.menuUrl,
                     enableGoldRates: config.enableGoldRates,
                     pizzaShopId: (pizzaConfig.enabled && pizzaConfig.shopId) ? pizzaConfig.shopId : undefined,
-                    userPrompt: userMsg
+                    userPrompt: userMsg,
+                    conversationHistory: playgroundMessages.slice(-8)
                 })
             });
 
