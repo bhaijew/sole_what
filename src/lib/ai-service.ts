@@ -406,10 +406,15 @@ export async function generateAiResponse(
             }
         }
 
-        // Fetch AI Config for this session
+        // Fetch AI Config for this session (search by both id and sessionId)
         // @ts-ignore - Prisma model dynamic lookup
-        let aiConfig = await (prisma as any).aiConfig.findUnique({
-            where: { sessionId: session.id }
+        let aiConfig = await (prisma as any).aiConfig.findFirst({
+            where: {
+                OR: [
+                    { sessionId: session.id },
+                    { sessionId: session.sessionId }
+                ]
+            }
         });
 
         if (!aiConfig) {
@@ -419,8 +424,8 @@ export async function generateAiResponse(
                     data: {
                         sessionId: session.id,
                         enabled: true,
-                        provider: "openrouter",
-                        modelName: "meta-llama/llama-3.1-8b-instruct:free",
+                        provider: "groq",
+                        modelName: "qwen/qwen3.8-27b",
                         systemPrompt: DEFAULT_SYSTEM_PROMPT,
                         knowledgeBase: "",
                         enableGoldRates: false,
@@ -428,8 +433,13 @@ export async function generateAiResponse(
                     }
                 });
             } catch (e) {
-                aiConfig = await (prisma as any).aiConfig.findUnique({
-                    where: { sessionId: session.id }
+                aiConfig = await (prisma as any).aiConfig.findFirst({
+                    where: {
+                        OR: [
+                            { sessionId: session.id },
+                            { sessionId: session.sessionId }
+                        ]
+                    }
                 });
             }
         }
@@ -552,14 +562,16 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
 
         // Record AI request count metric for store / session
         try {
-            await (prisma as any).aiConfig.update({
-                where: { sessionId: session.id },
-                data: {
-                    aiRequestsCount: {
-                        increment: 1
+            if (aiConfig?.id) {
+                await (prisma as any).aiConfig.update({
+                    where: { id: aiConfig.id },
+                    data: {
+                        aiRequestsCount: {
+                            increment: 1
+                        }
                     }
-                }
-            });
+                });
+            }
         } catch (_) {}
 
         // If primary and secondary AI engines yielded an empty response, seamlessly engage Smart Fallback
@@ -798,7 +810,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     // =========================================================================
     const groqKey = process.env.GROQ_API_KEY?.trim() || (provider === "groq" ? apiKey?.trim() : "") || BUILTIN_KEYS.groq;
     if (groqKey) {
-        const groqModels = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "allam-2-7b"];
+        const groqModels = ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "allam-2-7b"];
         for (const model of groqModels) {
             try {
                 logger.info("AI-Gateway", `[1/4] Trying Groq LPU (${model}, historyTurns: ${conversationHistory.length})...`);
@@ -814,7 +826,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                         temperature,
                         max_tokens: maxTokens
                     }),
-                    signal: AbortSignal.timeout(12000)
+                    signal: AbortSignal.timeout(5000)
                 });
 
                 if (res.ok) {
@@ -844,7 +856,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     // =========================================================================
     const geminiKey = process.env.GEMINI_API_KEY?.trim() || (provider === "gemini" ? apiKey?.trim() : "") || BUILTIN_KEYS.gemini;
     if (geminiKey) {
-        const geminiModels = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+        const geminiModels = ["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.5-flash"];
         for (const model of geminiModels) {
             try {
                 logger.info("AI-Gateway", `[2/4] Trying Gemini (${model}, historyTurns: ${conversationHistory.length})...`);
@@ -856,7 +868,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                         contents: geminiContents,
                         generationConfig: { temperature, maxOutputTokens: maxTokens }
                     }),
-                    signal: AbortSignal.timeout(12000)
+                    signal: AbortSignal.timeout(6000)
                 });
 
                 if (res.ok) {

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeJid } from "@/lib/jid-utils";
 import { waManager } from "@/modules/whatsapp/manager";
 import { onMessageSent } from "@/lib/webhook";
+import { registerAiSentMessage } from "@/lib/handover-service";
 import * as waSticker from "wa-sticker-formatter";
 import path from "path";
 import { existsSync } from "fs";
@@ -277,7 +278,7 @@ export class ChatService {
         return { instance, resolvedSessionId, dbSessionId };
     }
 
-    static async sendTextMessage(sessionId: string, jid: string, messagePayload: any, mentions?: string[], quotedMessageId?: string) {
+    static async sendTextMessage(sessionId: string, jid: string, messagePayload: any, mentions?: string[], quotedMessageId?: string, isAiMessage?: boolean) {
         const { instance, resolvedSessionId, dbSessionId } = await ChatService.resolveSessionInstance(sessionId);
         if (!instance || !instance.socket) {
             throw new Error(`WhatsApp session is disconnected or not found (id: ${sessionId})`);
@@ -429,6 +430,11 @@ export class ChatService {
         }
 
         const sendResult = await instance.socket.sendMessage(jid, msgPayload, options);
+
+        // Pre-register AI message key ID to prevent onMessageSent from triggering false Owner Takeover
+        if (isAiMessage && sendResult?.key?.id) {
+            registerAiSentMessage(sendResult.key.id);
+        }
 
         // Fire webhook for sent message (non-blocking)
         try {

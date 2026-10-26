@@ -167,12 +167,11 @@ export function checkIfHandoverRequested(text: string): { requested: boolean; re
 
     const clean = text.toLowerCase().trim();
 
-    // 1. Direct agent / staff keywords
-    const agentRegex = /\b(human|agent|staff|manager|banda|banday|insan|admin|representative|boss|dukan\s*dar|owner)\b/i;
-    // 2. Clear intent phrases
-    const intentRegex = /(?:talk\s*to\s*(?:human|agent|staff|person|manager)|speak\s*to\s*(?:human|agent|staff)|call\s*staff|human\s*se\s*baat|staff\s*se\s*baat|insan\s*se\s*baat|banday\s*se\s*baat|real\s*person|live\s*agent|call\s*karo|phone\s*karo)/i;
-    // 3. Frustration / bot stop phrases
-    const stopBotRegex = /(?:bot\s*band\s*karo|chup\s*kar\s*bot|bakwas\s*bot|pagal\s*bot|stop\s*bot|stop\s*ai)/i;
+    // 1. Clear intent phrases to speak with human staff / manager / owner
+    const intentRegex = /(?:talk\s*to\s*(?:human|agent|staff|person|manager|owner)|speak\s*to\s*(?:human|agent|staff)|call\s*(?:staff|manager|owner)|human\s*se\s*baat|staff\s*se\s*baat|insan\s*se\s*baat|banday\s*se\s*baat|manager\s*se\s*baat|owner\s*se\s*baat|real\s*person|live\s*agent|asli\s*banda|representative\s*se\s*baat)/i;
+
+    // 2. Frustration / bot stop phrases
+    const stopBotRegex = /(?:bot\s*band\s*karo|chup\s*kar\s*bot|bakwas\s*bot|pagal\s*bot|stop\s*bot|stop\s*ai|ai\s*band\s*karo)/i;
 
     if (intentRegex.test(clean)) {
         return { requested: true, reason: "Customer explicitly requested to talk with staff" };
@@ -182,9 +181,6 @@ export function checkIfHandoverRequested(text: string): { requested: boolean; re
         return { requested: true, reason: "Customer asked to pause the automated bot" };
     }
 
-    if (agentRegex.test(clean) && clean.length <= 40) {
-        return { requested: true, reason: "Customer mentioned agent/staff keyword" };
-    }
-
     return { requested: false, reason: "" };
 }
+

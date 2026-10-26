@@ -11,7 +11,7 @@ import { generateAiResponse } from "./ai-service";
 import { ChatService } from "@/modules/whatsapp/chat.service";
 import { cancelDripOnCustomerReply } from "@/modules/whatsapp/drip-engine";
 import { hasMatchingKeywordRule } from "@/modules/whatsapp/store/autoreply";
-import { isHandoverActive, enableHandover, checkIfHandoverRequested, registerAiSentMessage, isAiSentMessage } from "./handover-service";
+import { isHandoverActive, enableHandover, disableHandover, checkIfHandoverRequested, registerAiSentMessage, isAiSentMessage } from "./handover-service";
 import { sendQuotationViaWhatsApp } from "./quotation-service";
 
 // Event types that can trigger webhooks
@@ -608,20 +608,34 @@ export async function onMessageReceived(sessionId: string, message: any, existin
             });
 
             if (dbSession) {
-                // Check AI Config for this session (auto-create if missing)
-                let aiConfig = await prisma.aiConfig.findUnique({ where: { sessionId: dbSession.id } });
+                // Check AI Config for this session (auto-create if missing, search both id and sessionId)
+                let aiConfig = await prisma.aiConfig.findFirst({
+                    where: {
+                        OR: [
+                            { sessionId: dbSession.id },
+                            { sessionId: dbSession.sessionId }
+                        ]
+                    }
+                });
                 if (!aiConfig) {
                     try {
                         aiConfig = await prisma.aiConfig.create({
                             data: {
                                 sessionId: dbSession.id,
                                 enabled: true,
-                                provider: "openrouter",
-                                modelName: "meta-llama/llama-3.1-8b-instruct:free"
+                                provider: "groq",
+                                modelName: "qwen/qwen3.8-27b"
                             }
                         });
                     } catch (e) {
-                        aiConfig = await prisma.aiConfig.findUnique({ where: { sessionId: dbSession.id } });
+                        aiConfig = await prisma.aiConfig.findFirst({
+                            where: {
+                                OR: [
+                                    { sessionId: dbSession.id },
+                                    { sessionId: dbSession.sessionId }
+                                ]
+                            }
+                        });
                     }
                 }
 
@@ -663,8 +677,15 @@ export async function onMessageReceived(sessionId: string, message: any, existin
 
                         // 2. Check if Human Handover is currently ACTIVE for this chat
                         if (isHandoverActive(sessionId, normalizedFrom)) {
-                            logger.info("AI-Bot", `[Handover Active] AI Bot is paused for ${normalizedFrom}. Live agent is handling this conversation.`);
-                            return;
+                            // If customer sends a message with inquiry intent (e.g. asking for menu, order, greeting, price, etc.), auto-release handover!
+                            const resumeIntent = /(?:menu|order|hi|hello|salam|slam|assalam|hey|pizza|deal|rate|price|kya\s*hai|shuru|start|help|chahiye)/i.test(normalized.content);
+                            if (resumeIntent) {
+                                logger.info("AI-Bot", `Customer ${normalizedFrom} initiated inquiry ("${normalized.content.substring(0, 30)}"). Auto-releasing handover lock to assist customer.`);
+                                disableHandover(sessionId, normalizedFrom);
+                            } else {
+                                logger.info("AI-Bot", `[Handover Active] AI Bot is paused for ${normalizedFrom}. Live agent is handling this conversation.`);
+                                return;
+                            }
                         }
 
                         // 3. Check if customer is asking for human staff / expressing frustration
@@ -750,14 +771,14 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                                     const res = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: resolvedImageMatches[0] },
                                                         caption: cleanText || undefined
-                                                    });
+                                                    }, undefined, undefined, true);
                                                     if (res?.key?.id) registerAiSentMessage(res.key.id);
                                                 } else {
-                                                    const r1 = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                    const r1 = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText, undefined, undefined, true);
                                                     if (r1?.key?.id) registerAiSentMessage(r1.key.id);
                                                     const r2 = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: resolvedImageMatches[0] }
-                                                    });
+                                                    }, undefined, undefined, true);
                                                     if (r2?.key?.id) registerAiSentMessage(r2.key.id);
                                                 }
                                             } else {
@@ -766,18 +787,18 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                                     const res = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: resolvedImageMatches[0] },
                                                         caption: cleanText
-                                                    });
+                                                    }, undefined, undefined, true);
                                                     if (res?.key?.id) registerAiSentMessage(res.key.id);
                                                 } else {
                                                     if (cleanText.length > 1000) {
-                                                        const r1 = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText);
+                                                        const r1 = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText, undefined, undefined, true);
                                                         if (r1?.key?.id) registerAiSentMessage(r1.key.id);
                                                         await new Promise((r) => setTimeout(r, 400));
                                                     }
                                                     const r2 = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: resolvedImageMatches[0] },
                                                         caption: "📄 Menu (Page 1)"
-                                                    });
+                                                    }, undefined, undefined, true);
                                                     if (r2?.key?.id) registerAiSentMessage(r2.key.id);
                                                 }
 
@@ -788,19 +809,24 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                                     const rNext = await ChatService.sendTextMessage(sessionId, normalizedFrom, {
                                                         image: { url: resolvedImageMatches[i] },
                                                         caption: pageLabel
-                                                    });
+                                                    }, undefined, undefined, true);
                                                     if (rNext?.key?.id) registerAiSentMessage(rNext.key.id);
                                                 }
                                             }
                                             logger.success("AI-Bot", `Successfully sent ${resolvedImageMatches.length} image attachment(s) via AI to ${normalizedFrom}`);
                                         } catch (imgError) {
                                             logger.error("AI-Bot", "Failed to send image attachment(s), falling back to text:", imgError);
-                                            const rFallback = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText || aiReply.trim());
+                                            const rFallback = await ChatService.sendTextMessage(sessionId, normalizedFrom, cleanText || aiReply.trim(), undefined, undefined, true);
                                             if (rFallback?.key?.id) registerAiSentMessage(rFallback.key.id);
                                         }
                                     } else {
-                                        const rText = await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim());
-                                        if (rText?.key?.id) registerAiSentMessage(rText.key.id);
+                                        try {
+                                            const rText = await ChatService.sendTextMessage(sessionId, normalizedFrom, aiReply.trim(), undefined, undefined, true);
+                                            if (rText?.key?.id) registerAiSentMessage(rText.key.id);
+                                            logger.success("AI-Bot", `Successfully sent text AI reply to ${normalizedFrom}`);
+                                        } catch (sendErr: any) {
+                                            logger.error("AI-Bot", `Failed to send text AI reply to ${normalizedFrom}:`, sendErr?.message || sendErr);
+                                        }
                                     }
                                 }
                             })
@@ -846,7 +872,7 @@ export async function onMessageSent(sessionId: string, message: any, existingFil
     const msgKeyId = message.key?.id;
     if (!isGroup && msgKeyId && !isAiSentMessage(msgKeyId)) {
         logger.warn("HandoverService", `[Owner Intervened] Store owner sent message to ${normalizedFrom}. Automatically pausing AI bot in real time...`);
-        enableHandover(sessionId, normalizedFrom, 120, "Store owner manually replied in chat", "Owner");
+        enableHandover(sessionId, normalizedFrom, 15, "Store owner manually replied in chat", "Owner");
     }
 
     // For sent messages, sender is "ME" (self)
