@@ -18,31 +18,34 @@ export interface AiTestRequest {
 
 export interface DeliveryRulesConfig {
     enabled?: boolean;
-    minOrderAmount?: number;
-    freeDeliveryRadiusKm?: number;
-    deliveryFeeBeyond?: number;
+    freeDeliveryMinOrder?: number;      // e.g. 700 (Orders of Rs. 700+ get FREE delivery within the circle)
+    freeDeliveryRadiusKm?: number;      // e.g. 5 (Free delivery circle radius in KM)
+    standardDeliveryFee?: number;       // e.g. 100 (Delivery fee if order is below Rs. 700 within circle)
+    deliveryFeeBeyond?: number;         // e.g. 150 (Delivery fee outside the circle)
+    minOrderAmount?: number;            // backwards compatibility
 }
 
 export function formatDeliveryRulesPrompt(rules?: DeliveryRulesConfig): string {
     if (!rules || !rules.enabled) return "";
-    const minOrder = Number(rules.minOrderAmount) || 0;
-    const freeKm = Number(rules.freeDeliveryRadiusKm) || 0;
-    const feeBeyond = Number(rules.deliveryFeeBeyond) || 0;
-
-    if (minOrder <= 0 && freeKm <= 0 && feeBeyond <= 0) return "";
+    const freeMin = Number(rules.freeDeliveryMinOrder || rules.minOrderAmount) || 700;
+    const freeKm = Number(rules.freeDeliveryRadiusKm) || 5;
+    const standardFee = Number(rules.standardDeliveryFee) || 100;
+    const feeBeyond = Number(rules.deliveryFeeBeyond) || 150;
 
     return `=====================================================
-🛵 DELIVERY CIRCLE (KM RADIUS) & MINIMUM ORDER POLICY:
+🛵 DELIVERY CIRCLE & FREE DELIVERY CHARGES POLICY:
 =====================================================
-${minOrder > 0 ? `• MINIMUM ORDER LIMIT: Rs. ${minOrder}
-  - Har order kam az kam Rs. ${minOrder} ka hona zaroori hai.
-  - Agar customer ka order bill Rs. ${minOrder} se kam ho to order PLACE NA KAREIN. Politely Roman Urdu mein batayein: "Hamara kam az kam (minimum) order Rs. ${minOrder} ka hai. Aapka bill Rs. [Total] ban raha hai, kindly kuch mazeed items shamil kar lein taake hum aapka order kitchen dispatch kar sakein."
-  - Agar customer poochay "minimum order kitna hai?", to batayein: "Hamara minimum order Rs. ${minOrder} hai."` : ""}
-${freeKm > 0 ? `• FREE DELIVERY CIRCLE / RADIUS: ${freeKm} KM
-  - Hamari delivery ${freeKm} KM ke radius / circle ke andar bilkul 100% FREE (Rs. 0) hai!
-  - ${freeKm} KM ke circle se aage / bahir delivery charges Rs. ${feeBeyond} hain.
-  - Agar customer delivery charges, delivery free hona, kitne KM tak delivery free hai, ya delivery circle ka poochay (e.g. "delivery free hai?", "kitne km tak free hai?", "charges kitne hain?", "delivery circle kitna hai?"):
-    Foran aur clearly batayein: "Hamari delivery ${freeKm} KM ke circle (radius) ke andar bilkul 100% FREE hai! Agar aapki location ${freeKm} KM se bahir ho to delivery charges Rs. ${feeBeyond} hotay hain."` : (feeBeyond > 0 ? `• DELIVERY CHARGES: Flat Rs. ${feeBeyond}` : "")}
+1. FREE DELIVERY THRESHOLD (${freeKm} KM CIRCLE):
+   • Hamari delivery ${freeKm} KM ke circle (radius) ke andar Rs. ${freeMin} ya us se baray order par bilkul 100% FREE (Rs. 0) hai!
+2. ORDERS BELOW Rs. ${freeMin} (WITHIN ${freeKm} KM):
+   • Agar customer ka order bill Rs. ${freeMin} se kam ho (maslan Rs. 200, 300, 400, 500 etc.), to order bilkul ACCEPT karein! Order reject NA KAREIN.
+   • Us order par Rs. ${standardFee} delivery fee lagegi (Total Bill = Subtotal + Rs. ${standardFee}).
+   • Summary mein friendly tip dein: "💡 Tip: Agar aap Rs. ${freeMin} ka order karein to ${freeKm} KM ke andar delivery bilkul FREE ho jayegi!"
+3. OUTSIDE ${freeKm} KM CIRCLE:
+   • Agar customer ka delivery address ${freeKm} KM circle se bahir ho to delivery charges Rs. ${feeBeyond} honge.
+4. CUSTOMER INQUIRIES (DELIVERY / MINIMUM ORDER):
+   • Agar customer poochay "delivery free hai?", "charges kitne hain?", "kitne km tak free hai?", ya "minimum order kitna hai?":
+     Clearly batayein: "Hamari delivery ${freeKm} KM ke circle mein Rs. ${freeMin} ya us se baray order par bilkul FREE hai! Agar order Rs. ${freeMin} se kam ho to sirf Rs. ${standardFee} delivery charges lagtay hain."
 =====================================================`;
 }
 
@@ -102,15 +105,19 @@ When a customer wants to place an order (e.g., asks for food items like Shawarma
   3. WhatsApp / Phone number (Rabta number)
 • STEP 2 (SUMMARY & CONFIRMATION QUESTION):
   Once the customer provides their Name and Delivery Address:
-  - Check Minimum Order Limit: If minimum order amount is configured and subtotal is less than minimum order amount, DO NOT confirm order yet. Politely tell them: "Hamara kam az kam (minimum) order limit Rs. <MinOrder> hai. Aapka bill Rs. <Subtotal> ban raha hai, kindly kuch mazeed items add kar lein taake order confirm kiya ja sakay."
-  - Delivery Circle Policy: If customer address is within the Free Delivery KM Circle, delivery is FREE (Rs. 0). If outside, state standard delivery charges.
+  Calculate Order Subtotal.
+  - Delivery Fee Calculation:
+    • Agar address within 5 KM circle ho:
+      - Agar Subtotal >= Rs. 700: Delivery is FREE (Rs. 0). Total Bill = Subtotal.
+      - Agar Subtotal < Rs. 700: Delivery is Rs. 100. Total Bill = Subtotal + 100. Tip: "💡 Tip: Agar aap Rs. 700 ka order karein to 5 KM ke andar delivery bilkul FREE ho jayegi!"
+    • Agar address outside 5 KM circle ho: Delivery is Rs. 150. Total Bill = Subtotal + 150.
   Present a clear, clean order receipt summary:
   📋 ORDER SUMMARY:
   • <Qty>x <Item Name>: Rs. <Price>
   ────────────────────
   Subtotal: Rs. <Subtotal>
-  Delivery: <FREE (within Free KM Circle) or Rs. <Fee>>
-  💵 Total Bill: Rs. <Total> (Cash on Delivery)
+  🛵 Delivery: <FREE (Rs. 700+ order) or Rs. 100>
+  💵 Total Bill: Rs. <Total Bill> (Cash on Delivery)
   👤 Name: <Customer Name>
   📍 Address: <Delivery Address>
   📞 Phone: <Customer Phone>
@@ -119,17 +126,16 @@ When a customer wants to place an order (e.g., asks for food items like Shawarma
   "👉 Order confirm karne ke liye 'YES' ya 'CONFIRM' reply karein."
 • STEP 3 (FINAL CONFIRMATION & POS KITCHEN DISPATCH):
   When the customer replies "YES", "CONFIRM", "HAAN", "OK", "DONE", "KAR DEIN":
-  (Only place order if subtotal meets Minimum Order limit!)
   You MUST attach this exact JSON tag at the very end of your response:
   [PLACE_ORDER: {"name": "<Customer Name>", "phone": "<Phone>", "address": "<Delivery Address>", "items": [{"name": "<Item Name>", "price": <Price>, "qty": <Qty>}], "total": <Total Bill>}]
   And reply with an enthusiastic confirmation:
   "🎉 Bohat shukriya [Customer Name]! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!"
 
-7. DELIVERY CIRCLE (KM RADIUS) & MINIMUM ORDER INQUIRIES:
+7. DELIVERY CIRCLE (KM RADIUS) & FREE DELIVERY INQUIRIES:
 - Agar customer delivery charges, delivery free hona, kitne KM tak delivery free hai, ya delivery circle ka poochay:
-  • Batayein ke kitne KM ke circle / radius ke andar delivery bilkul FREE hai aur circle se bahir kitne charges hain.
-- Agar customer poochay minimum order kitna hai ya kam az kam order limit kya hai:
-  • Batayein ke hamara kam az kam order limit kitna hai.
+  • Batayein: Hamari delivery 5 KM ke circle (radius) ke andar Rs. 700 ya us se baray order par bilkul FREE hai! Agar order Rs. 700 se kam ho to sirf Rs. 100 delivery charges lagtay hain.
+- Agar customer poochay minimum order kitna hai:
+  • Batayein ke Rs. 700 ke order par delivery free hai, aur 700 se kam par sirf Rs. 100 delivery charges lagtay hain.
   
 8. CONVERSATIONAL MEMORY & MULTI-TURN CONTINUITY:
 - Always REMEMBER what the customer stated in earlier messages in this chat.
@@ -568,18 +574,22 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
 
         // Delivery Circle (KM Radius) and Minimum Order Rules
         const sessionDeliveryRules = sessionConfig.deliveryRules;
+        const freeMin = sessionDeliveryRules ? (Number(sessionDeliveryRules.freeDeliveryMinOrder || sessionDeliveryRules.minOrderAmount) || 700) : 700;
+        const standardFee = sessionDeliveryRules ? (Number(sessionDeliveryRules.standardDeliveryFee) || 100) : (storeDeliveryFee || 100);
         deliveryRules = {
             enabled: sessionDeliveryRules !== undefined ? Boolean(sessionDeliveryRules.enabled) : true,
-            minOrderAmount: sessionDeliveryRules ? (Number(sessionDeliveryRules.minOrderAmount) || 0) : storeMinOrder,
-            freeDeliveryRadiusKm: sessionDeliveryRules ? (Number(sessionDeliveryRules.freeDeliveryRadiusKm) || 0) : 5,
-            deliveryFeeBeyond: sessionDeliveryRules ? (Number(sessionDeliveryRules.deliveryFeeBeyond) || 0) : storeDeliveryFee
+            freeDeliveryMinOrder: freeMin,
+            minOrderAmount: freeMin,
+            freeDeliveryRadiusKm: sessionDeliveryRules ? (Number(sessionDeliveryRules.freeDeliveryRadiusKm) || 5) : 5,
+            standardDeliveryFee: standardFee,
+            deliveryFeeBeyond: sessionDeliveryRules ? (Number(sessionDeliveryRules.deliveryFeeBeyond) || 150) : 150
         };
 
         if (deliveryRules.enabled) {
             const rulesPrompt = formatDeliveryRulesPrompt(deliveryRules);
             if (rulesPrompt) {
                 dynamicStoreContext = [dynamicStoreContext, rulesPrompt].filter(Boolean).join("\n\n");
-                logger.info("AI-Bot", `[Delivery-Rules] Injected: MinOrder=Rs.${deliveryRules.minOrderAmount}, FreeCircle=${deliveryRules.freeDeliveryRadiusKm}KM, BeyondFee=Rs.${deliveryRules.deliveryFeeBeyond}`);
+                logger.info("AI-Bot", `[Delivery-Rules] Injected: FreeMinOrder=Rs.${deliveryRules.freeDeliveryMinOrder}, FreeCircle=${deliveryRules.freeDeliveryRadiusKm}KM, StandardFee=Rs.${deliveryRules.standardDeliveryFee}, BeyondFee=Rs.${deliveryRules.deliveryFeeBeyond}`);
             }
         }
 
@@ -658,42 +668,36 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
             const { fullTag, orderData } = extracted;
             const orderTotal = Number(orderData.total) || 0;
 
-            // Check Minimum Order Amount validation
-            if (deliveryRules.enabled && deliveryRules.minOrderAmount && deliveryRules.minOrderAmount > 0 && orderTotal > 0 && orderTotal < deliveryRules.minOrderAmount) {
-                logger.info("AI-Bot", `Order total Rs.${orderTotal} is below minOrderAmount Rs.${deliveryRules.minOrderAmount}`);
-                finalReply = finalReply.replace(fullTag, `\n\n⚠️ *Kam az kam (Minimum) order limit Rs. ${deliveryRules.minOrderAmount} hai.* Aapka bill Rs. ${orderTotal} ban raha hai. Kindly kuch mazeed items shamil kar lein taake hum aapka order kitchen mein dispatch kar sakein! 🍕`).trim();
-            } else {
-                try {
-                    const targetShopId = pizzaIntegration?.shopId ? Number(pizzaIntegration.shopId) : 7;
-                    let cleanPhone = (orderData.phone || "").trim();
-                    if (!cleanPhone && customerJid) {
-                        cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
-                        if (cleanPhone.startsWith("92")) {
-                            cleanPhone = "0" + cleanPhone.substring(2);
-                        }
+            try {
+                const targetShopId = pizzaIntegration?.shopId ? Number(pizzaIntegration.shopId) : 7;
+                let cleanPhone = (orderData.phone || "").trim();
+                if (!cleanPhone && customerJid) {
+                    cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
+                    if (cleanPhone.startsWith("92")) {
+                        cleanPhone = "0" + cleanPhone.substring(2);
                     }
+                }
 
-                    const orderResult = await createPizzaOrderInSupabase({
-                        shopId: targetShopId,
-                        customerName: orderData.name || customerPushName || "WhatsApp Customer",
-                        customerPhone: cleanPhone || "03000000000",
-                        deliveryAddress: orderData.address || "Delivery Address",
-                        items: Array.isArray(orderData.items) ? orderData.items : [],
-                        total: orderTotal,
-                        notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
-                    });
+                const orderResult = await createPizzaOrderInSupabase({
+                    shopId: targetShopId,
+                    customerName: orderData.name || customerPushName || "WhatsApp Customer",
+                    customerPhone: cleanPhone || "03000000000",
+                    deliveryAddress: orderData.address || "Delivery Address",
+                    items: Array.isArray(orderData.items) ? orderData.items : [],
+                    total: orderTotal,
+                    notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
+                });
 
-                    if (orderResult.success && orderResult.orderNumber) {
-                        orderCompletedSuccess = true;
-                        finalReply = finalReply.replace(fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
-                        logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
-                    } else {
-                        finalReply = finalReply.replace(fullTag, "").trim();
-                    }
-                } catch (oErr: any) {
-                    logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
+                if (orderResult.success && orderResult.orderNumber) {
+                    orderCompletedSuccess = true;
+                    finalReply = finalReply.replace(fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                    logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
+                } else {
                     finalReply = finalReply.replace(fullTag, "").trim();
                 }
+            } catch (oErr: any) {
+                logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
+                finalReply = finalReply.replace(fullTag, "").trim();
             }
         }
 
@@ -1146,32 +1150,20 @@ export function getNaturalFallbackReply(
 ): string {
     const p = (userPrompt || "").trim().toLowerCase();
     const { enableGoldRates = false, menuUrl, businessName = "Pizza Mafia", deliveryRules } = options || {};
-    const minOrder = Number(deliveryRules?.minOrderAmount) || 0;
-    const freeKm = Number(deliveryRules?.freeDeliveryRadiusKm) || 0;
-    const feeBeyond = Number(deliveryRules?.deliveryFeeBeyond) || 0;
+    const freeMin = Number(deliveryRules?.freeDeliveryMinOrder || deliveryRules?.minOrderAmount) || 700;
+    const freeKm = Number(deliveryRules?.freeDeliveryRadiusKm) || 5;
+    const standardFee = Number(deliveryRules?.standardDeliveryFee) || 100;
+    const feeBeyond = Number(deliveryRules?.deliveryFeeBeyond) || 150;
 
-    // Delivery Circle (KM Radius) and Free Delivery inquiries
+    // Delivery Circle (KM Radius), Free Delivery & Charges inquiries
     const isDeliveryCircleOrFreeQuery = /(?:free\s*delivery|delivery\s*free|kitne\s*km|km\s*tak|circle|radius|dilevry\s*free|kitna\s*circle|circle\s*ma|circle\s*mein|free\s*ha\s*km|dilevry)/i.test(p);
     const isDeliveryChargesQuery = /(?:delivery\s*charges|delivery\s*fee|delivery\s*kya\s*hai|delivery\s*ke\s*charges|charges\s*kitne)/i.test(p);
-
-    if (isDeliveryCircleOrFreeQuery || isDeliveryChargesQuery) {
-        if (freeKm > 0) {
-            return sanitizePakistaniRomanUrdu(
-                `G bilkul! Hamari delivery ${freeKm} KM ke circle (radius) ke andar bilkul 100% FREE hai! Agar aapka delivery address ${freeKm} KM se aage ho to delivery charges Rs. ${feeBeyond} lagtay hain. 🛵`
-            );
-        } else if (feeBeyond > 0) {
-            return sanitizePakistaniRomanUrdu(
-                `Hamare standard delivery charges Rs. ${feeBeyond} hain. Cash on Delivery (COD) available hai! 🛵`
-            );
-        }
-    }
-
-    // Minimum order amount inquiries
     const isMinOrderQuery = /(?:minimum|kam\s*az\s*kam|min|kam\s*se\s*kam)\s*(?:order|limit|bill)/i.test(p) ||
         /(?:order\s*kitna|order\s*limit)/i.test(p);
-    if (isMinOrderQuery && minOrder > 0) {
+
+    if (isDeliveryCircleOrFreeQuery || isDeliveryChargesQuery || isMinOrderQuery) {
         return sanitizePakistaniRomanUrdu(
-            `G bilkul! Hamara kam az kam (minimum) order limit Rs. ${minOrder} hai. Aap menu se apni marzi ki items order karwa sakte hain! 🍕`
+            `G bilkul! Hamari delivery ${freeKm} KM ke circle (radius) ke andar Rs. ${freeMin} ya us se baray order par bilkul 100% FREE hai! Agar aapka order Rs. ${freeMin} se kam ho to delivery charges sirf Rs. ${standardFee} hotay hain. 🛵`
         );
     }
 
@@ -1199,14 +1191,10 @@ export function getNaturalFallbackReply(
             ? Array.from(new Set(foodItemsMatch)).map(it => ({ name: it.trim(), qty: 1, price: 500 }))
             : [{ name: "Food Order", qty: 1, price: 500 }];
 
-        const total = itemsList.reduce((sum, it) => sum + it.price * it.qty, 0);
-
-        // Minimum order validation before placing order
-        if (minOrder > 0 && total < minOrder) {
-            return sanitizePakistaniRomanUrdu(
-                `Bara-e-meharbani note farmayein ke hamara kam az kam (minimum) order Rs. ${minOrder} ka hai. Aapka bill filhal Rs. ${total} ban raha hai. Kindly kuch mazeed items add kar lein taake hum aapka order kitchen mein dispatch kar sakein! 🍕`
-            );
-        }
+        const subtotal = itemsList.reduce((sum, it) => sum + it.price * it.qty, 0);
+        const isFree = subtotal >= freeMin;
+        const deliveryFee = isFree ? 0 : standardFee;
+        const total = subtotal + deliveryFee;
 
         return sanitizePakistaniRomanUrdu(
             `🎉 Bohat shukriya ${customerName}! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!\n\n[PLACE_ORDER: {"name": "${customerName}", "phone": "${customerPhone}", "address": "${customerAddress}", "items": ${JSON.stringify(itemsList)}, "total": ${total}}]`
@@ -1217,18 +1205,21 @@ export function getNaturalFallbackReply(
         // Customer provided their delivery address, items already in memory!
         const uniqueItems = Array.from(new Set(foodItemsMatch)).join(", ");
         const itemsList = Array.from(new Set(foodItemsMatch)).map(it => ({ name: it.trim(), qty: 1, price: 500 }));
-        const total = itemsList.reduce((sum, it) => sum + it.price * it.qty, 0);
+        const subtotal = itemsList.reduce((sum, it) => sum + it.price * it.qty, 0);
 
-        if (minOrder > 0 && total < minOrder) {
-            return sanitizePakistaniRomanUrdu(
-                `Aapki delivery details note kar li hain, lekin note farmayein ke hamara kam az kam (minimum) order limit Rs. ${minOrder} hai (Aapka bill Rs. ${total} hai). Kindly kuch mazeed items add kar lein taake order confirm kiya ja sakay!`
-            );
-        }
+        const isFree = subtotal >= freeMin;
+        const deliveryFee = isFree ? 0 : standardFee;
+        const total = subtotal + deliveryFee;
 
-        const deliveryStatus = freeKm > 0 ? `FREE (${freeKm} KM circle ke andar)` : (feeBeyond > 0 ? `Rs. ${feeBeyond}` : "FREE");
+        const deliveryStatus = isFree
+            ? `FREE (${freeKm} KM circle ke andar Rs. ${freeMin}+ order par)`
+            : `Rs. ${standardFee} (5 KM ke andar)`;
+        const tipText = !isFree
+            ? `\n💡 *Tip:* Agar aap Rs. ${freeMin} ka order karein to ${freeKm} KM ke andar delivery bilkul FREE ho jayegi!`
+            : "";
 
         return sanitizePakistaniRomanUrdu(
-            `Bohat khoob! Aapki delivery details note kar li hain:\n\n📋 *ORDER SUMMARY:*\n• Items: ${uniqueItems}\n• Subtotal: Rs. ${total}\n• Delivery: ${deliveryStatus}\n💵 Total Bill: Rs. ${total} (COD)\n📍 Delivery Address: ${userPrompt}\n\n👉 Order confirm karne ke liye kindly *'YES'* ya *'CONFIRM'* reply karein.`
+            `Bohat khoob! Aapki delivery details note kar li hain:\n\n📋 *ORDER SUMMARY:*\n• Items: ${uniqueItems}\n• Subtotal: Rs. ${subtotal}\n• Delivery: ${deliveryStatus}\n💵 Total Bill: Rs. ${total} (Cash on Delivery)\n📍 Delivery Address: ${userPrompt}\n${tipText}\n\n👉 Order confirm karne ke liye kindly *'YES'* ya *'CONFIRM'* reply karein.`
         );
     }
 

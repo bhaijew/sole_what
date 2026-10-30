@@ -38,11 +38,14 @@ export async function GET(
         }
 
         const sessionConfig = (session.config as any) || {};
-        const deliveryRules = sessionConfig.deliveryRules || {
-            enabled: true,
-            minOrderAmount: 0,
-            freeDeliveryRadiusKm: 5,
-            deliveryFeeBeyond: 100
+        const rawDeliveryRules = sessionConfig.deliveryRules || {};
+        const deliveryRules = {
+            enabled: rawDeliveryRules.enabled !== undefined ? Boolean(rawDeliveryRules.enabled) : true,
+            freeDeliveryMinOrder: Math.max(0, Number(rawDeliveryRules.freeDeliveryMinOrder || rawDeliveryRules.minOrderAmount) || 700),
+            freeDeliveryRadiusKm: Math.max(0, Number(rawDeliveryRules.freeDeliveryRadiusKm) || 5),
+            standardDeliveryFee: Math.max(0, Number(rawDeliveryRules.standardDeliveryFee) || 100),
+            deliveryFeeBeyond: Math.max(0, Number(rawDeliveryRules.deliveryFeeBeyond) || 150),
+            minOrderAmount: Math.max(0, Number(rawDeliveryRules.freeDeliveryMinOrder || rawDeliveryRules.minOrderAmount) || 700)
         };
 
         // @ts-ignore
@@ -55,13 +58,14 @@ export async function GET(
         try {
             const store = await prisma.store.findFirst({
                 where: { OR: [{ sessionId: session.id }, { sessionId }] },
-                select: { slug: true, customDomain: true, minOrderAmount: true, deliveryFee: true }
+                select: { slug: true, customDomain: true, minOrderAmount: true, deliveryFee: true, freeDeliveryAbove: true }
             });
             if (store) {
                 defaultMenuUrl = store.customDomain ? `https://${store.customDomain}` : `/s/${store.slug}`;
-                if (!sessionConfig.deliveryRules && store.minOrderAmount) {
-                    deliveryRules.minOrderAmount = store.minOrderAmount;
-                    deliveryRules.deliveryFeeBeyond = store.deliveryFee || 100;
+                if (!sessionConfig.deliveryRules) {
+                    deliveryRules.freeDeliveryMinOrder = store.freeDeliveryAbove || store.minOrderAmount || 700;
+                    deliveryRules.minOrderAmount = deliveryRules.freeDeliveryMinOrder;
+                    deliveryRules.standardDeliveryFee = store.deliveryFee || 100;
                 }
             }
         } catch (_) {}
@@ -161,11 +165,18 @@ export async function POST(
         if (deliveryRules) {
             try {
                 const currentConfig = (session.config as any) || {};
+                const effectiveFreeMin = Math.max(0, Number(deliveryRules.freeDeliveryMinOrder ?? deliveryRules.minOrderAmount) || 700);
+                const effectiveKm = Math.max(0, Number(deliveryRules.freeDeliveryRadiusKm) || 5);
+                const effectiveStandardFee = Math.max(0, Number(deliveryRules.standardDeliveryFee) || 100);
+                const effectiveBeyondFee = Math.max(0, Number(deliveryRules.deliveryFeeBeyond) || 150);
+
                 const updatedDeliveryRules = {
                     enabled: Boolean(deliveryRules.enabled ?? true),
-                    minOrderAmount: Math.max(0, Number(deliveryRules.minOrderAmount) || 0),
-                    freeDeliveryRadiusKm: Math.max(0, Number(deliveryRules.freeDeliveryRadiusKm) || 0),
-                    deliveryFeeBeyond: Math.max(0, Number(deliveryRules.deliveryFeeBeyond) || 0),
+                    freeDeliveryMinOrder: effectiveFreeMin,
+                    minOrderAmount: effectiveFreeMin,
+                    freeDeliveryRadiusKm: effectiveKm,
+                    standardDeliveryFee: effectiveStandardFee,
+                    deliveryFeeBeyond: effectiveBeyondFee,
                     updatedAt: new Date().toISOString()
                 };
                 await prisma.session.update({
@@ -186,8 +197,8 @@ export async function POST(
                         ]
                     },
                     data: {
-                        minOrderAmount: updatedDeliveryRules.minOrderAmount,
-                        deliveryFee: updatedDeliveryRules.deliveryFeeBeyond
+                        freeDeliveryAbove: effectiveFreeMin,
+                        deliveryFee: effectiveStandardFee
                     }
                 });
             } catch (cfgErr) {

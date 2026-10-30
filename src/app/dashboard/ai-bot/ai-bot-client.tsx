@@ -41,9 +41,11 @@ interface Session {
 
 export interface DeliveryRules {
     enabled: boolean;
-    minOrderAmount: number;
+    freeDeliveryMinOrder: number;
     freeDeliveryRadiusKm: number;
+    standardDeliveryFee: number;
     deliveryFeeBeyond: number;
+    minOrderAmount?: number;
 }
 
 interface AiConfigData {
@@ -225,9 +227,11 @@ export default function AiBotClient() {
         fallbackOnly: true,
         deliveryRules: {
             enabled: true,
-            minOrderAmount: 0,
+            freeDeliveryMinOrder: 700,
             freeDeliveryRadiusKm: 5,
-            deliveryFeeBeyond: 100
+            standardDeliveryFee: 100,
+            deliveryFeeBeyond: 150,
+            minOrderAmount: 700
         }
     });
 
@@ -664,9 +668,11 @@ export default function AiBotClient() {
                         fallbackOnly: res.data.fallbackOnly ?? true,
                         deliveryRules: res.data.deliveryRules || {
                             enabled: true,
-                            minOrderAmount: 0,
+                            freeDeliveryMinOrder: 700,
                             freeDeliveryRadiusKm: 5,
-                            deliveryFeeBeyond: 100
+                            standardDeliveryFee: 100,
+                            deliveryFeeBeyond: 150,
+                            minOrderAmount: 700
                         }
                     });
                 }
@@ -1040,7 +1046,7 @@ export default function AiBotClient() {
                 )}
             </div>
 
-            {/* Delivery Circle (KM Radius) & Minimum Order Policy Card */}
+            {/* Delivery Circle (KM Radius) & Free Delivery Policy Card */}
             <div className="p-5 rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-500/5 via-card to-blue-500/5 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
                     <div className="flex items-center gap-3">
@@ -1049,13 +1055,13 @@ export default function AiBotClient() {
                         </div>
                         <div>
                             <h4 className="font-bold text-sm text-foreground flex items-center gap-2 flex-wrap">
-                                Delivery Circle & Minimum Order Rules (KM Radius)
+                                Delivery Circle & Free Delivery Threshold (KM Radius)
                                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.deliveryRules?.enabled ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-muted text-muted-foreground border-border/50"}`}>
                                     {config.deliveryRules?.enabled ? "ACTIVE (Rules Enforced)" : "OFF (Rules Disabled)"}
                                 </span>
                             </h4>
                             <p className="text-xs text-muted-foreground">
-                                کم از کم آرڈر اور فری ڈلیوری کا دائرہ (KM): AI کسٹمر کو بتائے گا کہ کتنے KM تک ڈلیوری بالکل فری ہے اور کم از کم کتنا آرڈر ہونا چاہیے۔
+                                5 KM دائرے میں فری ڈلیوری اور کم آرڈر پر 100 روپے چارجز: 700 کے آرڈر پر ڈلیوری بالکل فری، اور 700 سے کم پر 100 روپے ڈلیوری فیس۔
                             </p>
                         </div>
                     </div>
@@ -1066,7 +1072,7 @@ export default function AiBotClient() {
                             onCheckedChange={(val) => setConfig((prev) => ({
                                 ...prev,
                                 deliveryRules: {
-                                    ...(prev.deliveryRules || { minOrderAmount: 0, freeDeliveryRadiusKm: 5, deliveryFeeBeyond: 100 }),
+                                    ...(prev.deliveryRules || { freeDeliveryMinOrder: 700, freeDeliveryRadiusKm: 5, standardDeliveryFee: 100, deliveryFeeBeyond: 150 }),
                                     enabled: val
                                 }
                             }))}
@@ -1087,11 +1093,11 @@ export default function AiBotClient() {
 
                 {config.deliveryRules?.enabled && (
                     <div className="space-y-4 pt-1">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            {/* Minimum Order Amount */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            {/* Free Delivery Minimum Order */}
                             <div className="p-3.5 rounded-xl border border-sky-500/20 bg-card space-y-1.5">
                                 <label className="text-xs font-bold text-foreground flex items-center justify-between">
-                                    <span>Minimum Order (کم از کم آرڈر)</span>
+                                    <span>Free Delivery Order (فری آرڈر حد)</span>
                                     <span className="text-[10px] text-sky-500 font-semibold">PKR / Rs.</span>
                                 </label>
                                 <div className="relative">
@@ -1100,30 +1106,31 @@ export default function AiBotClient() {
                                         type="number"
                                         min="0"
                                         step="50"
-                                        value={config.deliveryRules?.minOrderAmount || 0}
+                                        value={config.deliveryRules?.freeDeliveryMinOrder || config.deliveryRules?.minOrderAmount || 700}
                                         onChange={(e) => {
                                             const val = Math.max(0, parseFloat(e.target.value) || 0);
                                             setConfig(prev => ({
                                                 ...prev,
                                                 deliveryRules: {
-                                                    ...(prev.deliveryRules || { enabled: true, freeDeliveryRadiusKm: 5, deliveryFeeBeyond: 100 }),
+                                                    ...(prev.deliveryRules || { enabled: true, freeDeliveryRadiusKm: 5, standardDeliveryFee: 100, deliveryFeeBeyond: 150 }),
+                                                    freeDeliveryMinOrder: val,
                                                     minOrderAmount: val
                                                 }
                                             }));
                                         }}
                                         className="w-full bg-background border border-border/80 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/30"
-                                        placeholder="e.g. 500"
+                                        placeholder="e.g. 700"
                                     />
                                 </div>
                                 <p className="text-[10px] text-muted-foreground">
-                                    اس رقم سے کم کا آرڈر AI فائنل نہیں کرے گا اور مزید آئٹمز ایڈ کرنے کا کہے گا۔ (0 = No limit)
+                                    اس رقم (مثلاً 700) یا اس سے بڑے آرڈر پر ڈلیوری 100% فری ہوگی۔
                                 </p>
                             </div>
 
                             {/* Free Delivery Radius in KM */}
                             <div className="p-3.5 rounded-xl border border-sky-500/20 bg-card space-y-1.5">
                                 <label className="text-xs font-bold text-foreground flex items-center justify-between">
-                                    <span>Free Delivery Circle (فری دائرہ)</span>
+                                    <span>Delivery Circle (فری سرکل)</span>
                                     <span className="text-[10px] text-sky-500 font-semibold">Kilometers (KM)</span>
                                 </label>
                                 <div className="relative">
@@ -1132,13 +1139,13 @@ export default function AiBotClient() {
                                         type="number"
                                         min="0"
                                         step="0.5"
-                                        value={config.deliveryRules?.freeDeliveryRadiusKm || 0}
+                                        value={config.deliveryRules?.freeDeliveryRadiusKm || 5}
                                         onChange={(e) => {
                                             const val = Math.max(0, parseFloat(e.target.value) || 0);
                                             setConfig(prev => ({
                                                 ...prev,
                                                 deliveryRules: {
-                                                    ...(prev.deliveryRules || { enabled: true, minOrderAmount: 0, deliveryFeeBeyond: 100 }),
+                                                    ...(prev.deliveryRules || { enabled: true, freeDeliveryMinOrder: 700, standardDeliveryFee: 100, deliveryFeeBeyond: 150 }),
                                                     freeDeliveryRadiusKm: val
                                                 }
                                             }));
@@ -1148,14 +1155,14 @@ export default function AiBotClient() {
                                     />
                                 </div>
                                 <p className="text-[10px] text-muted-foreground">
-                                    کتنے کلومیٹر کے دائرے میں ڈلیوری بالکل 100% مفت ہو گی۔ (مثلاً 5 KM)
+                                    کتنے کلومیٹر کے دائرے میں 700 کے آرڈر پر ڈلیوری بالکل مفت ہو گی۔ (مثلاً 5 KM)
                                 </p>
                             </div>
 
-                            {/* Delivery Fee Beyond Free Circle */}
+                            {/* Standard Delivery Fee (Below 700) */}
                             <div className="p-3.5 rounded-xl border border-sky-500/20 bg-card space-y-1.5">
                                 <label className="text-xs font-bold text-foreground flex items-center justify-between">
-                                    <span>Charges Outside Circle (باہر چارجز)</span>
+                                    <span>Fee Below 700 (کم آرڈر پر فیس)</span>
                                     <span className="text-[10px] text-sky-500 font-semibold">PKR / Rs.</span>
                                 </label>
                                 <div className="relative">
@@ -1164,14 +1171,14 @@ export default function AiBotClient() {
                                         type="number"
                                         min="0"
                                         step="10"
-                                        value={config.deliveryRules?.deliveryFeeBeyond || 0}
+                                        value={config.deliveryRules?.standardDeliveryFee || 100}
                                         onChange={(e) => {
                                             const val = Math.max(0, parseFloat(e.target.value) || 0);
                                             setConfig(prev => ({
                                                 ...prev,
                                                 deliveryRules: {
-                                                    ...(prev.deliveryRules || { enabled: true, minOrderAmount: 0, freeDeliveryRadiusKm: 5 }),
-                                                    deliveryFeeBeyond: val
+                                                    ...(prev.deliveryRules || { enabled: true, freeDeliveryMinOrder: 700, freeDeliveryRadiusKm: 5, deliveryFeeBeyond: 150 }),
+                                                    standardDeliveryFee: val
                                                 }
                                             }));
                                         }}
@@ -1180,7 +1187,39 @@ export default function AiBotClient() {
                                     />
                                 </div>
                                 <p className="text-[10px] text-muted-foreground">
-                                    فری سرکل کے بعد ڈلیوری چارجز کتنے ہوں گے جو کسٹمر بل میں شامل ہوں گے۔
+                                    اگر آرڈر 700 سے کم ہو تو اتنے روپے ڈلیوری فیس بل میں شامل ہو گی۔
+                                </p>
+                            </div>
+
+                            {/* Charges Beyond Circle */}
+                            <div className="p-3.5 rounded-xl border border-sky-500/20 bg-card space-y-1.5">
+                                <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                                    <span>Beyond Circle (5 KM سے باہر)</span>
+                                    <span className="text-[10px] text-sky-500 font-semibold">PKR / Rs.</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">Rs.</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="10"
+                                        value={config.deliveryRules?.deliveryFeeBeyond || 150}
+                                        onChange={(e) => {
+                                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                            setConfig(prev => ({
+                                                ...prev,
+                                                deliveryRules: {
+                                                    ...(prev.deliveryRules || { enabled: true, freeDeliveryMinOrder: 700, freeDeliveryRadiusKm: 5, standardDeliveryFee: 100 }),
+                                                    deliveryFeeBeyond: val
+                                                }
+                                            }));
+                                        }}
+                                        className="w-full bg-background border border-border/80 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                                        placeholder="e.g. 150"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                    فری سرکل (5 KM) سے باہر کے ایڈریس پر لگنے والے ڈلیوری چارجز۔
                                 </p>
                             </div>
                         </div>
@@ -1192,7 +1231,7 @@ export default function AiBotClient() {
                                 <span>AI Response Preview (WhatsApp Bot kaisay reply karega):</span>
                             </div>
                             <p className="text-[11px] text-muted-foreground leading-relaxed italic">
-                                &quot;G bilkul! Hamari delivery {config.deliveryRules?.freeDeliveryRadiusKm || 5} KM ke circle (radius) ke andar bilkul 100% FREE hai! Agar aapka delivery address {config.deliveryRules?.freeDeliveryRadiusKm || 5} KM se aage ho to delivery charges Rs. {config.deliveryRules?.deliveryFeeBeyond || 100} lagtay hain. Hamara minimum order limit Rs. {config.deliveryRules?.minOrderAmount || 0} hai.&quot;
+                                &quot;G bilkul! Hamari delivery {config.deliveryRules?.freeDeliveryRadiusKm || 5} KM ke circle (radius) ke andar Rs. {config.deliveryRules?.freeDeliveryMinOrder || config.deliveryRules?.minOrderAmount || 700} ya us se baray order par bilkul 100% FREE hai! Agar aapka order Rs. {config.deliveryRules?.freeDeliveryMinOrder || config.deliveryRules?.minOrderAmount || 700} se kam ho to delivery charges sirf Rs. {config.deliveryRules?.standardDeliveryFee || 100} lagtay hain. 🛵&quot;
                             </p>
                         </div>
                     </div>

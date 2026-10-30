@@ -38,10 +38,22 @@ export async function GET(
             });
 
             deliveryRules = {
-                enabled: Boolean(store?.minOrderAmount && store.minOrderAmount > 0),
-                minOrderAmount: store?.minOrderAmount || 0,
+                enabled: true,
+                freeDeliveryMinOrder: store?.freeDeliveryAbove || store?.minOrderAmount || 700,
                 freeDeliveryRadiusKm: 5,
-                deliveryFeeBeyond: store?.deliveryFee || 100
+                standardDeliveryFee: store?.deliveryFee || 100,
+                deliveryFeeBeyond: 150,
+                minOrderAmount: store?.freeDeliveryAbove || store?.minOrderAmount || 700
+            };
+        } else {
+            // Ensure fields are normalized
+            deliveryRules = {
+                enabled: deliveryRules.enabled !== undefined ? Boolean(deliveryRules.enabled) : true,
+                freeDeliveryMinOrder: Math.max(0, Number(deliveryRules.freeDeliveryMinOrder || deliveryRules.minOrderAmount) || 700),
+                freeDeliveryRadiusKm: Math.max(0, Number(deliveryRules.freeDeliveryRadiusKm) || 5),
+                standardDeliveryFee: Math.max(0, Number(deliveryRules.standardDeliveryFee) || 100),
+                deliveryFeeBeyond: Math.max(0, Number(deliveryRules.deliveryFeeBeyond) || 150),
+                minOrderAmount: Math.max(0, Number(deliveryRules.freeDeliveryMinOrder || deliveryRules.minOrderAmount) || 700)
             };
         }
 
@@ -82,17 +94,26 @@ export async function POST(
         const body = await request.json();
         const {
             enabled = true,
-            minOrderAmount = 0,
-            freeDeliveryRadiusKm = 0,
-            deliveryFeeBeyond = 0
+            freeDeliveryMinOrder,
+            minOrderAmount,
+            freeDeliveryRadiusKm = 5,
+            standardDeliveryFee = 100,
+            deliveryFeeBeyond = 150
         } = body;
+
+        const effectiveFreeMin = Math.max(0, Number(freeDeliveryMinOrder ?? minOrderAmount) || 700);
+        const effectiveKm = Math.max(0, Number(freeDeliveryRadiusKm) || 5);
+        const effectiveStandardFee = Math.max(0, Number(standardDeliveryFee) || 100);
+        const effectiveBeyondFee = Math.max(0, Number(deliveryFeeBeyond) || 150);
 
         const currentConfig = (session.config as any) || {};
         const updatedDeliveryRules = {
             enabled: Boolean(enabled),
-            minOrderAmount: Math.max(0, Number(minOrderAmount) || 0),
-            freeDeliveryRadiusKm: Math.max(0, Number(freeDeliveryRadiusKm) || 0),
-            deliveryFeeBeyond: Math.max(0, Number(deliveryFeeBeyond) || 0),
+            freeDeliveryMinOrder: effectiveFreeMin,
+            minOrderAmount: effectiveFreeMin,
+            freeDeliveryRadiusKm: effectiveKm,
+            standardDeliveryFee: effectiveStandardFee,
+            deliveryFeeBeyond: effectiveBeyondFee,
             updatedAt: new Date().toISOString()
         };
 
@@ -106,7 +127,7 @@ export async function POST(
             data: { config: updatedConfig }
         });
 
-        // Also sync minOrderAmount and deliveryFee to any linked Store
+        // Also sync freeDeliveryAbove and deliveryFee to any linked Store
         try {
             await prisma.store.updateMany({
                 where: {
@@ -116,19 +137,18 @@ export async function POST(
                     ]
                 },
                 data: {
-                    minOrderAmount: updatedDeliveryRules.minOrderAmount,
-                    deliveryFee: updatedDeliveryRules.deliveryFeeBeyond
+                    freeDeliveryAbove: effectiveFreeMin,
+                    deliveryFee: effectiveStandardFee
                 }
             });
         } catch (_) {}
 
         return NextResponse.json({
             status: true,
-            message: "Delivery and Minimum Order rules updated successfully!",
+            message: "Delivery and Free Delivery rules updated successfully!",
             data: updatedDeliveryRules
         });
     } catch (e: any) {
         return NextResponse.json({ status: false, message: e.message }, { status: 500 });
     }
 }
-
