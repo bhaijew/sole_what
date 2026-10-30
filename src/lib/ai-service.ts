@@ -13,6 +13,37 @@ export interface AiTestRequest {
     conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
     enableGoldRates?: boolean;
     menuUrl?: string;
+    deliveryRules?: DeliveryRulesConfig;
+}
+
+export interface DeliveryRulesConfig {
+    enabled?: boolean;
+    minOrderAmount?: number;
+    freeDeliveryRadiusKm?: number;
+    deliveryFeeBeyond?: number;
+}
+
+export function formatDeliveryRulesPrompt(rules?: DeliveryRulesConfig): string {
+    if (!rules || !rules.enabled) return "";
+    const minOrder = Number(rules.minOrderAmount) || 0;
+    const freeKm = Number(rules.freeDeliveryRadiusKm) || 0;
+    const feeBeyond = Number(rules.deliveryFeeBeyond) || 0;
+
+    if (minOrder <= 0 && freeKm <= 0 && feeBeyond <= 0) return "";
+
+    return `=====================================================
+🛵 DELIVERY CIRCLE (KM RADIUS) & MINIMUM ORDER POLICY:
+=====================================================
+${minOrder > 0 ? `• MINIMUM ORDER LIMIT: Rs. ${minOrder}
+  - Har order kam az kam Rs. ${minOrder} ka hona zaroori hai.
+  - Agar customer ka order bill Rs. ${minOrder} se kam ho to order PLACE NA KAREIN. Politely Roman Urdu mein batayein: "Hamara kam az kam (minimum) order Rs. ${minOrder} ka hai. Aapka bill Rs. [Total] ban raha hai, kindly kuch mazeed items shamil kar lein taake hum aapka order kitchen dispatch kar sakein."
+  - Agar customer poochay "minimum order kitna hai?", to batayein: "Hamara minimum order Rs. ${minOrder} hai."` : ""}
+${freeKm > 0 ? `• FREE DELIVERY CIRCLE / RADIUS: ${freeKm} KM
+  - Hamari delivery ${freeKm} KM ke radius / circle ke andar bilkul 100% FREE (Rs. 0) hai!
+  - ${freeKm} KM ke circle se aage / bahir delivery charges Rs. ${feeBeyond} hain.
+  - Agar customer delivery charges, delivery free hona, kitne KM tak delivery free hai, ya delivery circle ka poochay (e.g. "delivery free hai?", "kitne km tak free hai?", "charges kitne hain?", "delivery circle kitna hai?"):
+    Foran aur clearly batayein: "Hamari delivery ${freeKm} KM ke circle (radius) ke andar bilkul 100% FREE hai! Agar aapki location ${freeKm} KM se bahir ho to delivery charges Rs. ${feeBeyond} hotay hain."` : (feeBeyond > 0 ? `• DELIVERY CHARGES: Flat Rs. ${feeBeyond}` : "")}
+=====================================================`;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are a polite, natural, and friendly human customer support executive for this business on WhatsApp.
@@ -43,7 +74,7 @@ CORE COMMUNICATION RULES:
 - STRICT RULE: Agar live menu link mojood hai, to KABHI BHI yeh mat kahein ke "We don't have a direct menu link" ya "hamare paas link nahi hai".
 
 4. ACCURACY & KNOWLEDGE BASE:
-- Strictly answer based on the provided Business Profile, Knowledge Base, and Products list.
+- Strictly answer based on the provided Business Profile, Knowledge Base, Products list, and Delivery Policy.
 - Agar koi aisi baat ho jo Knowledge Base mein na ho, to politely kahein: "Is bare mein mazeed maloomat ke liye main apne staff se confirm kar ke aapko foran update karta hoon."
 
 5. STRICT LANGUAGE POLICY (AUTHENTIC PAKISTANI ROMAN URDU OR ENGLISH ONLY - ABSOLUTELY ZERO HINDI):
@@ -71,10 +102,14 @@ When a customer wants to place an order (e.g., asks for food items like Shawarma
   3. WhatsApp / Phone number (Rabta number)
 • STEP 2 (SUMMARY & CONFIRMATION QUESTION):
   Once the customer provides their Name and Delivery Address:
+  - Check Minimum Order Limit: If minimum order amount is configured and subtotal is less than minimum order amount, DO NOT confirm order yet. Politely tell them: "Hamara kam az kam (minimum) order limit Rs. <MinOrder> hai. Aapka bill Rs. <Subtotal> ban raha hai, kindly kuch mazeed items add kar lein taake order confirm kiya ja sakay."
+  - Delivery Circle Policy: If customer address is within the Free Delivery KM Circle, delivery is FREE (Rs. 0). If outside, state standard delivery charges.
   Present a clear, clean order receipt summary:
   📋 ORDER SUMMARY:
   • <Qty>x <Item Name>: Rs. <Price>
   ────────────────────
+  Subtotal: Rs. <Subtotal>
+  Delivery: <FREE (within Free KM Circle) or Rs. <Fee>>
   💵 Total Bill: Rs. <Total> (Cash on Delivery)
   👤 Name: <Customer Name>
   📍 Address: <Delivery Address>
@@ -84,12 +119,19 @@ When a customer wants to place an order (e.g., asks for food items like Shawarma
   "👉 Order confirm karne ke liye 'YES' ya 'CONFIRM' reply karein."
 • STEP 3 (FINAL CONFIRMATION & POS KITCHEN DISPATCH):
   When the customer replies "YES", "CONFIRM", "HAAN", "OK", "DONE", "KAR DEIN":
+  (Only place order if subtotal meets Minimum Order limit!)
   You MUST attach this exact JSON tag at the very end of your response:
   [PLACE_ORDER: {"name": "<Customer Name>", "phone": "<Phone>", "address": "<Delivery Address>", "items": [{"name": "<Item Name>", "price": <Price>, "qty": <Qty>}], "total": <Total Bill>}]
   And reply with an enthusiastic confirmation:
   "🎉 Bohat shukriya [Customer Name]! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!"
+
+7. DELIVERY CIRCLE (KM RADIUS) & MINIMUM ORDER INQUIRIES:
+- Agar customer delivery charges, delivery free hona, kitne KM tak delivery free hai, ya delivery circle ka poochay:
+  • Batayein ke kitne KM ke circle / radius ke andar delivery bilkul FREE hai aur circle se bahir kitne charges hain.
+- Agar customer poochay minimum order kitna hai ya kam az kam order limit kya hai:
+  • Batayein ke hamara kam az kam order limit kitna hai.
   
-7. CONVERSATIONAL MEMORY & MULTI-TURN CONTINUITY:
+8. CONVERSATIONAL MEMORY & MULTI-TURN CONTINUITY:
 - Always REMEMBER what the customer stated in earlier messages in this chat.
 - If the customer previously named the items they want (e.g. "1 grilled shawarma aur 1 1-litre drink") and now provides their Name and Address (e.g. "Ali Raza, Street 4 Sohawa"), DO NOT ask them what they want to order! You ALREADY KNOW their items.
 - Immediately combine their items with their provided Name, Address, and Phone into STEP 2 (Order Summary) and ask them to reply 'YES' or 'CONFIRM'.
@@ -333,6 +375,7 @@ export async function generateAiResponse(
     let enableGoldRates = false;
     let businessName = "Business";
     let targetShopId = 7;
+    let deliveryRules: DeliveryRulesConfig = { enabled: true, minOrderAmount: 0, freeDeliveryRadiusKm: 5, deliveryFeeBeyond: 100 };
 
     // Build memory key (for 1-on-1 private customer chats, not noisy groups)
     const normalizedCustomerJid = (customerJid || "").trim().toLowerCase();
@@ -458,6 +501,9 @@ export async function generateAiResponse(
 
         // Fetch associated Store to dynamically inject REAL business context (NO FAKE DEFAULTS)
         let dynamicStoreContext = "";
+        let storeMinOrder = 0;
+        let storeDeliveryFee = 0;
+
         try {
             const store = await prisma.store.findFirst({
                 where: {
@@ -478,6 +524,8 @@ export async function generateAiResponse(
 
             if (store) {
                 businessName = store.name;
+                storeMinOrder = store.minOrderAmount || 0;
+                storeDeliveryFee = store.deliveryFee || 0;
                 menuUrl = aiConfig?.menuUrl || (store.customDomain ? `https://${store.customDomain}` : `/s/${store.slug}`);
                 
                 const productsList = store.products?.length > 0
@@ -515,6 +563,23 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
                 }
             } catch (pErr: any) {
                 logger.warn("AI-Bot", "Failed to load live pizza catalog: " + pErr?.message);
+            }
+        }
+
+        // Delivery Circle (KM Radius) and Minimum Order Rules
+        const sessionDeliveryRules = sessionConfig.deliveryRules;
+        deliveryRules = {
+            enabled: sessionDeliveryRules !== undefined ? Boolean(sessionDeliveryRules.enabled) : true,
+            minOrderAmount: sessionDeliveryRules ? (Number(sessionDeliveryRules.minOrderAmount) || 0) : storeMinOrder,
+            freeDeliveryRadiusKm: sessionDeliveryRules ? (Number(sessionDeliveryRules.freeDeliveryRadiusKm) || 0) : 5,
+            deliveryFeeBeyond: sessionDeliveryRules ? (Number(sessionDeliveryRules.deliveryFeeBeyond) || 0) : storeDeliveryFee
+        };
+
+        if (deliveryRules.enabled) {
+            const rulesPrompt = formatDeliveryRulesPrompt(deliveryRules);
+            if (rulesPrompt) {
+                dynamicStoreContext = [dynamicStoreContext, rulesPrompt].filter(Boolean).join("\n\n");
+                logger.info("AI-Bot", `[Delivery-Rules] Injected: MinOrder=Rs.${deliveryRules.minOrderAmount}, FreeCircle=${deliveryRules.freeDeliveryRadiusKm}KM, BeyondFee=Rs.${deliveryRules.deliveryFeeBeyond}`);
             }
         }
 
@@ -557,7 +622,8 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
             maxTokens: aiConfig?.maxTokens || 800,
             enableGoldRates,
             menuUrl,
-            businessName
+            businessName,
+            deliveryRules
         });
 
         // Record AI request count metric for store / session
@@ -578,7 +644,7 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
         let finalReply = aiReply;
         if (!finalReply || finalReply.trim().length === 0) {
             logger.warn("AI-Bot", `AI generated empty response. Using natural Pakistani Roman Urdu fallback.`);
-            finalReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName }, conversationHistory);
+            finalReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName, deliveryRules }, conversationHistory);
         }
 
         // Apply strict Pakistani Roman Urdu sanitization layer (strips any Devanagari or Hindi)
@@ -590,36 +656,44 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
 
         if (extracted && extracted.orderData) {
             const { fullTag, orderData } = extracted;
-            try {
-                const targetShopId = pizzaIntegration?.shopId ? Number(pizzaIntegration.shopId) : 7;
-                let cleanPhone = (orderData.phone || "").trim();
-                if (!cleanPhone && customerJid) {
-                    cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
-                    if (cleanPhone.startsWith("92")) {
-                        cleanPhone = "0" + cleanPhone.substring(2);
+            const orderTotal = Number(orderData.total) || 0;
+
+            // Check Minimum Order Amount validation
+            if (deliveryRules.enabled && deliveryRules.minOrderAmount && deliveryRules.minOrderAmount > 0 && orderTotal > 0 && orderTotal < deliveryRules.minOrderAmount) {
+                logger.info("AI-Bot", `Order total Rs.${orderTotal} is below minOrderAmount Rs.${deliveryRules.minOrderAmount}`);
+                finalReply = finalReply.replace(fullTag, `\n\n⚠️ *Kam az kam (Minimum) order limit Rs. ${deliveryRules.minOrderAmount} hai.* Aapka bill Rs. ${orderTotal} ban raha hai. Kindly kuch mazeed items shamil kar lein taake hum aapka order kitchen mein dispatch kar sakein! 🍕`).trim();
+            } else {
+                try {
+                    const targetShopId = pizzaIntegration?.shopId ? Number(pizzaIntegration.shopId) : 7;
+                    let cleanPhone = (orderData.phone || "").trim();
+                    if (!cleanPhone && customerJid) {
+                        cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
+                        if (cleanPhone.startsWith("92")) {
+                            cleanPhone = "0" + cleanPhone.substring(2);
+                        }
                     }
-                }
 
-                const orderResult = await createPizzaOrderInSupabase({
-                    shopId: targetShopId,
-                    customerName: orderData.name || customerPushName || "WhatsApp Customer",
-                    customerPhone: cleanPhone || "03000000000",
-                    deliveryAddress: orderData.address || "Delivery Address",
-                    items: Array.isArray(orderData.items) ? orderData.items : [],
-                    total: Number(orderData.total) || 0,
-                    notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
-                });
+                    const orderResult = await createPizzaOrderInSupabase({
+                        shopId: targetShopId,
+                        customerName: orderData.name || customerPushName || "WhatsApp Customer",
+                        customerPhone: cleanPhone || "03000000000",
+                        deliveryAddress: orderData.address || "Delivery Address",
+                        items: Array.isArray(orderData.items) ? orderData.items : [],
+                        total: orderTotal,
+                        notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
+                    });
 
-                if (orderResult.success && orderResult.orderNumber) {
-                    orderCompletedSuccess = true;
-                    finalReply = finalReply.replace(fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
-                    logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
-                } else {
+                    if (orderResult.success && orderResult.orderNumber) {
+                        orderCompletedSuccess = true;
+                        finalReply = finalReply.replace(fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                        logger.info("AI-Bot", `[CONVERSATIONAL ORDER] Successfully created order ${orderResult.orderNumber} in Supabase for shop #${targetShopId}`);
+                    } else {
+                        finalReply = finalReply.replace(fullTag, "").trim();
+                    }
+                } catch (oErr: any) {
+                    logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
                     finalReply = finalReply.replace(fullTag, "").trim();
                 }
-            } catch (oErr: any) {
-                logger.error("AI-Bot", "Failed to parse/create order from AI: " + oErr?.message);
-                finalReply = finalReply.replace(fullTag, "").trim();
             }
         }
 
@@ -644,34 +718,39 @@ ${productsList ? `\nAVAILABLE PRODUCTS & PRICES IN STORE:\n${productsList}` : ""
 
     } catch (error: any) {
         logger.error("AI-Service", `Error generating AI response: ${error?.message || error}`);
-        let fallbackReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName }, conversationHistory);
+        let fallbackReply = getNaturalFallbackReply(userMessageText, detectedImages, { enableGoldRates, menuUrl, businessName, deliveryRules }, conversationHistory);
         fallbackReply = sanitizePakistaniRomanUrdu(fallbackReply);
 
         // Also check if fallback in error handler generated order tag
         const extracted = extractPlaceOrderPayload(fallbackReply);
         if (extracted && extracted.orderData) {
-            try {
-                let cleanPhone = (extracted.orderData.phone || "").trim();
-                if (!cleanPhone && customerJid) {
-                    cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
-                    if (cleanPhone.startsWith("92")) cleanPhone = "0" + cleanPhone.substring(2);
-                }
-                const orderResult = await createPizzaOrderInSupabase({
-                    shopId: targetShopId,
-                    customerName: extracted.orderData.name || customerPushName || "WhatsApp Customer",
-                    customerPhone: cleanPhone || "03000000000",
-                    deliveryAddress: extracted.orderData.address || "Delivery Address",
-                    items: Array.isArray(extracted.orderData.items) ? extracted.orderData.items : [],
-                    total: Number(extracted.orderData.total) || 0,
-                    notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
-                });
-                if (orderResult.success && orderResult.orderNumber) {
-                    fallbackReply = fallbackReply.replace(extracted.fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
-                    if (memoryKey) customerChatMemory.delete(memoryKey);
-                    return fallbackReply;
-                }
-            } catch (_) {}
-            fallbackReply = fallbackReply.replace(extracted.fullTag, "").trim();
+            const orderTotal = Number(extracted.orderData.total) || 0;
+            if (deliveryRules?.enabled && deliveryRules.minOrderAmount && deliveryRules.minOrderAmount > 0 && orderTotal > 0 && orderTotal < deliveryRules.minOrderAmount) {
+                fallbackReply = fallbackReply.replace(extracted.fullTag, `\n\n⚠️ *Kam az kam (Minimum) order limit Rs. ${deliveryRules.minOrderAmount} hai.* Aapka bill filhal Rs. ${orderTotal} ban raha hai. Kindly kuch mazeed items shamil kar lein taake hum aapka order kitchen dispatch kar sakein! 🍕`).trim();
+            } else {
+                try {
+                    let cleanPhone = (extracted.orderData.phone || "").trim();
+                    if (!cleanPhone && customerJid) {
+                        cleanPhone = customerJid.replace(/@.*$/, "").replace(/\D/g, "");
+                        if (cleanPhone.startsWith("92")) cleanPhone = "0" + cleanPhone.substring(2);
+                    }
+                    const orderResult = await createPizzaOrderInSupabase({
+                        shopId: targetShopId,
+                        customerName: extracted.orderData.name || customerPushName || "WhatsApp Customer",
+                        customerPhone: cleanPhone || "03000000000",
+                        deliveryAddress: extracted.orderData.address || "Delivery Address",
+                        items: Array.isArray(extracted.orderData.items) ? extracted.orderData.items : [],
+                        total: orderTotal,
+                        notes: `[WhatsApp AI Order | Contact: ${cleanPhone}]`
+                    });
+                    if (orderResult.success && orderResult.orderNumber) {
+                        fallbackReply = fallbackReply.replace(extracted.fullTag, `\n\n🧾 *Order Number:* ${orderResult.orderNumber}\n⚡ *Status:* Sent directly to Kitchen & POS!`).trim();
+                        if (memoryKey) customerChatMemory.delete(memoryKey);
+                        return fallbackReply;
+                    }
+                } catch (_) {}
+                fallbackReply = fallbackReply.replace(extracted.fullTag, "").trim();
+            }
         }
 
         if (memoryKey) {
@@ -704,6 +783,7 @@ export async function callAiApi(params: {
     menuUrl?: string;
     businessName?: string;
     conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+    deliveryRules?: DeliveryRulesConfig;
 }): Promise<string> {
     const {
         systemPrompt,
@@ -716,7 +796,8 @@ export async function callAiApi(params: {
         enableGoldRates = false,
         menuUrl,
         businessName,
-        conversationHistory = []
+        conversationHistory = [],
+        deliveryRules
     } = params;
 
     // Detect image URLs in Knowledge Base (Menu Image 1 & 2, Catalog, etc.)
@@ -749,6 +830,9 @@ LIVE MENU LINK RULES:
     // ONLY inject gold rate prompt IF enableGoldRates is explicitly TRUE
     const goldPrompt = enableGoldRates ? `\n\n${formatGoldRatePrompt()}` : "";
 
+    // Inject delivery circle & minimum order rules if enabled
+    const deliveryPrompt = deliveryRules && deliveryRules.enabled ? `\n\n${formatDeliveryRulesPrompt(deliveryRules)}` : "";
+
     // Format human-readable multi-turn history block directly into system instructions for 100% failover retention
     let historyPromptBlock = "";
     if (conversationHistory && conversationHistory.length > 0) {
@@ -769,7 +853,7 @@ ${historyPromptBlock ? `==================================================\n${hi
 
 ==================================================
 BUSINESS KNOWLEDGE BASE & FAQS:
-${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific details provided. Answer politely and concisely."}${mediaInstruction}${menuUrlInstruction}${goldPrompt}
+${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specific details provided. Answer politely and concisely."}${mediaInstruction}${menuUrlInstruction}${goldPrompt}${deliveryPrompt}
 ==================================================`;
 
     // Multi-turn message array for OpenAI-compatible gateways (Groq, OpenRouter, Together AI)
@@ -965,7 +1049,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
                 const content = data?.choices?.[0]?.message?.content;
                 if (content && content.trim().length > 0) {
                     logger.success("AI-Gateway", `[Success via Together AI] Generated ${content.length} chars`);
-                    return finalizeAiReply(content, userPrompt, detectedImages, menuUrl, conversationHistory);
+                    return finalizeAiReply(content, userPrompt, detectedImages, menuUrl, conversationHistory, deliveryRules);
                 }
             }
         } catch (err: any) {
@@ -977,7 +1061,7 @@ ${knowledgeBase && knowledgeBase.trim().length > 0 ? knowledgeBase : "No specifi
     // 5. NATURAL ROMAN URDU FALLBACK ENGINE (100% Guaranteed Always-On)
     // =========================================================================
     logger.info("AI-Gateway", `[5/5] Using Smart Natural Fallback for: "${userPrompt}"`);
-    return getNaturalFallbackReply(userPrompt, detectedImages, { enableGoldRates, menuUrl, businessName }, conversationHistory);
+    return getNaturalFallbackReply(userPrompt, detectedImages, { enableGoldRates, menuUrl, businessName, deliveryRules }, conversationHistory);
 }
 
 /**
@@ -990,7 +1074,8 @@ function finalizeAiReply(
     userPrompt: string,
     detectedImages: string[],
     menuUrl?: string,
-    conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
+    conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [],
+    deliveryRules?: DeliveryRulesConfig
 ): string {
     const trimmedPrompt = (userPrompt || "").trim().toLowerCase();
     const asksForLink = /\b(link|website|url|web)\b/i.test(trimmedPrompt);
@@ -999,7 +1084,7 @@ function finalizeAiReply(
         /(?:menu\s*send|send\s*menu|menu\s*dikhao|menu\s*bhejo|kaho\s*menu|catalog\s*bhejo)/i.test(trimmedPrompt);
 
     if (!rawReply || rawReply.trim().length === 0) {
-        return getNaturalFallbackReply(userPrompt, detectedImages, { menuUrl }, conversationHistory);
+        return getNaturalFallbackReply(userPrompt, detectedImages, { menuUrl, deliveryRules }, conversationHistory);
     }
 
     // 1. Rigorously sanitize against any Hindi words or Devanagari Unicode
@@ -1055,11 +1140,40 @@ export function getNaturalFallbackReply(
         enableGoldRates?: boolean;
         menuUrl?: string;
         businessName?: string;
+        deliveryRules?: DeliveryRulesConfig;
     },
     conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = []
 ): string {
     const p = (userPrompt || "").trim().toLowerCase();
-    const { enableGoldRates = false, menuUrl, businessName = "Pizza Mafia" } = options || {};
+    const { enableGoldRates = false, menuUrl, businessName = "Pizza Mafia", deliveryRules } = options || {};
+    const minOrder = Number(deliveryRules?.minOrderAmount) || 0;
+    const freeKm = Number(deliveryRules?.freeDeliveryRadiusKm) || 0;
+    const feeBeyond = Number(deliveryRules?.deliveryFeeBeyond) || 0;
+
+    // Delivery Circle (KM Radius) and Free Delivery inquiries
+    const isDeliveryCircleOrFreeQuery = /(?:free\s*delivery|delivery\s*free|kitne\s*km|km\s*tak|circle|radius|dilevry\s*free|kitna\s*circle|circle\s*ma|circle\s*mein|free\s*ha\s*km|dilevry)/i.test(p);
+    const isDeliveryChargesQuery = /(?:delivery\s*charges|delivery\s*fee|delivery\s*kya\s*hai|delivery\s*ke\s*charges|charges\s*kitne)/i.test(p);
+
+    if (isDeliveryCircleOrFreeQuery || isDeliveryChargesQuery) {
+        if (freeKm > 0) {
+            return sanitizePakistaniRomanUrdu(
+                `G bilkul! Hamari delivery ${freeKm} KM ke circle (radius) ke andar bilkul 100% FREE hai! Agar aapka delivery address ${freeKm} KM se aage ho to delivery charges Rs. ${feeBeyond} lagtay hain. 🛵`
+            );
+        } else if (feeBeyond > 0) {
+            return sanitizePakistaniRomanUrdu(
+                `Hamare standard delivery charges Rs. ${feeBeyond} hain. Cash on Delivery (COD) available hai! 🛵`
+            );
+        }
+    }
+
+    // Minimum order amount inquiries
+    const isMinOrderQuery = /(?:minimum|kam\s*az\s*kam|min|kam\s*se\s*kam)\s*(?:order|limit|bill)/i.test(p) ||
+        /(?:order\s*kitna|order\s*limit)/i.test(p);
+    if (isMinOrderQuery && minOrder > 0) {
+        return sanitizePakistaniRomanUrdu(
+            `G bilkul! Hamara kam az kam (minimum) order limit Rs. ${minOrder} hai. Aap menu se apni marzi ki items order karwa sakte hain! 🍕`
+        );
+    }
 
     // =========================================================================
     // 0. CHECK MULTI-TURN ORDERING CONTINUITY IN CONVERSATION HISTORY
@@ -1087,6 +1201,13 @@ export function getNaturalFallbackReply(
 
         const total = itemsList.reduce((sum, it) => sum + it.price * it.qty, 0);
 
+        // Minimum order validation before placing order
+        if (minOrder > 0 && total < minOrder) {
+            return sanitizePakistaniRomanUrdu(
+                `Bara-e-meharbani note farmayein ke hamara kam az kam (minimum) order Rs. ${minOrder} ka hai. Aapka bill filhal Rs. ${total} ban raha hai. Kindly kuch mazeed items add kar lein taake hum aapka order kitchen mein dispatch kar sakein! 🍕`
+            );
+        }
+
         return sanitizePakistaniRomanUrdu(
             `🎉 Bohat shukriya ${customerName}! Aapka order receive ho kar kitchen mein chala gaya hai. Hamara delivery rider jald aapke address par pohanch jayega!\n\n[PLACE_ORDER: {"name": "${customerName}", "phone": "${customerPhone}", "address": "${customerAddress}", "items": ${JSON.stringify(itemsList)}, "total": ${total}}]`
         );
@@ -1095,8 +1216,19 @@ export function getNaturalFallbackReply(
     if (hasAddressKeywords && foodItemsMatch && foodItemsMatch.length > 0) {
         // Customer provided their delivery address, items already in memory!
         const uniqueItems = Array.from(new Set(foodItemsMatch)).join(", ");
+        const itemsList = Array.from(new Set(foodItemsMatch)).map(it => ({ name: it.trim(), qty: 1, price: 500 }));
+        const total = itemsList.reduce((sum, it) => sum + it.price * it.qty, 0);
+
+        if (minOrder > 0 && total < minOrder) {
+            return sanitizePakistaniRomanUrdu(
+                `Aapki delivery details note kar li hain, lekin note farmayein ke hamara kam az kam (minimum) order limit Rs. ${minOrder} hai (Aapka bill Rs. ${total} hai). Kindly kuch mazeed items add kar lein taake order confirm kiya ja sakay!`
+            );
+        }
+
+        const deliveryStatus = freeKm > 0 ? `FREE (${freeKm} KM circle ke andar)` : (feeBeyond > 0 ? `Rs. ${feeBeyond}` : "FREE");
+
         return sanitizePakistaniRomanUrdu(
-            `Bohat khoob! Aapki delivery details note kar li hain:\n\n📋 *ORDER SUMMARY:*\n• Items: ${uniqueItems}\n📍 Delivery Address: ${userPrompt}\n\n👉 Order confirm karne ke liye kindly *'YES'* ya *'CONFIRM'* reply karein.`
+            `Bohat khoob! Aapki delivery details note kar li hain:\n\n📋 *ORDER SUMMARY:*\n• Items: ${uniqueItems}\n• Subtotal: Rs. ${total}\n• Delivery: ${deliveryStatus}\n💵 Total Bill: Rs. ${total} (COD)\n📍 Delivery Address: ${userPrompt}\n\n👉 Order confirm karne ke liye kindly *'YES'* ya *'CONFIRM'* reply karein.`
         );
     }
 

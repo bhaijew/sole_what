@@ -24,7 +24,10 @@ import {
     Upload,
     Trash2,
     Coins,
-    UtensilsCrossed
+    UtensilsCrossed,
+    Truck,
+    MapPin,
+    Compass
 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -34,6 +37,13 @@ interface Session {
     sessionId: string;
     name: string;
     status: string;
+}
+
+export interface DeliveryRules {
+    enabled: boolean;
+    minOrderAmount: number;
+    freeDeliveryRadiusKm: number;
+    deliveryFeeBeyond: number;
 }
 
 interface AiConfigData {
@@ -50,6 +60,7 @@ interface AiConfigData {
     maxTokens: number;
     triggerInGroups: boolean;
     fallbackOnly: boolean;
+    deliveryRules?: DeliveryRules;
 }
 
 const OPENROUTER_MODELS = [
@@ -211,8 +222,17 @@ export default function AiBotClient() {
         temperature: 0.7,
         maxTokens: 800,
         triggerInGroups: false,
-        fallbackOnly: true
+        fallbackOnly: true,
+        deliveryRules: {
+            enabled: true,
+            minOrderAmount: 0,
+            freeDeliveryRadiusKm: 5,
+            deliveryFeeBeyond: 100
+        }
     });
+
+    // Delivery Rules saving state
+    const [savingDelivery, setSavingDelivery] = useState(false);
 
     // Playground Chatbox state
     const [playgroundMessages, setPlaygroundMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
@@ -641,13 +661,44 @@ export default function AiBotClient() {
                         temperature: res.data.temperature ?? 0.7,
                         maxTokens: res.data.maxTokens ?? 800,
                         triggerInGroups: res.data.triggerInGroups ?? false,
-                        fallbackOnly: res.data.fallbackOnly ?? true
+                        fallbackOnly: res.data.fallbackOnly ?? true,
+                        deliveryRules: res.data.deliveryRules || {
+                            enabled: true,
+                            minOrderAmount: 0,
+                            freeDeliveryRadiusKm: 5,
+                            deliveryFeeBeyond: 100
+                        }
                     });
                 }
             })
             .catch(() => {})
             .finally(() => setLoadingConfig(false));
     }, [selectedSessionId]);
+
+    const handleSaveDeliveryRules = async () => {
+        if (!selectedSessionId) {
+            toast.error("Please select a session first");
+            return;
+        }
+        setSavingDelivery(true);
+        try {
+            const res = await fetch(`/api/sessions/${selectedSessionId}/delivery-rules`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(config.deliveryRules || {})
+            });
+            const data = await res.json();
+            if (data.status) {
+                toast.success(data.message || "Delivery and Minimum Order rules saved!");
+            } else {
+                toast.error(data.message || "Failed to save delivery rules");
+            }
+        } catch (e: any) {
+            toast.error("Failed to save delivery rules: " + e.message);
+        } finally {
+            setSavingDelivery(false);
+        }
+    };
 
     const handleSaveConfig = async () => {
         if (!selectedSessionId) {
@@ -696,6 +747,7 @@ export default function AiBotClient() {
                     knowledgeBase: config.knowledgeBase,
                     menuUrl: config.menuUrl,
                     enableGoldRates: config.enableGoldRates,
+                    deliveryRules: config.deliveryRules,
                     pizzaShopId: (pizzaConfig.enabled && pizzaConfig.shopId) ? pizzaConfig.shopId : undefined,
                     userPrompt: userMsg,
                     conversationHistory: playgroundMessages.slice(-8)
@@ -983,6 +1035,165 @@ export default function AiBotClient() {
                                     </>
                                 )}
                             </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Delivery Circle (KM Radius) & Minimum Order Policy Card */}
+            <div className="p-5 rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-500/5 via-card to-blue-500/5 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-3">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-sky-500 text-white shadow-sm shrink-0 flex items-center justify-center">
+                            <Truck size={20} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-sm text-foreground flex items-center gap-2 flex-wrap">
+                                Delivery Circle & Minimum Order Rules (KM Radius)
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.deliveryRules?.enabled ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : "bg-muted text-muted-foreground border-border/50"}`}>
+                                    {config.deliveryRules?.enabled ? "ACTIVE (Rules Enforced)" : "OFF (Rules Disabled)"}
+                                </span>
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                                کم از کم آرڈر اور فری ڈلیوری کا دائرہ (KM): AI کسٹمر کو بتائے گا کہ کتنے KM تک ڈلیوری بالکل فری ہے اور کم از کم کتنا آرڈر ہونا چاہیے۔
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                        <Switch
+                            checked={Boolean(config.deliveryRules?.enabled)}
+                            onCheckedChange={(val) => setConfig((prev) => ({
+                                ...prev,
+                                deliveryRules: {
+                                    ...(prev.deliveryRules || { minOrderAmount: 0, freeDeliveryRadiusKm: 5, deliveryFeeBeyond: 100 }),
+                                    enabled: val
+                                }
+                            }))}
+                            className="data-[state=checked]:bg-sky-500"
+                        />
+                        {config.deliveryRules?.enabled && (
+                            <button
+                                onClick={handleSaveDeliveryRules}
+                                disabled={savingDelivery}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+                            >
+                                <Save size={13} />
+                                <span>{savingDelivery ? "Saving..." : "Save Delivery Rules"}</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {config.deliveryRules?.enabled && (
+                    <div className="space-y-4 pt-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            {/* Minimum Order Amount */}
+                            <div className="p-3.5 rounded-xl border border-sky-500/20 bg-card space-y-1.5">
+                                <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                                    <span>Minimum Order (کم از کم آرڈر)</span>
+                                    <span className="text-[10px] text-sky-500 font-semibold">PKR / Rs.</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">Rs.</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="50"
+                                        value={config.deliveryRules?.minOrderAmount || 0}
+                                        onChange={(e) => {
+                                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                            setConfig(prev => ({
+                                                ...prev,
+                                                deliveryRules: {
+                                                    ...(prev.deliveryRules || { enabled: true, freeDeliveryRadiusKm: 5, deliveryFeeBeyond: 100 }),
+                                                    minOrderAmount: val
+                                                }
+                                            }));
+                                        }}
+                                        className="w-full bg-background border border-border/80 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                                        placeholder="e.g. 500"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                    اس رقم سے کم کا آرڈر AI فائنل نہیں کرے گا اور مزید آئٹمز ایڈ کرنے کا کہے گا۔ (0 = No limit)
+                                </p>
+                            </div>
+
+                            {/* Free Delivery Radius in KM */}
+                            <div className="p-3.5 rounded-xl border border-sky-500/20 bg-card space-y-1.5">
+                                <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                                    <span>Free Delivery Circle (فری دائرہ)</span>
+                                    <span className="text-[10px] text-sky-500 font-semibold">Kilometers (KM)</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">📍</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        value={config.deliveryRules?.freeDeliveryRadiusKm || 0}
+                                        onChange={(e) => {
+                                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                            setConfig(prev => ({
+                                                ...prev,
+                                                deliveryRules: {
+                                                    ...(prev.deliveryRules || { enabled: true, minOrderAmount: 0, deliveryFeeBeyond: 100 }),
+                                                    freeDeliveryRadiusKm: val
+                                                }
+                                            }));
+                                        }}
+                                        className="w-full bg-background border border-border/80 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                                        placeholder="e.g. 5"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                    کتنے کلومیٹر کے دائرے میں ڈلیوری بالکل 100% مفت ہو گی۔ (مثلاً 5 KM)
+                                </p>
+                            </div>
+
+                            {/* Delivery Fee Beyond Free Circle */}
+                            <div className="p-3.5 rounded-xl border border-sky-500/20 bg-card space-y-1.5">
+                                <label className="text-xs font-bold text-foreground flex items-center justify-between">
+                                    <span>Charges Outside Circle (باہر چارجز)</span>
+                                    <span className="text-[10px] text-sky-500 font-semibold">PKR / Rs.</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-muted-foreground font-semibold">Rs.</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="10"
+                                        value={config.deliveryRules?.deliveryFeeBeyond || 0}
+                                        onChange={(e) => {
+                                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                            setConfig(prev => ({
+                                                ...prev,
+                                                deliveryRules: {
+                                                    ...(prev.deliveryRules || { enabled: true, minOrderAmount: 0, freeDeliveryRadiusKm: 5 }),
+                                                    deliveryFeeBeyond: val
+                                                }
+                                            }));
+                                        }}
+                                        className="w-full bg-background border border-border/80 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                                        placeholder="e.g. 100"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                    فری سرکل کے بعد ڈلیوری چارجز کتنے ہوں گے جو کسٹمر بل میں شامل ہوں گے۔
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Live AI Response Preview Banner */}
+                        <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs text-foreground space-y-1">
+                            <div className="font-semibold text-sky-600 dark:text-sky-400 flex items-center gap-1.5 text-[11px]">
+                                <Compass size={13} />
+                                <span>AI Response Preview (WhatsApp Bot kaisay reply karega):</span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed italic">
+                                &quot;G bilkul! Hamari delivery {config.deliveryRules?.freeDeliveryRadiusKm || 5} KM ke circle (radius) ke andar bilkul 100% FREE hai! Agar aapka delivery address {config.deliveryRules?.freeDeliveryRadiusKm || 5} KM se aage ho to delivery charges Rs. {config.deliveryRules?.deliveryFeeBeyond || 100} lagtay hain. Hamara minimum order limit Rs. {config.deliveryRules?.minOrderAmount || 0} hai.&quot;
+                            </p>
                         </div>
                     </div>
                 )}

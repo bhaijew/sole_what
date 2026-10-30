@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getAuthenticatedUser } from "@/lib/api-auth";
-import { callAiApi, extractPlaceOrderPayload } from "@/lib/ai-service";
+import { callAiApi, extractPlaceOrderPayload, formatDeliveryRulesPrompt } from "@/lib/ai-service";
 import { getPizzaShopCatalogForAi, createPizzaOrderInSupabase } from "@/lib/pizza-supabase";
 
 export async function POST(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, conversationHistory, menuUrl, enableGoldRates, pizzaShopId } = body;
+        const { provider, apiKey, modelName, systemPrompt, knowledgeBase, userPrompt, conversationHistory, menuUrl, enableGoldRates, pizzaShopId, deliveryRules } = body;
 
         if (!userPrompt) {
             return NextResponse.json({ status: false, message: "userPrompt is required" }, { status: 400 });
@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
                     combinedKb = [combinedKb, pizzaCatalog].filter(Boolean).join("\n\n");
                 }
             } catch (_) {}
+        }
+
+        if (deliveryRules && deliveryRules.enabled) {
+            const rulesPrompt = formatDeliveryRulesPrompt(deliveryRules);
+            if (rulesPrompt) {
+                combinedKb = [combinedKb, rulesPrompt].filter(Boolean).join("\n\n");
+            }
         }
 
         let replyText = await callAiApi({

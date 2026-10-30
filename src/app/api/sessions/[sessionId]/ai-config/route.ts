@@ -30,12 +30,20 @@ export async function GET(
                     { id: sessionId }
                 ]
             },
-            select: { id: true }
+            select: { id: true, sessionId: true, config: true }
         });
 
         if (!session) {
             return NextResponse.json({ status: false, message: "Session not found" }, { status: 404 });
         }
+
+        const sessionConfig = (session.config as any) || {};
+        const deliveryRules = sessionConfig.deliveryRules || {
+            enabled: true,
+            minOrderAmount: 0,
+            freeDeliveryRadiusKm: 5,
+            deliveryFeeBeyond: 100
+        };
 
         // @ts-ignore
         let aiConfig = await (prisma as any).aiConfig.findUnique({
@@ -47,10 +55,14 @@ export async function GET(
         try {
             const store = await prisma.store.findFirst({
                 where: { OR: [{ sessionId: session.id }, { sessionId }] },
-                select: { slug: true, customDomain: true }
+                select: { slug: true, customDomain: true, minOrderAmount: true, deliveryFee: true }
             });
             if (store) {
                 defaultMenuUrl = store.customDomain ? `https://${store.customDomain}` : `/s/${store.slug}`;
+                if (!sessionConfig.deliveryRules && store.minOrderAmount) {
+                    deliveryRules.minOrderAmount = store.minOrderAmount;
+                    deliveryRules.deliveryFeeBeyond = store.deliveryFee || 100;
+                }
             }
         } catch (_) {}
 
@@ -60,7 +72,8 @@ export async function GET(
                 ...aiConfig,
                 menuUrl: aiConfig.menuUrl || defaultMenuUrl,
                 enableGoldRates: Boolean(aiConfig.enableGoldRates),
-                aiRequestsCount: aiConfig.aiRequestsCount || 0
+                aiRequestsCount: aiConfig.aiRequestsCount || 0,
+                deliveryRules
             } : {
                 enabled: true,
                 provider: "openrouter",
@@ -82,7 +95,8 @@ COMMUNICATION RULES:
                 temperature: 0.7,
                 maxTokens: 800,
                 triggerInGroups: false,
-                fallbackOnly: true
+                fallbackOnly: true,
+                deliveryRules
             }
         });
     } catch (error: any) {
@@ -119,7 +133,7 @@ export async function POST(
                     { id: sessionId }
                 ]
             },
-            select: { id: true }
+            select: { id: true, sessionId: true, config: true }
         });
 
         if (!session) {
@@ -139,8 +153,47 @@ export async function POST(
             temperature,
             maxTokens,
             triggerInGroups,
-            fallbackOnly
+            fallbackOnly,
+            deliveryRules
         } = body;
+
+        // If deliveryRules are passed, update session config
+        if (deliveryRules) {
+            try {
+                const currentConfig = (session.config as any) || {};
+                const updatedDeliveryRules = {
+                    enabled: Boolean(deliveryRules.enabled ?? true),
+                    minOrderAmount: Math.max(0, Number(deliveryRules.minOrderAmount) || 0),
+                    freeDeliveryRadiusKm: Math.max(0, Number(deliveryRules.freeDeliveryRadiusKm) || 0),
+                    deliveryFeeBeyond: Math.max(0, Number(deliveryRules.deliveryFeeBeyond) || 0),
+                    updatedAt: new Date().toISOString()
+                };
+                await prisma.session.update({
+                    where: { id: session.id },
+                    data: {
+                        config: {
+                            ...currentConfig,
+                            deliveryRules: updatedDeliveryRules
+                        }
+                    }
+                });
+                // Also update any linked Store
+                await prisma.store.updateMany({
+                    where: {
+                        OR: [
+                            { sessionId: session.id },
+                            { sessionId: session.sessionId }
+                        ]
+                    },
+                    data: {
+                        minOrderAmount: updatedDeliveryRules.minOrderAmount,
+                        deliveryFee: updatedDeliveryRules.deliveryFeeBeyond
+                    }
+                });
+            } catch (cfgErr) {
+                console.error("Failed to update delivery rules in session config:", cfgErr);
+            }
+        }
 
         // Upsert AI Config
         // @ts-ignore
