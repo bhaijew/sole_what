@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 RUN apk add --no-cache openssl ca-certificates
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN node scripts/sync-db-provider.js && npx prisma generate && npm run build
 RUN npm prune --omit=dev --legacy-peer-deps && npm install --no-save --legacy-peer-deps tsx typescript
 
 # Production image
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 RUN apk add --no-cache openssl ca-certificates
 WORKDIR /app
 
