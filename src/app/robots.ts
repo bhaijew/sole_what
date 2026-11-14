@@ -1,5 +1,7 @@
 import { MetadataRoute } from "next";
 
+export const dynamic = "force-dynamic";
+
 export default function robots(): MetadataRoute.Robots {
     const allowIndexing = process.env.NEXT_PUBLIC_ALLOW_INDEXING === "true";
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://wa-akg.app";

@@ -21,10 +21,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://wa-akg.app";
 export const dynamic = "force-dynamic";
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-  ],
+  themeColor: "#0a0a0a",
   width: "device-width",
   initialScale: 1,
 };

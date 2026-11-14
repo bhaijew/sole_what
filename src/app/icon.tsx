@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 // Use nodejs runtime to allow Prisma access
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 // Image metadata
 export const size = {

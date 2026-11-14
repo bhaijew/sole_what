@@ -1,5 +1,7 @@
 import { MetadataRoute } from "next";
 
+export const dynamic = "force-dynamic";
+
 export default function sitemap(): MetadataRoute.Sitemap {
     // Only generate sitemap if indexing is allowed
     if (process.env.NEXT_PUBLIC_ALLOW_INDEXING !== "true") {
