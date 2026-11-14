@@ -88,7 +88,7 @@ function getSafeRedirectUrl(targetPath: string, request: NextRequest): URL {
         let baseHost = "";
         const u = process.env.BASE_URL || process.env.NEXTAUTH_URL;
         if (u) { try { baseHost = new URL(u).host; } catch {} }
-        host = process.env.RAILWAY_PUBLIC_DOMAIN || baseHost || "solewhat-production-33f6.up.railway.app";
+        host = process.env.PUBLIC_DOMAIN || process.env.RAILWAY_PUBLIC_DOMAIN || baseHost || "wa.solewhat.store";
     }
 
     const proto = (host.includes("localhost") || host.includes("127.0.0.1"))

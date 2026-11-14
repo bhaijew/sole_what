@@ -756,7 +756,7 @@ export async function onMessageReceived(sessionId: string, message: any, existin
                                     // Resolve relative image URLs (e.g. /api/uploads/...) to absolute URLs for Baileys WhatsApp client
                                     const resolvedImageMatches = imageMatches.map((u) => {
                                         if (u.startsWith("http://") || u.startsWith("https://")) return u;
-                                        const base = process.env.NEXTAUTH_URL || process.env.BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "https://solewhat-production-33f6.up.railway.app");
+                                        const base = process.env.NEXTAUTH_URL || process.env.BASE_URL || (process.env.PUBLIC_DOMAIN ? `https://${process.env.PUBLIC_DOMAIN}` : (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : "https://wa.solewhat.store"));
                                         const cleanBase = base.replace(/\/+$/, "");
                                         return `${cleanBase}${u.startsWith("/") ? "" : "/"}${u}`;
                                     });
