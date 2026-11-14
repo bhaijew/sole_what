@@ -1,8 +1,25 @@
 'use client';
 
 import React from 'react';
-import { AlertOctagon, RotateCcw } from 'lucide-react';
-import '@/app/globals.css';
+
+function AlertIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+function RotateIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
 
 export default function GlobalError({
   error,
@@ -12,45 +29,27 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background text-foreground antialiased flex items-center justify-center p-4 sm:p-6 md:p-8" suppressHydrationWarning>
-        <div className="w-full max-w-lg bg-background/50 backdrop-blur-3xl border border-destructive/20 shadow-2xl shadow-destructive/5 rounded-3xl p-8 sm:p-12 flex flex-col items-center relative overflow-hidden" suppressHydrationWarning>
-          {/* Glow Effect behind the card content */}
-          <div className="absolute inset-0 bg-gradient-to-b from-destructive/10 to-transparent pointer-events-none" suppressHydrationWarning />
-          
-          {/* Decorative Icon */}
-          <div className="relative w-24 h-24 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-8 ring-8 ring-destructive/5" suppressHydrationWarning>
-            <AlertOctagon className="size-12 animate-pulse" />
+    <html lang="en">
+      <body style={{ minHeight: '100vh', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', backgroundColor: '#0f172a', color: '#f8fafc' }}>
+        <div style={{ maxWidth: '480px', width: '90%', padding: '2rem', textAlign: 'center', backgroundColor: '#1e293b', borderRadius: '1rem', border: '1px solid #334155' }}>
+          <div style={{ display: 'inline-flex', padding: '1rem', borderRadius: '50%', backgroundColor: '#ef444420', color: '#ef4444', marginBottom: '1.5rem' }}>
+            <AlertIcon className="w-12 h-12" />
           </div>
-
-          {/* Text Content */}
-          <div className="relative text-center mb-10 w-full" suppressHydrationWarning>
-            <h1 className="text-5xl font-black tracking-tight text-destructive mb-3 drop-shadow-sm" suppressHydrationWarning>
-              Fatal Error
-            </h1>
-            <h2 className="text-xl font-bold text-foreground mb-4" suppressHydrationWarning>
-              Sistem Mengalami Kendala Kritis
-            </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-sm mx-auto" suppressHydrationWarning>
-              Aplikasi mengalami kesalahan pada konfigurasi dasar. Silakan muat ulang sistem.
-            </p>
-          </div>
-
-          {/* Action */}
-          <div className="relative w-full flex flex-col sm:flex-row gap-4" suppressHydrationWarning>
-            <button
-              onClick={() => reset()}
-              className="w-full flex-1 flex items-center justify-center gap-2 h-12 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-medium rounded-xl transition-all shadow-lg shadow-destructive/20 active:scale-95 duration-150"
-            >
-              <RotateCcw className="size-4" />
-              <span>Muat Ulang Aplikasi</span>
-            </button>
-          </div>
-
-          {error.digest && (
-            <div className="relative mt-8 text-[11px] text-muted-foreground font-mono bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-border/30 w-full text-center break-all" suppressHydrationWarning>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: '#ef4444' }}>Fatal Error</h1>
+          <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
+            An unexpected error occurred. Please try reloading the application.
+          </p>
+          <button
+            onClick={() => reset()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '0.75rem', fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem' }}
+          >
+            <RotateIcon />
+            <span>Reload Application</span>
+          </button>
+          {error?.digest && (
+            <p style={{ marginTop: '1.5rem', fontSize: '0.75rem', color: '#64748b', wordBreak: 'break-all' }}>
               Digest ID: {error.digest}
-            </div>
+            </p>
           )}
         </div>
       </body>
