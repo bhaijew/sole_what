@@ -38,4 +38,4 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
-CMD ["sh", "-c", "node scripts/sync-db-provider.js && npx prisma generate && npx prisma db push && node scripts/setup-admin.js && node node_modules/tsx/dist/cli.mjs src/server/index.ts"]
+CMD ["sh", "-c", "node scripts/sync-db-provider.js && ./node_modules/.bin/prisma generate && ./node_modules/.bin/prisma db push && node scripts/setup-admin.js && node node_modules/tsx/dist/cli.mjs src/server/index.ts"]
