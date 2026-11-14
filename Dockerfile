@@ -7,7 +7,8 @@ COPY package*.json ./
 COPY .npmrc ./
 COPY patches ./patches/
 COPY prisma ./prisma/
-ENV NODE_ENV=development
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm ci --include=dev --legacy-peer-deps && npm cache clean --force
 
 # Source & build
