@@ -1,5 +1,5 @@
 FROM node:22-alpine AS builder
-RUN apk add --no-cache openssl ca-certificates
+RUN apk add --no-cache openssl ca-certificates libc6-compat git patch
 WORKDIR /app
 
 # Dependency layer — cache-friendly: only rerun when package*.json changes
@@ -19,7 +19,7 @@ RUN npm prune --omit=dev --legacy-peer-deps && npm install --no-save --legacy-pe
 
 # Production image
 FROM node:22-alpine AS runner
-RUN apk add --no-cache openssl ca-certificates
+RUN apk add --no-cache openssl ca-certificates libc6-compat
 WORKDIR /app
 
 COPY --from=builder /app/package*.json ./
