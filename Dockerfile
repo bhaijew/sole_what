@@ -7,7 +7,8 @@ COPY package*.json ./
 COPY .npmrc ./
 COPY patches ./patches/
 COPY prisma ./prisma/
-RUN npm ci --legacy-peer-deps && npm cache clean --force
+ENV NODE_ENV=development
+RUN npm ci --include=dev --legacy-peer-deps && npm cache clean --force
 
 # Source & build
 COPY . .

@@ -69,6 +69,7 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "wa-sticker-formatter": "^1.6.0",
+    "patch-package": "^6.0.7",
     "zod": "^4.3.5"
   },
   "devDependencies": {
@@ -82,7 +83,6 @@
     "eslint": "^9",
     "eslint-config-next": "^14.2.35",
     "next-swagger-doc": "^0.4.1",
-    "patch-package": "^6.0.7",
     "postinstall-postinstall": "^2.1.0",
     "prisma": "^5.22.0",
     "swagger-ui-react": "^5.31.0",
