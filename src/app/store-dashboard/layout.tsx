@@ -10,14 +10,22 @@ export const metadata = {
     description: "All-in-one Store Management Command Center for WhatsApp E-Commerce, POS billing, shipping labels, and abandoned cart recovery."
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function StoreDashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const session = await auth();
-    // @ts-ignore
-    const systemConfig = await prisma.systemConfig.findUnique({ where: { id: "default" } });
+    let session = null;
+    let systemConfig = null;
+    try {
+        session = await auth();
+        // @ts-ignore
+        systemConfig = await prisma.systemConfig.findUnique({ where: { id: "default" } });
+    } catch (e) {
+        // Safe fallback during build or when DB is initializing
+    }
     const appName = systemConfig?.appName || process.env.APP_NAME || "SoleWhat";
 
     return (

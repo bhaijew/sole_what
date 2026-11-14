@@ -10,14 +10,22 @@ import { Toaster } from "sonner";
 import pkg from "../../../package.json";
 
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const session = await auth();
-    // @ts-ignore
-    const systemConfig = await prisma.systemConfig.findUnique({ where: { id: "default" } });
+    let session = null;
+    let systemConfig = null;
+    try {
+        session = await auth();
+        // @ts-ignore
+        systemConfig = await prisma.systemConfig.findUnique({ where: { id: "default" } });
+    } catch (e) {
+        // Safe fallback during build or when DB is initializing
+    }
     const appName = systemConfig?.appName || process.env.APP_NAME || "SoleWhat";
     const registrationEnabled = systemConfig?.enableRegistration ?? false;
 
