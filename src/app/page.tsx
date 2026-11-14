@@ -61,47 +61,93 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-hidden bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground">
-      {/* Floating Glass Navbar */}
-      <header className="fixed top-4 inset-x-4 md:inset-x-auto md:top-6 md:left-1/2 md:-translate-x-1/2 z-50 md:w-full md:max-w-6xl transition-all duration-300">
-        <div className="glass rounded-full px-4 md:px-8 h-14 md:h-16 flex items-center justify-between mx-auto shadow-xl shadow-black/5 dark:shadow-black/20 border border-white/40 dark:border-white/10 backdrop-blur-xl">
-          <Link href="/" className="flex items-center gap-2.5 font-bold text-xl group">
-            <div className="relative flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-primary text-white shadow-md shadow-primary/25 transition-transform group-hover:scale-105">
-              <Bot className="h-5 w-5 md:h-6 md:w-6" />
-              <div className="absolute inset-0 rounded-2xl bg-primary blur-md -z-10 opacity-50" />
+      {/* DeepSeek Harness Style Header */}
+      <header className="fixed top-0 inset-x-0 z-50 w-full bg-[#0d1726]/95 dark:bg-[#0a121f]/95 backdrop-blur-xl border-b border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.3)] transition-all">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+          {/* Left Brand: deepseek HARNESS Preview style */}
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-sm shadow-sky-500/30 transition-transform group-hover:scale-105">
+              <Bot className="h-4 w-4" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-foreground font-black tracking-tight leading-none text-lg">SoleWhat</span>
-              <span className="text-[10px] text-primary font-semibold tracking-wider uppercase">WA Engine</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[17px] font-bold tracking-tight text-white font-sans lowercase">solewhat</span>
+              <span className="px-1.5 py-[1.5px] text-[9px] font-black tracking-wider uppercase text-white border border-white/70 rounded bg-white/[0.06] leading-none">
+                HARNESS
+              </span>
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 text-[10px] font-medium text-slate-300/80 bg-white/[0.06] border border-white/[0.08] rounded-full">
+                Preview
+              </span>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/dukaan" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 transition-colors flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <Store className="h-3.5 w-3.5" />
+          {/* Center Navigation Links */}
+          <nav className="hidden md:flex items-center gap-1.5 lg:gap-2">
+            <Link
+              href="/dukaan"
+              className="text-xs font-medium text-slate-200 hover:text-white flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] transition-all mr-1"
+            >
+              <Store className="h-3.5 w-3.5 text-emerald-400" />
               <span>Dukaan Directory</span>
             </Link>
-            <Link href="#features" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">Features</Link>
-            <Link href="#ai-bot" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">AI Responder</Link>
-            <Link href="#ecommerce" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">E-Commerce Alerts</Link>
-            <Link href="#use-cases" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">Use Cases</Link>
-            <Link href="/docs" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">API Docs</Link>
+            <Link
+              href="#features"
+              className="text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1 rounded-md hover:bg-white/[0.05] transition-colors"
+            >
+              Features
+            </Link>
+            <Link
+              href="#ai-bot"
+              className="text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1 rounded-md hover:bg-white/[0.05] transition-colors"
+            >
+              AI Responder
+            </Link>
+            <Link
+              href="#ecommerce"
+              className="text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1 rounded-md hover:bg-white/[0.05] transition-colors"
+            >
+              E-Commerce Alerts
+            </Link>
+            <Link
+              href="#use-cases"
+              className="text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1 rounded-md hover:bg-white/[0.05] transition-colors"
+            >
+              Use Cases
+            </Link>
+            <Link
+              href="/docs"
+              className="text-xs font-medium text-slate-300 hover:text-white px-2.5 py-1 rounded-md hover:bg-white/[0.05] transition-colors"
+            >
+              API Docs
+            </Link>
           </nav>
 
-          <div className="flex items-center gap-2.5">
-            <Link href="#create-store">
-              <Button size="sm" className="rounded-full px-4 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer">
-                <Store className="h-3.5 w-3.5" />
-                <span>Create Store</span>
-              </Button>
-            </Link>
+          {/* Right Action Buttons */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
             <Link href="/auth/login">
-              <Button size="sm" variant="ghost" className="rounded-full px-3.5 text-xs font-semibold text-foreground hover:bg-muted">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="rounded-full px-3 h-8 text-xs font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+              >
                 Sign In
               </Button>
             </Link>
             <Link href="/dashboard">
-              <Button size="sm" variant="outline" className="rounded-full px-3.5 text-xs font-bold border-border/80 hover:bg-muted">
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full px-3.5 h-8 text-xs font-medium text-slate-200 hover:text-white bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] transition-all shadow-sm"
+              >
                 Dashboard
+              </Button>
+            </Link>
+            <Link href="#create-store">
+              <Button
+                size="sm"
+                className="rounded-full px-3.5 sm:px-4 h-8 text-xs font-semibold bg-white hover:bg-slate-100 text-slate-900 border border-white shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Store className="h-3.5 w-3.5 text-slate-900" />
+                <span>Create Store</span>
               </Button>
             </Link>
           </div>
