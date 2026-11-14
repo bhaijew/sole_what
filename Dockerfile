@@ -1,4 +1,4 @@
-FROM node:22-slim AS builder
+FROM node:25-slim AS builder
 RUN apt-get update && apt-get install -y openssl ca-certificates git patch && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN node scripts/sync-db-provider.js && npx prisma generate && npm run build
 RUN npm prune --omit=dev --legacy-peer-deps && npm install --no-save --legacy-peer-deps tsx typescript
 
 # Production image
-FROM node:22-slim AS runner
+FROM node:25-slim AS runner
 RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
