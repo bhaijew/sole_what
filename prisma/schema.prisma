@@ -50,6 +50,8 @@ model User {
   notifications Notification[]
   sessionAccesses SessionAccess[]
   stores        Store[]
+  clientHuntingConfig ClientHuntingConfig?
+  clientLeads         ClientLead[]
 }
 
 model Session {
@@ -656,4 +658,52 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
 }
+
+// ── Client Hunting & Google Maps Automation ─────────────────────────
+
+model ClientHuntingConfig {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId      String?
+  isEnabled      Boolean  @default(true)
+  scheduleTime   String   @default("09:00")
+  targetNiche    String   @default("Restaurants, Salons, Clinics, Gyms")
+  targetCity     String   @default("Lahore")
+  dailyLeadLimit Int      @default(15)
+  pitchTemplate  String   @default("Assalam-o-Alaikum {business_name}! I noticed your business on Google in {city} but saw that you don't have an official website yet. A website can easily help you get 2x-3x more customers. Would you be open to a quick 2-minute demo preview?") @db.Text
+  autoSendPitch  Boolean  @default(false)
+  googleApiKey   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ClientLead {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName  String
+  phone         String
+  cleanPhone    String
+  address       String?   @db.Text
+  city          String?
+  category      String?
+  rating        Float?
+  reviewCount   Int?      @default(0)
+  website       String?
+  googleMapsUrl String?   @db.Text
+  status        String    @default("FOUND")
+  pitchSentAt   DateTime?
+  pitchContent  String?   @db.Text
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([cleanPhone])
+  @@index([status])
+  @@index([city])
+  @@index([createdAt])
+}
+
 

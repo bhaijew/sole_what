@@ -83,8 +83,9 @@ app.prepare().then(() => {
   waManager.setup(io);
   waManager.loadSessions();
 
-  // Start Scheduler
+  // Start Schedulers
   import("../modules/whatsapp/scheduler").then(m => m.startScheduler());
+  import("../lib/lead-hunter/cron").then(m => m.startLeadHunterScheduler());
 
   // Reverse proxy / Railway / Cloudflare fix:
   // Node.js documentation mandates: headersTimeout MUST be strictly greater than keepAliveTimeout.

@@ -33,7 +33,8 @@ import {
     Sparkles,
     Repeat,
     Globe,
-    Store
+    Store,
+    Compass
 } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import {
@@ -86,6 +87,7 @@ const navGroups: NavGroup[] = [
     {
         label: "Automation",
         items: [
+            { href: "/dashboard/client-hunting", label: "Client Hunting (Maps)", icon: Compass },
             { href: "/dashboard/connect-website", label: "Connect Website", icon: Globe, superadminOnly: true },
             { href: "/dashboard/bot-settings", label: "Bot Settings", icon: Bot },
             { href: "/dashboard/ai-bot", label: "AI Auto-Responder", icon: Sparkles, allowedRoles: ["SUPERADMIN", "OWNER"] },
