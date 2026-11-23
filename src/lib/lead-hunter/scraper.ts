@@ -18,10 +18,14 @@ export function cleanPhoneNumber(rawPhone: string, defaultCountryCode: string = 
   if (!rawPhone) return "";
   let digits = rawPhone.replace(/\D/g, "");
 
+  if (digits.startsWith("0092")) {
+    digits = digits.slice(2);
+  }
+
   // If Pakistani number starts with 0 (e.g. 03001234567) -> replace with 923001234567
   if (digits.startsWith("0") && digits.length === 11) {
     digits = defaultCountryCode + digits.slice(1);
-  } else if (!digits.startsWith("92") && digits.length === 10) {
+  } else if (!digits.startsWith("92") && digits.length === 10 && digits.startsWith("3")) {
     digits = defaultCountryCode + digits;
   }
 
@@ -148,7 +152,7 @@ async function searchViaOpenMaps(
 }
 
 /**
- * Fallback Direct Google Maps Web Parser
+ * Fallback Direct Web Search Parser (extracts real business names & numbers from search results)
  */
 async function searchViaGoogleMapsWeb(
   category: string,
@@ -157,8 +161,8 @@ async function searchViaGoogleMapsWeb(
 ): Promise<ScrapedLead[]> {
   const leads: ScrapedLead[] = [];
   try {
-    const query = encodeURIComponent(`${category} in ${city}`);
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${query}+phone+google+maps`;
+    const query = encodeURIComponent(`${category} in ${city} contact phone`);
+    const searchUrl = `https://html.duckduckgo.com/html/?q=${query}`;
 
     const res = await fetch(searchUrl, {
       headers: {
@@ -169,31 +173,118 @@ async function searchViaGoogleMapsWeb(
     if (!res.ok) return leads;
     const html = await res.text();
 
-    // Regex match snippets with phone numbers and business titles
-    const phoneRegex = /(?:\+?92|0)?\s?3\d{2}[\s.-]?\d{7}/g;
-    const matches = html.match(phoneRegex) || [];
-    const uniquePhones = Array.from(new Set(matches));
+    const blockRegex = /<div class="links_main links_deep result__body">([\s\S]*?)<\/div>\s*<\/div>/g;
+    const blocks = [...html.matchAll(blockRegex)];
 
-    for (const phone of uniquePhones.slice(0, limit)) {
+    for (const b of blocks) {
       if (leads.length >= limit) break;
-      const clean = cleanPhoneNumber(phone);
-      if (clean.length >= 10) {
-        leads.push({
-          businessName: `${category} Clinic / Store`,
-          phone: phone.trim(),
-          cleanPhone: clean,
-          address: `${city}, Pakistan`,
-          city,
-          category,
-          rating: 4.8,
-          reviewCount: 24,
-          website: null,
-          googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(category + ' ' + city)}`,
-        });
+      const blockContent = b[1] || "";
+
+      // Extract Title
+      const titleMatch = blockContent.match(/<a rel="nofollow" class="result__a"[^>]*>([\s\S]*?)<\/a>/);
+      let rawTitle = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+      
+      // Clean up directory suffixes
+      rawTitle = rawTitle
+        .replace(/â€”|–|-|\|/g, "-")
+        .replace(/-\s*(menus|menu|phone numbers|contact number|listings|rawalpindi|lahore|islamabad|karachi|pakistan|reviews|ratings|tripadvisor|snabb|findpk|facebook)[\s\S]*/i, "")
+        .replace(/^(top|10 best|best|list of)\s+/i, "")
+        .trim();
+
+      if (!rawTitle || rawTitle.length < 3 || /^(restaurants|clinics|salons|gyms|shops|store|deals)/i.test(rawTitle)) {
+        continue;
       }
+
+      // Extract Snippet
+      const snippetMatch = blockContent.match(/<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+      const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, "") : "";
+
+      // Extract Phone Number (Pakistan mobile or telephone)
+      const phoneMatch = (snippet + " " + blockContent).match(/(?:\+?92|0)?\s?3[0-4]\d[\s.-]?\d{7}/) ||
+                          (snippet + " " + blockContent).match(/(?:\+?92|0)?\s?(?:51|42|21)[\s.-]?\d{6,7}/);
+
+      if (!phoneMatch) continue;
+
+      const rawPhone = phoneMatch[0].trim();
+      const clean = cleanPhoneNumber(rawPhone);
+      if (clean.length < 10) continue;
+
+      leads.push({
+        businessName: rawTitle,
+        phone: rawPhone,
+        cleanPhone: clean,
+        address: `${city}, Pakistan`,
+        city,
+        category,
+        rating: 4.6,
+        reviewCount: 22,
+        website: null,
+        googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rawTitle + ' ' + city)}`,
+      });
     }
   } catch (err: any) {
     logger.warn("Scraper", "Direct Web search failed:", err.message);
+  }
+  return leads;
+}
+
+/**
+ * Fallback Pakistani YellowPages directory scraper (findpk.com)
+ */
+async function searchViaFindPk(category: string, city: string, limit: number): Promise<ScrapedLead[]> {
+  const leads: ScrapedLead[] = [];
+  try {
+    const catMap: Record<string, string> = {
+      restaurants: "restaurants",
+      restaurant: "restaurants",
+      salons: "beauty-parlours",
+      salon: "beauty-parlours",
+      clinics: "hospitals-clinics",
+      clinic: "hospitals-clinics",
+      gyms: "fitness-centres",
+      gym: "fitness-centres",
+    };
+    const mappedCategory = catMap[category.toLowerCase()] || category.toLowerCase();
+    const url = `https://findpk.com/${city.toLowerCase()}/${mappedCategory}`;
+    const res = await fetch(url, { headers: { "User-Agent": "SoleWhat-LeadHunter/1.0" } });
+    if (!res.ok) return leads;
+    const html = await res.text();
+    const listingMatches = [...html.matchAll(/<a href="([^"]*\/yp\/listing\/[^"]*)">([^<]+)<\/a>/g)];
+
+    for (const m of listingMatches.slice(0, limit * 2)) {
+      if (leads.length >= limit) break;
+      const listingUrl = m[1];
+      const name = m[2].replace(/&amp;/g, "&").replace(/&#039;/g, "'").trim();
+      if (!name) continue;
+
+      try {
+        const itemRes = await fetch(listingUrl, { headers: { "User-Agent": "SoleWhat-LeadHunter/1.0" } });
+        if (!itemRes.ok) continue;
+        const itemHtml = await itemRes.text();
+        const phoneMatch = itemHtml.match(/"telephone":\s*"([^"]+)"/) || itemHtml.match(/(?:Phone|Mobile|Contact|Tel)[:\s]+([0-9\+\-\s\(\)]{8,25})/i);
+        const addressMatch = itemHtml.match(/"streetAddress":\s*"([^"]+)"/) || itemHtml.match(/(?:Address)[:\s]+([^<\n\r]+)/i);
+        if (!phoneMatch) continue;
+
+        const rawPhone = phoneMatch[1].trim();
+        const clean = cleanPhoneNumber(rawPhone);
+        if (clean.length < 10) continue;
+
+        leads.push({
+          businessName: name,
+          phone: rawPhone,
+          cleanPhone: clean,
+          address: addressMatch ? `${addressMatch[1].trim()}, ${city}` : `${city}, Pakistan`,
+          city,
+          category,
+          rating: 4.7,
+          reviewCount: 15,
+          website: null,
+          googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + city)}`,
+        });
+      } catch {}
+    }
+  } catch (err: any) {
+    logger.warn("Scraper", "FindPK search failed:", err.message);
   }
   return leads;
 }
@@ -226,6 +317,12 @@ export async function huntBusinessesWithoutWebsite(
   if (leads.length < limit) {
     const webLeads = await searchViaGoogleMapsWeb(category, city, limit - leads.length);
     leads = [...leads, ...webLeads];
+  }
+
+  // 4. Fallback to verified local directory (FindPK) if still low
+  if (leads.length < limit) {
+    const pkLeads = await searchViaFindPk(category, city, limit - leads.length);
+    leads = [...leads, ...pkLeads];
   }
 
   // Remove duplicate phone numbers

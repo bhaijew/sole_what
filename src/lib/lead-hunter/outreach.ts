@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { waManager } from "@/modules/whatsapp/manager";
+import { ChatService } from "@/modules/whatsapp/chat.service";
 import { logger } from "@/lib/logger";
 
 export interface SendPitchOptions {
@@ -42,11 +42,6 @@ export async function sendPitchToLead(options: SendPitchOptions): Promise<{ succ
       return { success: false, error: "No active WhatsApp session selected for outreach" };
     }
 
-    const instance = waManager.getInstance(sessionId);
-    if (!instance || !instance.socket) {
-      return { success: false, error: `WhatsApp session "${sessionId}" is not connected / active` };
-    }
-
     const template = options.customPitch || config?.pitchTemplate || "Assalam-o-Alaikum {business_name}! I saw your business on Google Maps in {city} but noticed you don't have a website yet. Would you be interested in having a modern website to double your orders?";
     const messageText = formatPitchTemplate(template, {
       business_name: lead.businessName,
@@ -57,10 +52,10 @@ export async function sendPitchToLead(options: SendPitchOptions): Promise<{ succ
 
     const targetJid = lead.cleanPhone.includes("@") ? lead.cleanPhone : `${lead.cleanPhone}@s.whatsapp.net`;
 
-    logger.info("Outreach", `Sending WhatsApp pitch to ${lead.businessName} (${targetJid})...`);
+    logger.info("Outreach", `Sending WhatsApp pitch to ${lead.businessName} (${targetJid}) via session ${sessionId}...`);
 
-    // Send WhatsApp Message via Baileys socket
-    await instance.socket.sendMessage(targetJid, { text: messageText });
+    // Send WhatsApp Message via ChatService (resolves session, validates socket, saves to DB, emits live events)
+    await ChatService.sendTextMessage(sessionId, targetJid, messageText);
 
     // Update Lead Status in Database
     await prisma.clientLead.update({
